@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, MessageCircle, ShoppingCart, Plus, Mic, MicOff, Sparkles } from 'lucide-react';
+import { Send, MessageCircle, ShoppingCart, Plus, Mic, MicOff, Sparkles, CheckCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useShoppingList } from '@/hooks/useShoppingList';
 import { toast } from 'sonner';
@@ -19,6 +19,12 @@ interface ChatMessage {
   created_at: string;
   household_id: string;
   sender_name?: string;
+}
+
+interface ReadReceipt {
+  user_id: string;
+  last_read_message_id: string;
+  last_read_at: string;
 }
 
 interface MentionTarget {
@@ -57,6 +63,7 @@ export default function ChatPage() {
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionCursorPos, setMentionCursorPos] = useState(0);
+  const [readReceipts, setReadReceipts] = useState<ReadReceipt[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -138,6 +145,59 @@ export default function ChatPage() {
       supabase.removeChannel(channel);
     };
   }, [household, members]);
+
+  // Fetch and subscribe to read receipts
+  useEffect(() => {
+    if (!household) return;
+
+    const fetchReceipts = async () => {
+      const { data } = await supabase
+        .from('chat_read_receipts')
+        .select('user_id, last_read_message_id, last_read_at')
+        .eq('household_id', household.id);
+      if (data) setReadReceipts(data);
+    };
+    void fetchReceipts();
+
+    const channel = supabase
+      .channel(`read-receipts-${household.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_read_receipts',
+        filter: `household_id=eq.${household.id}`,
+      }, (payload) => {
+        const updated = payload.new as any;
+        setReadReceipts(prev => {
+          const filtered = prev.filter(r => r.user_id !== updated.user_id);
+          return [...filtered, { user_id: updated.user_id, last_read_message_id: updated.last_read_message_id, last_read_at: updated.last_read_at }];
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [household]);
+
+  // Update own read receipt when messages change
+  useEffect(() => {
+    if (!household || !user || messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    // Don't mark own messages
+    const myReceipt = readReceipts.find(r => r.user_id === user.id);
+    if (myReceipt?.last_read_message_id === lastMsg.id) return;
+
+    const updateReceipt = async () => {
+      await supabase
+        .from('chat_read_receipts')
+        .upsert({
+          household_id: household.id,
+          user_id: user.id,
+          last_read_message_id: lastMsg.id,
+          last_read_at: new Date().toISOString(),
+        }, { onConflict: 'household_id,user_id' });
+    };
+    void updateReceipt();
+  }, [household, user, messages]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -462,8 +522,13 @@ export default function ChatPage() {
             </p>
           </div>
         ) : (
-          messages.map(msg => {
+          messages.map((msg, idx) => {
             const isMe = msg.user_id === user?.id;
+            // Find members whose last_read_message_id is THIS message (excluding sender)
+            const seenByUsers = readReceipts
+              .filter(r => r.last_read_message_id === msg.id && r.user_id !== msg.user_id)
+              .map(r => memberMap.get(r.user_id) || 'Someone');
+
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] group`}>
@@ -477,6 +542,11 @@ export default function ChatPage() {
                     <span className="text-[10px] text-muted-foreground">
                       {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                     </span>
+                    {isMe && (
+                      <span className="flex items-center gap-0.5">
+                        <CheckCheck className={`w-3 h-3 ${seenByUsers.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`} />
+                      </span>
+                    )}
                     <button
                       onClick={() => { setAddToListMsg(msg); setItemName(msg.content.slice(0, 50)); }}
                       className="text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-0.5"
@@ -484,6 +554,15 @@ export default function ChatPage() {
                       <ShoppingCart className="w-3 h-3" /> Add to list
                     </button>
                   </div>
+                  {/* Seen by indicator */}
+                  {seenByUsers.length > 0 && (
+                    <p className={`text-[9px] text-muted-foreground mt-0.5 px-1 ${isMe ? 'text-right' : 'text-left'}`}>
+                      Seen by {seenByUsers.length <= 3
+                        ? seenByUsers.join(', ')
+                        : `${seenByUsers.slice(0, 2).join(', ')} +${seenByUsers.length - 2}`
+                      }
+                    </p>
+                  )}
                 </div>
               </div>
             );

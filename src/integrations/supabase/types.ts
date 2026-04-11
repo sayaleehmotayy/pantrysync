@@ -84,6 +84,30 @@ export type Database = {
           },
         ]
       }
+      chat_read_receipts: {
+        Row: {
+          household_id: string
+          id: string
+          last_read_at: string
+          last_read_message_id: string
+          user_id: string
+        }
+        Insert: {
+          household_id: string
+          id?: string
+          last_read_at?: string
+          last_read_message_id: string
+          user_id: string
+        }
+        Update: {
+          household_id?: string
+          id?: string
+          last_read_at?: string
+          last_read_message_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       device_tokens: {
         Row: {
           created_at: string
