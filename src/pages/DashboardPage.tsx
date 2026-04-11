@@ -1,6 +1,6 @@
 import React from 'react';
 import { useInventory, InventoryItem } from '@/hooks/useInventory';
-import { useShoppingList } from '@/hooks/useShoppingList';
+import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
