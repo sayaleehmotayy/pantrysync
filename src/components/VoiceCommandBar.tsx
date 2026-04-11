@@ -203,7 +203,7 @@ export default function VoiceCommandBar() {
       setIsProcessing(false);
       setTranscript('');
     }
-  }, [inventory, executeActions]);
+  }, [inventory, shopping, executeActions]);
 
   const toggleListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
