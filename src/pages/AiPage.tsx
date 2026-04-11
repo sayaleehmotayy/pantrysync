@@ -121,7 +121,7 @@ export default function AiPage() {
                 <p className="text-sm">Analyzing your pantry...</p>
               </div>
             )}
-            </ScrollArea>
+            
           </CardContent>
         </Card>
 
