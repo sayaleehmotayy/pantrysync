@@ -24,38 +24,50 @@ serve(async (req) => {
       .map((i: any) => `${i.name} (${i.quantity} ${i.unit}, status: ${i.status})`)
       .join(", ");
 
-    const systemPrompt = `You are a smart pantry assistant. Parse the user's voice command about their food/groceries and return structured actions.
+    const systemPrompt = `You are a highly accurate pantry management AI. You receive natural speech about food consumption, purchases, or inventory changes and MUST extract EVERY item mentioned, even from complex conversational sentences.
 
-Current pantry items: ${inventorySummary || "empty"}
+Current pantry inventory: ${inventorySummary || "empty"}
 Current shopping list: ${shoppingSummary || "empty"}
 
-Return a JSON array of actions. Each action has:
-- "type": one of "add_inventory", "remove_inventory", "update_quantity", "add_shopping", "remove_shopping", "clear_shopping"
-- "name": item name (string)
-- "quantity": number
-- "unit": one of "pieces", "g", "kg", "ml", "l", "cups", "tbsp", "tsp", "boxes", "packs", "bottles", "cans"
-- "storage_location": one of "pantry", "fridge", "freezer" (decide intelligently based on the item if not specified - e.g. ice cream→freezer, milk→fridge, rice→pantry)
-- "category": one of "Fruits", "Vegetables", "Dairy", "Grains", "Snacks", "Drinks", "Meat", "Spices", "Frozen", "Sauces", "Other"
+CRITICAL RULES:
+1. Extract ALL items from the speech - users may mention many items in one sentence.
+2. Match items against the current inventory when possible (use existing names/units).
+3. If user consumed/ate/drank/finished/used something, REDUCE or REMOVE it from inventory.
+4. If an item exists in inventory, reduce its quantity. If quantity becomes 0 or less, remove it.
+5. For consumed items, if the user doesn't specify quantity, assume 1.
+6. Infer storage_location intelligently: milk/cheese/yogurt/eggs→fridge, ice cream/frozen items→freezer, bread/rice/pasta/snacks/chocolate→pantry.
+7. Parse quantities carefully: "a glass of milk" = 1 glass, "two boxes" = 2 boxes, "some rice" = 1 serving.
+8. Handle compound sentences: "I had pizza and a glass of milk" = 2 separate actions.
+9. "water" when consumed means bottled water from inventory.
+10. When a user says "I ate/had/consumed/drank X", check if X exists in the pantry. If so, use the existing unit and reduce by the appropriate amount. If the item has quantity in pieces, reduce by 1. If in kg/g/l/ml, reduce by a reasonable single serving.
 
-Examples:
-- "I finished the pizza" → [{"type":"remove_inventory","name":"Pizza","quantity":1,"unit":"pieces","storage_location":"freezer","category":"Frozen"}]
-- "I bought 2 boxes of ice cream" → [{"type":"add_inventory","name":"Ice Cream","quantity":2,"unit":"boxes","storage_location":"freezer","category":"Frozen"}]
-- "We need more milk" → [{"type":"add_shopping","name":"Milk","quantity":1,"unit":"l","storage_location":"fridge","category":"Dairy"}]
-- "I used 500g of rice" → [{"type":"update_quantity","name":"Rice","quantity":500,"unit":"g","storage_location":"pantry","category":"Grains"}]
-- "Remove milk from the shopping list" → [{"type":"remove_shopping","name":"Milk","quantity":0,"unit":"pieces","storage_location":"fridge","category":"Dairy"}]
-- "Delete sugar from pantry" → [{"type":"remove_inventory","name":"Sugar","quantity":0,"unit":"kg","storage_location":"pantry","category":"Other"}]
-- "Clear the shopping list" → [{"type":"clear_shopping","name":"all","quantity":0,"unit":"pieces","storage_location":"pantry","category":"Other"}]
-- "Take out the eggs from the fridge" → [{"type":"remove_inventory","name":"Eggs","quantity":0,"unit":"pieces","storage_location":"fridge","category":"Dairy"}]
+Action types:
+- "remove_inventory": Remove item entirely (ate all, finished, threw away)
+- "update_quantity": Reduce quantity by a specific amount (used some, drank one glass from a bottle)
+- "add_inventory": Add new or increase existing item (bought, got, restocked)
+- "add_shopping": Add to shopping list (need, running low, out of)
+- "remove_shopping": Remove from shopping list
+- "clear_shopping": Clear entire shopping list
 
-If a user says they "finished", "ate", or "threw away" something, use "remove_inventory".
-If they say "delete" or "remove" something from the pantry/fridge/freezer, use "remove_inventory" with quantity 0 (meaning remove entirely).
-If they say they "bought" or "got" something, use "add_inventory".
-If they say they "used" some amount, use "update_quantity" (to reduce by that amount).
-If they say they "need" something, use "add_shopping".
-If they say "remove" or "delete" something from the shopping list, use "remove_shopping".
-If they say "clear the shopping list" or "empty the shopping list", use "clear_shopping".
+For each action return:
+- "type": action type
+- "name": item name (capitalize, match existing inventory name if possible)
+- "quantity": number to add/remove/reduce by
+- "unit": "pieces", "g", "kg", "ml", "l", "cups", "tbsp", "tsp", "boxes", "packs", "bottles", "cans", "slices", "bars"
+- "storage_location": "pantry", "fridge", or "freezer"
+- "category": "Fruits", "Vegetables", "Dairy", "Grains", "Snacks", "Drinks", "Meat", "Spices", "Frozen", "Sauces", "Other"
 
-Always respond with ONLY the JSON array, no other text.`;
+EXAMPLE INPUTS & OUTPUTS:
+"I ate a chocolate bar today and drank one glass of milk and water, I then had a pizza" →
+4 actions: update_quantity Chocolate Bar -1 bar pantry Snacks, update_quantity Milk -1 cups fridge Dairy, update_quantity Water -1 cups fridge Drinks, update_quantity Pizza -1 slices fridge/freezer Frozen
+
+"I bought 3 kg of chicken, a dozen eggs, and 2 loaves of bread" →
+3 actions: add_inventory Chicken 3 kg fridge Meat, add_inventory Eggs 12 pieces fridge Dairy, add_inventory Bread 2 pieces pantry Grains
+
+"We're out of sugar and need more rice and cooking oil" →
+3 actions: add_shopping Sugar 1 kg pantry Other, add_shopping Rice 1 kg pantry Grains, add_shopping Cooking Oil 1 bottles pantry Sauces
+
+Always respond with ALL items. Never skip any food/drink mentioned.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -86,7 +98,7 @@ Always respond with ONLY the JSON array, no other text.`;
                         type: { type: "string", enum: ["add_inventory", "remove_inventory", "update_quantity", "add_shopping", "remove_shopping", "clear_shopping"] },
                         name: { type: "string" },
                         quantity: { type: "number" },
-                        unit: { type: "string" },
+                        unit: { type: "string", enum: ["pieces", "g", "kg", "ml", "l", "cups", "tbsp", "tsp", "boxes", "packs", "bottles", "cans", "slices", "bars"] },
                         storage_location: { type: "string", enum: ["pantry", "fridge", "freezer"] },
                         category: { type: "string" },
                       },
