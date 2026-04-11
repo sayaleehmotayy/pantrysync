@@ -256,10 +256,10 @@ serve(async (req) => {
                 },
                 android: {
                   priority: "high",
-                  notification: {
-                    sound: "default",
-                    channel_id: "default",
-                  },
+                    notification: {
+                      sound: "default",
+                      channel_id: "mentions",
+                    },
                 },
                 apns: {
                   payload: {
