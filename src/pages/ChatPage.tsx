@@ -525,9 +525,16 @@ export default function ChatPage() {
           messages.map((msg, idx) => {
             const isMe = msg.user_id === user?.id;
             // Find members whose last_read_message_id is THIS message (excluding sender)
-            const seenByUsers = readReceipts
+            const seenByMembers = readReceipts
               .filter(r => r.last_read_message_id === msg.id && r.user_id !== msg.user_id)
-              .map(r => memberMap.get(r.user_id) || 'Someone');
+              .map(r => {
+                const member = members.find(m => m.user_id === r.user_id);
+                return {
+                  userId: r.user_id,
+                  name: memberMap.get(r.user_id) || 'Someone',
+                  avatar: member?.profile?.avatar_url || null,
+                };
+              });
 
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -544,7 +551,7 @@ export default function ChatPage() {
                     </span>
                     {isMe && (
                       <span className="flex items-center gap-0.5">
-                        <CheckCheck className={`w-3 h-3 ${seenByUsers.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`} />
+                        <CheckCheck className={`w-3 h-3 ${seenByMembers.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`} />
                       </span>
                     )}
                     <button
@@ -554,14 +561,30 @@ export default function ChatPage() {
                       <ShoppingCart className="w-3 h-3" /> Add to list
                     </button>
                   </div>
-                  {/* Seen by indicator */}
-                  {seenByUsers.length > 0 && (
-                    <p className={`text-[9px] text-muted-foreground mt-0.5 px-1 ${isMe ? 'text-right' : 'text-left'}`}>
-                      Seen by {seenByUsers.length <= 3
-                        ? seenByUsers.join(', ')
-                        : `${seenByUsers.slice(0, 2).join(', ')} +${seenByUsers.length - 2}`
-                      }
-                    </p>
+                  {/* Seen-by avatars */}
+                  {seenByMembers.length > 0 && (
+                    <div className={`flex items-center mt-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <div className="flex -space-x-1.5">
+                        {seenByMembers.slice(0, 5).map((m) => (
+                          <div
+                            key={m.userId}
+                            className="w-4 h-4 rounded-full border-[1.5px] border-card overflow-hidden bg-primary/10 flex items-center justify-center animate-fade-in"
+                            title={m.name}
+                          >
+                            {m.avatar ? (
+                              <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[7px] font-bold text-primary leading-none">
+                                {m.name.charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {seenByMembers.length > 5 && (
+                        <span className="text-[9px] text-muted-foreground ml-1">+{seenByMembers.length - 5}</span>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
