@@ -54,7 +54,7 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Sonner />
+      <Sonner position="top-center" />
       <BrowserRouter>
         <AuthProvider>
           <HouseholdProvider>
