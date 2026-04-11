@@ -81,6 +81,8 @@ export default function RecipesPage() {
           ))}
         </SelectContent>
       </Select>
+
+      {recipesLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">Loading recipes...</div>
       ) : displayRecipes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
