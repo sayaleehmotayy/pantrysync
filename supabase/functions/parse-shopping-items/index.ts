@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const { message } = await req.json();
-    if (!message || typeof message !== "string" || message.length > 1000) {
+    if (!message || typeof message !== "string" || message.length > 2000) {
       return new Response(JSON.stringify({ items: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -33,9 +33,21 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a shopping list parser. Given a chat message, extract grocery/shopping items if the user intends to add them to a shopping list. 
+            content: `You are a smart shopping list parser for a household pantry app.
+
+Given a chat message, extract grocery/shopping items the user wants to add.
 Only extract items when the message clearly indicates adding to a shopping list (e.g. "add X to the list", "buy X", "we need X", "get X from the store", "add X to shopping list").
 If the message is just casual conversation with no shopping intent, return NO items.
+
+IMPORTANT RULES:
+1. **Extract the correct unit**: If the user says "500 milliliters" or "500ml", set quantity to 500 and unit to "ml". If they say "2 kg", set quantity to 2 and unit to "kg". If they say "3 bottles", set quantity to 3 and unit to "bottles". Default to "pieces" only if no unit is mentioned.
+2. **Smart serving estimation**: If the user says something like "enough ketchup to serve 40 people" or "enough rice for 10 people", estimate a realistic quantity and unit based on common serving sizes. For example:
+   - "enough ketchup for 40 people" → ~2 bottles (500ml each) → name: "ketchup", quantity: 2, unit: "bottles"
+   - "enough rice for 10 people" → ~2 kg → name: "rice", quantity: 2, unit: "kg"
+   - "enough milk for 20 people" → ~4 liters → name: "milk", quantity: 4, unit: "l"
+   Use practical, store-buyable quantities and common packaging sizes.
+3. **Keep item names clean and singular**: "chocolate ice cream" not "chocolate ice cream 500 milliliters". The quantity and unit should be separate fields.
+
 Use the provided tool to return structured data.`,
           },
           { role: "user", content: message },
@@ -45,7 +57,7 @@ Use the provided tool to return structured data.`,
             type: "function",
             function: {
               name: "extract_shopping_items",
-              description: "Extract shopping items from a message",
+              description: "Extract shopping items from a message with proper quantity, unit, and category",
               parameters: {
                 type: "object",
                 properties: {
@@ -54,14 +66,19 @@ Use the provided tool to return structured data.`,
                     items: {
                       type: "object",
                       properties: {
-                        name: { type: "string", description: "Product name e.g. apples, milk, bread" },
-                        quantity: { type: "number", description: "How many, default 1" },
+                        name: { type: "string", description: "Clean product name e.g. apples, milk, bread (no quantities or units in the name)" },
+                        quantity: { type: "number", description: "Numeric quantity e.g. 500 for 500ml, 2 for 2 bottles, 1 if unspecified" },
+                        unit: { 
+                          type: "string", 
+                          description: "Unit of measurement",
+                          enum: ["pieces", "g", "kg", "ml", "l", "cups", "tbsp", "tsp", "bottles", "packets"]
+                        },
                         category: {
                           type: "string",
-                          enum: ["Fruits", "Vegetables", "Dairy", "Grains", "Snacks", "Drinks", "Meat", "Spices", "Other"],
+                          enum: ["Fruits", "Vegetables", "Dairy", "Grains", "Snacks", "Drinks", "Meat", "Spices", "Frozen", "Sauces", "Other"],
                         },
                       },
-                      required: ["name", "quantity", "category"],
+                      required: ["name", "quantity", "unit", "category"],
                       additionalProperties: false,
                     },
                   },
