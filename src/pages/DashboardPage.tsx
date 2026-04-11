@@ -61,6 +61,9 @@ export default function DashboardPage() {
         <div className="absolute -right-2 -bottom-4 w-20 h-20 rounded-full bg-accent/10 blur-xl" />
       </div>
 
+      {/* AI Voice Command Bar */}
+      <VoiceCommandBar />
+
       {/* Quick actions */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         <Button size="sm" onClick={() => navigate('/pantry')} className="rounded-full gap-1.5 flex-shrink-0 shadow-sm transition-all duration-200 active:scale-95">
