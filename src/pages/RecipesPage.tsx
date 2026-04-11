@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ChefHat, Clock, Users, Plus, Check, X, AlertCircle, Sparkles } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ChefHat, Clock, Users, Plus, Check, X, AlertCircle, Sparkles, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 
 function MatchBadge({ pct }: { pct: number }) {
@@ -20,13 +21,19 @@ export default function RecipesPage() {
   const { addItem: addShoppingItem } = useShoppingList();
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeMatch | null>(null);
   const [showMatching, setShowMatching] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  const MEAL_TYPES = useMemo(() => {
+    const cats = new Set(recipes.map(r => r.category || 'Other'));
+    return ['all', ...Array.from(cats).sort()];
+  }, [recipes]);
 
   const matched = useMemo(() => {
     if (!showMatching) return null;
     return matchRecipes(recipes, inventory);
   }, [recipes, inventory, showMatching]);
 
-  const displayRecipes = matched || recipes.map(r => ({
+  const displayRecipes = (matched || recipes.map(r => ({
     recipe: r,
     ingredients: r.ingredients,
     matches: [],
@@ -35,7 +42,7 @@ export default function RecipesPage() {
     missingIngredients: [],
     insufficientIngredients: [],
     availableIngredients: [],
-  } as RecipeMatch));
+  } as RecipeMatch))).filter(m => categoryFilter === 'all' || m.recipe.category === categoryFilter);
 
   const addMissingToShoppingList = (match: RecipeMatch) => {
     const missing = [...match.missingIngredients, ...match.insufficientIngredients];
@@ -60,6 +67,20 @@ export default function RecipesPage() {
           {showMatching ? 'Matching On' : 'Match Pantry'}
         </Button>
       </div>
+
+      <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+        <SelectTrigger className="w-full">
+          <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+          <SelectValue placeholder="Filter by meal type" />
+        </SelectTrigger>
+        <SelectContent>
+          {MEAL_TYPES.map(cat => (
+            <SelectItem key={cat} value={cat}>
+              {cat === 'all' ? 'All Categories' : cat}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       {recipesLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">Loading recipes...</div>
