@@ -54,7 +54,12 @@ export function useShoppingList() {
 
   const updateItem = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ShoppingItem> & { id: string }) => {
-      const item = qc.getQueryData<ShoppingItem[]>(['shopping', household?.id])?.find(i => i.id === id);
+      // Fetch fresh item from DB to avoid stale cache issues
+      const { data: item } = await supabase
+        .from('shopping_list_items')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
       // Handle partial buy: add bought qty to pantry, reduce shopping item to remainder
       if (updates.status === 'partial' && household && user && item) {
