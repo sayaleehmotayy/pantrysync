@@ -522,8 +522,13 @@ export default function ChatPage() {
             </p>
           </div>
         ) : (
-          messages.map(msg => {
+          messages.map((msg, idx) => {
             const isMe = msg.user_id === user?.id;
+            // Find members whose last_read_message_id is THIS message (excluding sender)
+            const seenByUsers = readReceipts
+              .filter(r => r.last_read_message_id === msg.id && r.user_id !== msg.user_id)
+              .map(r => memberMap.get(r.user_id) || 'Someone');
+
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] group`}>
@@ -537,6 +542,11 @@ export default function ChatPage() {
                     <span className="text-[10px] text-muted-foreground">
                       {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                     </span>
+                    {isMe && (
+                      <span className="flex items-center gap-0.5">
+                        <CheckCheck className={`w-3 h-3 ${seenByUsers.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`} />
+                      </span>
+                    )}
                     <button
                       onClick={() => { setAddToListMsg(msg); setItemName(msg.content.slice(0, 50)); }}
                       className="text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-0.5"
@@ -544,6 +554,15 @@ export default function ChatPage() {
                       <ShoppingCart className="w-3 h-3" /> Add to list
                     </button>
                   </div>
+                  {/* Seen by indicator */}
+                  {seenByUsers.length > 0 && (
+                    <p className={`text-[9px] text-muted-foreground mt-0.5 px-1 ${isMe ? 'text-right' : 'text-left'}`}>
+                      Seen by {seenByUsers.length <= 3
+                        ? seenByUsers.join(', ')
+                        : `${seenByUsers.slice(0, 2).join(', ')} +${seenByUsers.length - 2}`
+                      }
+                    </p>
+                  )}
                 </div>
               </div>
             );
