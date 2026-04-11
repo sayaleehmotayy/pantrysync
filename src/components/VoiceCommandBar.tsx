@@ -222,18 +222,31 @@ export default function VoiceCommandBar() {
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 1;
+
+    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+    let fullTranscript = '';
 
     recognition.onresult = (event: any) => {
       const results = Array.from(event.results);
-      const transcript = results
+      fullTranscript = results
         .map((r: any) => r[0].transcript)
-        .join('');
-      setTranscript(transcript);
+        .join(' ');
+      setTranscript(fullTranscript);
 
-      if (event.results[event.results.length - 1].isFinal) {
-        processCommand(transcript);
-        setIsListening(false);
+      // Reset silence timer on each result - wait for user to finish speaking
+      if (silenceTimer) clearTimeout(silenceTimer);
+      
+      // Check if the latest result is final
+      const lastResult = event.results[event.results.length - 1];
+      if (lastResult.isFinal) {
+        // Give 2s of silence after final result before processing
+        silenceTimer = setTimeout(() => {
+          recognition.stop();
+          processCommand(fullTranscript);
+          setIsListening(false);
+        }, 2000);
       }
     };
 
