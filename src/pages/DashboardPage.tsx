@@ -2,7 +2,6 @@ import React from 'react';
 import { useInventory, InventoryItem } from '@/hooks/useInventory';
 import VoiceCommandBar from '@/components/VoiceCommandBar';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
-import { useActivityLog } from '@/hooks/useActivityLog';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import {
-  Package, ShoppingCart, AlertTriangle, Clock, Activity,
-  ChevronRight, Plus, ChefHat, MessageCircle, Sparkles, Check
+  Package, ShoppingCart, AlertTriangle, Clock,
+  ChevronRight, Plus, ChefHat, MessageCircle, Check
 } from 'lucide-react';
 import { formatDistanceToNow, isBefore, addDays, format } from 'date-fns';
 
@@ -27,10 +26,13 @@ function getExpiryStatus(date: string | null): 'safe' | 'expiring' | 'expired' |
 export default function DashboardPage() {
   const { data: inventory = [] } = useInventory();
   const { data: shopping = [], updateItem } = useShoppingList();
-  const { data: activities = [], getMemberName } = useActivityLog(10);
   const { household } = useHousehold();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const recentlyBought = shopping
+    .filter(i => i.status === 'bought')
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
   const lowStock = inventory.filter(i => i.min_threshold > 0 && i.quantity <= i.min_threshold);
   const expiringSoon = inventory.filter(i => getExpiryStatus(i.expiry_date) === 'expiring');
