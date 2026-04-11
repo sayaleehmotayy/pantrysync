@@ -85,7 +85,7 @@ export default function RecipesPage() {
                   </div>
                   {showMatching && <MatchBadge pct={match.matchPercentage} />}
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-3">
                   <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {(match.recipe.prep_time || 0) + (match.recipe.cook_time || 0)}m</span>
                   <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {showMatching && match.possibleServings > 0 ? match.possibleServings : match.recipe.servings} servings</span>
                   <Badge variant="secondary" className="text-[10px] h-5">{match.recipe.difficulty}</Badge>
