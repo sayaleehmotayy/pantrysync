@@ -98,7 +98,7 @@ Always respond with ALL items. Never skip any food/drink mentioned.`;
                         type: { type: "string", enum: ["add_inventory", "remove_inventory", "update_quantity", "add_shopping", "remove_shopping", "clear_shopping"] },
                         name: { type: "string" },
                         quantity: { type: "number" },
-                        unit: { type: "string" },
+                        unit: { type: "string", enum: ["pieces", "g", "kg", "ml", "l", "cups", "tbsp", "tsp", "boxes", "packs", "bottles", "cans", "slices", "bars"] },
                         storage_location: { type: "string", enum: ["pantry", "fridge", "freezer"] },
                         category: { type: "string" },
                       },
