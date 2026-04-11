@@ -271,12 +271,12 @@ export default function CouponsPage() {
               <Card key={item.id} className={`border-border/50 overflow-hidden ${isExpired(item.expiry_date) ? 'opacity-50' : ''}`}>
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
-                    {item.receipt_image_url && (
+                    {item.receipt_image_url && signedUrls[item.id] && (
                       <button
-                        onClick={() => setPreviewImage(item.receipt_image_url)}
+                        onClick={() => setPreviewImage(signedUrls[item.id])}
                         className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted"
                       >
-                        <img src={item.receipt_image_url} alt="Receipt" className="w-full h-full object-cover" />
+                        <img src={signedUrls[item.id]} alt="Receipt" className="w-full h-full object-cover" />
                       </button>
                     )}
                     <div className="flex-1 min-w-0">
