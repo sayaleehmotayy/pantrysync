@@ -22,10 +22,16 @@ interface DiscountCode {
   created_at: string;
 }
 
-const STORES = [
+const IRISH_STORES = [
+  'Tesco', 'Dunnes Stores', 'SuperValu', 'Aldi', 'Lidl',
+  'Centra', 'Spar', 'Supervalu', 'M&S Food', 'Iceland',
+  'Dealz', 'EuroSpar', 'Londis', 'Mace',
+];
+
+const AMERICAN_STORES = [
   'Walmart', 'Target', 'Costco', 'Kroger', 'Whole Foods',
-  'Trader Joe\'s', 'Aldi', 'Publix', 'Safeway', 'Sam\'s Club',
-  'Lidl', 'Meijer', 'H-E-B', 'Wegmans', 'Other'
+  "Trader Joe's", 'Publix', 'Safeway', "Sam's Club",
+  'Meijer', 'H-E-B', 'Wegmans', 'Aldi', 'Lidl',
 ];
 
 export default function CouponsPage() {
@@ -33,18 +39,24 @@ export default function CouponsPage() {
   const { household, members } = useHousehold();
   const [codes, setCodes] = useState<DiscountCode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [codeDialogOpen, setCodeDialogOpen] = useState(false);
+  const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  // Form state
+  // Code form state
   const [storeName, setStoreName] = useState('');
   const [customStore, setCustomStore] = useState('');
   const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  // Photo form state
+  const [photoStoreName, setPhotoStoreName] = useState('');
+  const [photoCustomStore, setPhotoCustomStore] = useState('');
+  const [photoExpiryDate, setPhotoExpiryDate] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -77,12 +89,9 @@ export default function CouponsPage() {
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setCapturedFile(file);
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setCapturedImage(ev.target?.result as string);
-    };
+    reader.onload = (ev) => setCapturedImage(ev.target?.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -90,58 +99,72 @@ export default function CouponsPage() {
     if (!user) return null;
     const ext = file.name.split('.').pop() || 'jpg';
     const filePath = `${user.id}/${Date.now()}.${ext}`;
-
-    const { error } = await supabase.storage
-      .from('receipt-images')
-      .upload(filePath, file);
-
+    const { error } = await supabase.storage.from('receipt-images').upload(filePath, file);
     if (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload receipt image');
+      toast.error('Failed to upload image');
       return null;
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('receipt-images')
-      .getPublicUrl(filePath);
-
+    const { data: { publicUrl } } = supabase.storage.from('receipt-images').getPublicUrl(filePath);
     return publicUrl;
   };
 
-  const handleSubmit = async () => {
+  const handleCodeSubmit = async () => {
     if (!household || !user) return;
     const finalStore = storeName === 'Other' ? customStore : storeName;
     if (!finalStore.trim() || !code.trim()) {
       toast.error('Store and code are required');
       return;
     }
-
     setUploading(true);
-    let imageUrl: string | null = null;
-
-    if (capturedFile) {
-      imageUrl = await uploadReceiptImage(capturedFile);
-    }
-
-    const { error } = await supabase
-      .from('discount_codes')
-      .insert({
-        household_id: household.id,
-        store_name: finalStore.trim(),
-        code: code.trim(),
-        description: description.trim() || null,
-        receipt_image_url: imageUrl,
-        expiry_date: expiryDate || null,
-        added_by: user.id,
-      });
-
+    const { error } = await supabase.from('discount_codes').insert({
+      household_id: household.id,
+      store_name: finalStore.trim(),
+      code: code.trim(),
+      description: description.trim() || null,
+      receipt_image_url: null,
+      expiry_date: expiryDate || null,
+      added_by: user.id,
+    });
     if (error) {
-      console.error('Insert error:', error);
       toast.error('Failed to save discount code');
     } else {
-      toast.success(`Discount code for ${finalStore} saved!`);
-      resetForm();
-      setDialogOpen(false);
+      toast.success(`Code for ${finalStore} saved!`);
+      resetCodeForm();
+      setCodeDialogOpen(false);
+      fetchCodes();
+    }
+    setUploading(false);
+  };
+
+  const handlePhotoSubmit = async () => {
+    if (!household || !user || !capturedFile) {
+      toast.error('Please take or upload a photo');
+      return;
+    }
+    const finalStore = photoStoreName === 'Other' ? photoCustomStore : photoStoreName;
+    if (!finalStore.trim()) {
+      toast.error('Please select a store');
+      return;
+    }
+    setUploading(true);
+    const imageUrl = await uploadReceiptImage(capturedFile);
+    if (!imageUrl) { setUploading(false); return; }
+
+    const { error } = await supabase.from('discount_codes').insert({
+      household_id: household.id,
+      store_name: finalStore.trim(),
+      code: 'RECEIPT',
+      description: 'Receipt photo',
+      receipt_image_url: imageUrl,
+      expiry_date: photoExpiryDate || null,
+      added_by: user.id,
+    });
+    if (error) {
+      toast.error('Failed to save');
+    } else {
+      toast.success(`Receipt for ${finalStore} saved!`);
+      resetPhotoForm();
+      setPhotoDialogOpen(false);
       fetchCodes();
     }
     setUploading(false);
@@ -153,35 +176,45 @@ export default function CouponsPage() {
       toast.error('Failed to delete');
     } else {
       setCodes(prev => prev.filter(c => c.id !== id));
-      toast.success('Discount code deleted');
+      toast.success('Deleted');
     }
   };
 
   const copyCode = (codeText: string) => {
     navigator.clipboard.writeText(codeText);
-    toast.success('Code copied to clipboard!');
+    toast.success('Code copied!');
   };
 
-  const resetForm = () => {
-    setStoreName('');
-    setCustomStore('');
-    setCode('');
-    setDescription('');
-    setExpiryDate('');
-    setCapturedImage(null);
-    setCapturedFile(null);
+  const resetCodeForm = () => {
+    setStoreName(''); setCustomStore(''); setCode(''); setDescription(''); setExpiryDate('');
   };
 
-  const isExpired = (date: string | null) => {
-    if (!date) return false;
-    return isBefore(new Date(date), new Date());
+  const resetPhotoForm = () => {
+    setPhotoStoreName(''); setPhotoCustomStore(''); setPhotoExpiryDate('');
+    setCapturedImage(null); setCapturedFile(null);
   };
 
-  // Group codes by store
+  const isExpired = (date: string | null) => date ? isBefore(new Date(date), new Date()) : false;
+
   const grouped = codes.reduce<Record<string, DiscountCode[]>>((acc, c) => {
     (acc[c.store_name] = acc[c.store_name] || []).push(c);
     return acc;
   }, {});
+
+  const StoreSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger><SelectValue placeholder="Select a store" /></SelectTrigger>
+      <SelectContent>
+        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Irish Stores</div>
+        {IRISH_STORES.map(s => <SelectItem key={`ie-${s}`} value={s}>{s}</SelectItem>)}
+        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-1">American Stores</div>
+        {AMERICAN_STORES.map(s => <SelectItem key={`us-${s}`} value={s}>{s}</SelectItem>)}
+        <div className="border-t border-border mt-1 pt-1">
+          <SelectItem value="Other">Other</SelectItem>
+        </div>
+      </SelectContent>
+    </Select>
+  );
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -190,10 +223,16 @@ export default function CouponsPage() {
           <h1 className="text-xl font-display font-bold">Coupons & Deals</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Save & share discount codes</p>
         </div>
-        <Button size="sm" onClick={() => { resetForm(); setDialogOpen(true); }} className="gap-1.5">
-          <Plus className="w-4 h-4" />
-          Add Code
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => { resetPhotoForm(); setPhotoDialogOpen(true); }} className="gap-1.5">
+            <Camera className="w-4 h-4" />
+            Photo
+          </Button>
+          <Button size="sm" onClick={() => { resetCodeForm(); setCodeDialogOpen(true); }} className="gap-1.5">
+            <Plus className="w-4 h-4" />
+            Add Code
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -204,9 +243,7 @@ export default function CouponsPage() {
             <Tag className="w-8 h-8 text-muted-foreground" />
           </div>
           <h3 className="font-display font-semibold">No discount codes yet</h3>
-          <p className="text-muted-foreground text-sm mt-1">
-            Add your first coupon or discount code
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">Add a coupon code or snap a receipt photo</p>
         </div>
       ) : (
         Object.entries(grouped).map(([store, storeCodes]) => (
@@ -220,34 +257,36 @@ export default function CouponsPage() {
               <Card key={item.id} className={`border-border/50 overflow-hidden ${isExpired(item.expiry_date) ? 'opacity-50' : ''}`}>
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
-                    {/* Receipt image thumbnail */}
                     {item.receipt_image_url && (
                       <button
                         onClick={() => setPreviewImage(item.receipt_image_url)}
                         className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted"
                       >
-                        <img
-                          src={item.receipt_image_url}
-                          alt="Receipt"
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={item.receipt_image_url} alt="Receipt" className="w-full h-full object-cover" />
                       </button>
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => copyCode(item.code)}
-                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
-                        >
-                          <Tag className="w-3 h-3 text-primary" />
-                          <span className="font-mono font-bold text-sm text-primary">{item.code}</span>
-                          <Copy className="w-3 h-3 text-primary/60" />
-                        </button>
+                        {item.code !== 'RECEIPT' && (
+                          <button
+                            onClick={() => copyCode(item.code)}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
+                          >
+                            <Tag className="w-3 h-3 text-primary" />
+                            <span className="font-mono font-bold text-sm text-primary">{item.code}</span>
+                            <Copy className="w-3 h-3 text-primary/60" />
+                          </button>
+                        )}
+                        {item.code === 'RECEIPT' && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Camera className="w-3 h-3" /> Receipt photo
+                          </span>
+                        )}
                         {isExpired(item.expiry_date) && (
                           <span className="text-[10px] font-semibold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">Expired</span>
                         )}
                       </div>
-                      {item.description && (
+                      {item.description && item.code !== 'RECEIPT' && (
                         <p className="text-xs text-muted-foreground mt-1 truncate">{item.description}</p>
                       )}
                       <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
@@ -280,7 +319,7 @@ export default function CouponsPage() {
       )}
 
       {/* Add Code Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={codeDialogOpen} onOpenChange={setCodeDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Discount Code</DialogTitle>
@@ -288,53 +327,48 @@ export default function CouponsPage() {
           <div className="space-y-4">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Store</label>
-              <Select value={storeName} onValueChange={setStoreName}>
-                <SelectTrigger><SelectValue placeholder="Select a store" /></SelectTrigger>
-                <SelectContent>
-                  {STORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <StoreSelect value={storeName} onChange={setStoreName} />
               {storeName === 'Other' && (
-                <Input
-                  placeholder="Enter store name"
-                  value={customStore}
-                  onChange={e => setCustomStore(e.target.value)}
-                  className="mt-2"
-                />
+                <Input placeholder="Enter store name" value={customStore} onChange={e => setCustomStore(e.target.value)} className="mt-2" />
+              )}
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Discount Code</label>
+              <Input placeholder="e.g. SAVE20" value={code} onChange={e => setCode(e.target.value)} className="font-mono" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Description (optional)</label>
+              <Input placeholder="e.g. 20% off all groceries" value={description} onChange={e => setDescription(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Expiry Date (optional)</label>
+              <Input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} />
+            </div>
+            <Button className="w-full" onClick={handleCodeSubmit} disabled={uploading}>
+              {uploading ? 'Saving...' : 'Save Discount Code'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Photo Dialog */}
+      <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Receipt Photo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Store</label>
+              <StoreSelect value={photoStoreName} onChange={setPhotoStoreName} />
+              {photoStoreName === 'Other' && (
+                <Input placeholder="Enter store name" value={photoCustomStore} onChange={e => setPhotoCustomStore(e.target.value)} className="mt-2" />
               )}
             </div>
 
+            {/* Photo capture */}
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Discount Code</label>
-              <Input
-                placeholder="e.g. SAVE20"
-                value={code}
-                onChange={e => setCode(e.target.value)}
-                className="font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Description (optional)</label>
-              <Input
-                placeholder="e.g. 20% off all groceries"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Expiry Date (optional)</label>
-              <Input
-                type="date"
-                value={expiryDate}
-                onChange={e => setExpiryDate(e.target.value)}
-              />
-            </div>
-
-            {/* Receipt image capture */}
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block">Receipt Photo (optional)</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block">Receipt Photo</label>
               {capturedImage ? (
                 <div className="relative rounded-xl overflow-hidden border border-border">
                   <img src={capturedImage} alt="Receipt" className="w-full max-h-48 object-cover" />
@@ -347,46 +381,25 @@ export default function CouponsPage() {
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1 gap-2"
-                    onClick={() => cameraInputRef.current?.click()}
-                  >
-                    <Camera className="w-4 h-4" />
-                    Take Photo
+                  <Button type="button" variant="outline" className="flex-1 gap-2" onClick={() => cameraInputRef.current?.click()}>
+                    <Camera className="w-4 h-4" /> Take Photo
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1 gap-2"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <ImageIcon className="w-4 h-4" />
-                    Upload
+                  <Button type="button" variant="outline" className="flex-1 gap-2" onClick={() => fileInputRef.current?.click()}>
+                    <ImageIcon className="w-4 h-4" /> Upload
                   </Button>
                 </div>
               )}
-              {/* Hidden inputs for camera and file */}
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleCapture}
-              />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleCapture}
-              />
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleCapture} />
             </div>
 
-            <Button className="w-full" onClick={handleSubmit} disabled={uploading}>
-              {uploading ? 'Saving...' : 'Save Discount Code'}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Expiry Date (optional)</label>
+              <Input type="date" value={photoExpiryDate} onChange={e => setPhotoExpiryDate(e.target.value)} />
+            </div>
+
+            <Button className="w-full" onClick={handlePhotoSubmit} disabled={uploading || !capturedFile}>
+              {uploading ? 'Uploading...' : 'Save Receipt'}
             </Button>
           </div>
         </DialogContent>
@@ -394,22 +407,14 @@ export default function CouponsPage() {
 
       {/* Full-screen image preview */}
       {previewImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setPreviewImage(null)}
-        >
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
           <button
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
             onClick={() => setPreviewImage(null)}
           >
             <X className="w-5 h-5" />
           </button>
-          <img
-            src={previewImage}
-            alt="Receipt"
-            className="max-w-full max-h-[85vh] rounded-2xl object-contain"
-            onClick={e => e.stopPropagation()}
-          />
+          <img src={previewImage} alt="Receipt" className="max-w-full max-h-[85vh] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </div>
