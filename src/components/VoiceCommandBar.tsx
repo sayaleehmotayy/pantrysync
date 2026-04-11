@@ -255,60 +255,108 @@ export default function VoiceCommandBar() {
   }, [isListening, processCommand]);
 
   return (
-    <div className="relative">
-      <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all duration-300 ${
-        isListening 
-          ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10' 
+    <div className="relative group">
+      {/* Ambient glow behind the bar */}
+      <div className={`absolute -inset-1 rounded-3xl transition-all duration-500 blur-xl ${
+        isListening
+          ? 'bg-primary/20 animate-pulse'
           : isProcessing
-          ? 'border-accent bg-accent/5'
-          : 'border-border/50 bg-card/50 backdrop-blur-sm'
+          ? 'bg-accent/15 animate-pulse'
+          : 'bg-primary/5 group-hover:bg-primary/10'
+      }`} />
+
+      <div className={`relative flex items-center gap-3 rounded-2xl border px-4 py-3.5 transition-all duration-500 backdrop-blur-md ${
+        isListening
+          ? 'border-primary/40 bg-primary/5 shadow-lg shadow-primary/15'
+          : isProcessing
+          ? 'border-accent/40 bg-accent/5 shadow-lg shadow-accent/10'
+          : 'border-primary/15 bg-gradient-to-r from-card/80 to-primary/[0.03] shadow-md hover:shadow-lg hover:border-primary/25'
       }`}>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`h-10 w-10 rounded-xl shrink-0 transition-all duration-300 ${
-            isListening
-              ? 'bg-primary text-primary-foreground animate-pulse shadow-md'
-              : isProcessing
-              ? 'bg-accent text-accent-foreground'
-              : 'bg-muted hover:bg-primary/10 hover:text-primary'
-          }`}
-          onClick={toggleListening}
-          disabled={isProcessing}
-        >
-          {isProcessing ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : isListening ? (
-            <MicOff className="w-5 h-5" />
-          ) : (
-            <Mic className="w-5 h-5" />
+        {/* Animated mic button */}
+        <div className="relative shrink-0">
+          {/* Orbiting dots when idle */}
+          {!isListening && !isProcessing && (
+            <>
+              <div className="absolute -inset-2 rounded-full">
+                <div className="absolute w-1.5 h-1.5 rounded-full bg-primary/40 animate-[spin_4s_linear_infinite]" style={{ top: '0', left: '50%', transformOrigin: '0 16px' }} />
+                <div className="absolute w-1 h-1 rounded-full bg-accent/40 animate-[spin_6s_linear_infinite_reverse]" style={{ top: '50%', right: '0', transformOrigin: '-12px 0' }} />
+              </div>
+            </>
           )}
-        </Button>
+
+          {/* Pulsing rings when listening */}
+          {isListening && (
+            <>
+              <div className="absolute -inset-3 rounded-full border border-primary/30 animate-ping" style={{ animationDuration: '1.5s' }} />
+              <div className="absolute -inset-5 rounded-full border border-primary/15 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
+              <div className="absolute -inset-7 rounded-full border border-primary/10 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.6s' }} />
+            </>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`relative h-11 w-11 rounded-xl shrink-0 transition-all duration-500 z-10 ${
+              isListening
+                ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-110'
+                : isProcessing
+                ? 'bg-accent text-accent-foreground shadow-md shadow-accent/20'
+                : 'bg-gradient-to-br from-primary/15 to-primary/5 text-primary hover:from-primary/25 hover:to-primary/10 hover:scale-105'
+            }`}
+            onClick={toggleListening}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : isListening ? (
+              <MicOff className="w-5 h-5 animate-pulse" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
+          </Button>
+        </div>
 
         <div className="flex-1 min-w-0">
           {isProcessing ? (
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-accent animate-pulse shrink-0" />
-              <p className="text-sm text-muted-foreground truncate">Processing your command...</p>
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <p className="text-sm text-muted-foreground truncate">AI is thinking...</p>
             </div>
           ) : isListening ? (
-            <p className="text-sm truncate">
-              {transcript || <span className="text-muted-foreground italic">Listening... say something like "I bought 2 kg of rice"</span>}
-            </p>
+            <div>
+              <p className="text-sm font-medium text-primary truncate">
+                {transcript || 'Listening...'}
+              </p>
+              {!transcript && (
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                  Try "I bought 2 kg of rice" or "remove milk"
+                </p>
+              )}
+            </div>
           ) : (
-            <p className="text-sm text-muted-foreground truncate">
-              Tap the mic to add items by voice
-            </p>
+            <div>
+              <p className="text-sm font-medium text-foreground/80 truncate flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-primary/60" />
+                AI Voice Assistant
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                Tap to add, remove, or manage items
+              </p>
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Listening pulse rings */}
-      {isListening && (
-        <div className="absolute inset-0 rounded-2xl pointer-events-none">
-          <div className="absolute inset-0 rounded-2xl border-2 border-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
-        </div>
-      )}
+        {/* Sparkle indicator */}
+        {!isListening && !isProcessing && (
+          <div className="shrink-0 w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-primary/40 animate-pulse" style={{ animationDuration: '3s' }} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
