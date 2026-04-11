@@ -1,0 +1,178 @@
+import React, { useState, useMemo } from 'react';
+import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, ShoppingCart, Check, AlertTriangle, X, ArrowUpToLine, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
+const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
+const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp'];
+
+const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  pending: { label: 'Pending', variant: 'secondary' },
+  bought: { label: 'Bought', variant: 'default' },
+  partial: { label: 'Partial', variant: 'outline' },
+  not_found: { label: 'Not Found', variant: 'destructive' },
+};
+
+export default function ShoppingPage() {
+  const { data: items = [], isLoading, addItem, updateItem, deleteItem, updatePantryFromShopping } = useShoppingList();
+  const [addOpen, setAddOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [unit, setUnit] = useState('pieces');
+  const [category, setCategory] = useState('Other');
+  const [partialId, setPartialId] = useState<string | null>(null);
+  const [partialQty, setPartialQty] = useState('');
+
+  const pendingItems = useMemo(() => items.filter(i => i.status === 'pending' || i.status === 'not_found'), [items]);
+  const completedItems = useMemo(() => items.filter(i => i.status === 'bought' || i.status === 'partial'), [items]);
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    addItem.mutate({ name, quantity: Number(quantity), unit, category });
+    setName(''); setQuantity('1'); setUnit('pieces'); setCategory('Other');
+    setAddOpen(false);
+  };
+
+  const handlePartialBought = (item: ShoppingItem) => {
+    const qty = Number(partialQty);
+    if (qty > 0 && qty < item.quantity) {
+      updateItem.mutate({ id: item.id, status: 'partial', bought_quantity: qty });
+    }
+    setPartialId(null);
+    setPartialQty('');
+  };
+
+  const hasBoughtItems = completedItems.length > 0;
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-display font-bold">Shopping List</h1>
+        <div className="flex gap-2">
+          {hasBoughtItems && (
+            <Button size="sm" variant="outline" onClick={() => updatePantryFromShopping(completedItems)}>
+              <ArrowUpToLine className="w-4 h-4 mr-1" /> Update Pantry
+            </Button>
+          )}
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Add Shopping Item</DialogTitle></DialogHeader>
+              <form onSubmit={handleAdd} className="space-y-4">
+                <Input placeholder="Item name" value={name} onChange={e => setName(e.target.value)} required />
+                <div className="flex gap-3">
+                  <Input type="number" placeholder="Qty" value={quantity} onChange={e => setQuantity(e.target.value)} required min="0.1" step="any" className="flex-1" />
+                  <Select value={unit} onValueChange={setUnit}>
+                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                    <SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+                <Button type="submit" className="w-full">Add to List</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-muted-foreground">Loading...</div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+            <ShoppingCart className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="font-display font-semibold">Nothing to buy</h3>
+          <p className="text-muted-foreground text-sm mt-1">Your shopping list is empty</p>
+        </div>
+      ) : (
+        <>
+          {pendingItems.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">To Buy ({pendingItems.length})</h3>
+              {pendingItems.map(item => (
+                <Card key={item.id} className="border-border/50 shadow-none">
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm truncate">{item.name}</p>
+                          <Badge variant={STATUS_CONFIG[item.status].variant} className="text-[10px] h-5">
+                            {STATUS_CONFIG[item.status].label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{item.quantity} {item.unit} · {item.category}</p>
+                      </div>
+                      <div className="flex gap-1 ml-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => updateItem.mutate({ id: item.id, status: 'bought', bought_quantity: item.quantity })}>
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setPartialId(item.id); setPartialQty(''); }}>
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => updateItem.mutate({ id: item.id, status: 'not_found' })}>
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteItem.mutate(item.id)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    {partialId === item.id && (
+                      <div className="flex gap-2 mt-2">
+                        <Input
+                          type="number"
+                          placeholder="Bought qty"
+                          value={partialQty}
+                          onChange={e => setPartialQty(e.target.value)}
+                          className="flex-1"
+                          min="0.1"
+                          max={String(item.quantity)}
+                          step="any"
+                        />
+                        <Button size="sm" onClick={() => handlePartialBought(item)}>Confirm</Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {completedItems.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Bought ({completedItems.length})</h3>
+              {completedItems.map(item => (
+                <Card key={item.id} className="border-border/50 shadow-none opacity-70">
+                  <CardContent className="p-3 flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm line-through truncate">{item.name}</p>
+                        <Badge variant={STATUS_CONFIG[item.status].variant} className="text-[10px] h-5">
+                          {item.status === 'partial' ? `${item.bought_quantity}/${item.quantity} ${item.unit}` : STATUS_CONFIG[item.status].label}
+                        </Badge>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteItem.mutate(item.id)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
