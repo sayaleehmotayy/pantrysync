@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const { data: inventory = [] } = useInventory();
   const { data: shopping = [], updateItem, deleteItem } = useShoppingList();
   const { household } = useHousehold();
-  const { user } = useAuth();
+  const { user, subscription } = useAuth();
   const navigate = useNavigate();
 
   const [partialId, setPartialId] = useState<string | null>(null);
