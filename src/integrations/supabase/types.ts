@@ -132,6 +132,45 @@ export type Database = {
         }
         Relationships: []
       }
+      discount_codes: {
+        Row: {
+          added_by: string
+          code: string
+          created_at: string
+          description: string | null
+          expiry_date: string | null
+          household_id: string
+          id: string
+          receipt_image_url: string | null
+          store_name: string
+          updated_at: string
+        }
+        Insert: {
+          added_by: string
+          code: string
+          created_at?: string
+          description?: string | null
+          expiry_date?: string | null
+          household_id: string
+          id?: string
+          receipt_image_url?: string | null
+          store_name: string
+          updated_at?: string
+        }
+        Update: {
+          added_by?: string
+          code?: string
+          created_at?: string
+          description?: string | null
+          expiry_date?: string | null
+          household_id?: string
+          id?: string
+          receipt_image_url?: string | null
+          store_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       household_members: {
         Row: {
           household_id: string
