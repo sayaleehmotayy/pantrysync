@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, MessageCircle, ShoppingCart, Plus } from 'lucide-react';
+import { Send, MessageCircle, ShoppingCart, Plus, Mic, MicOff, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useShoppingList } from '@/hooks/useShoppingList';
 import { toast } from 'sonner';
@@ -33,7 +33,10 @@ export default function ChatPage() {
   const [itemQty, setItemQty] = useState('1');
   const [itemCategory, setItemCategory] = useState('Other');
   const [, setTick] = useState(0);
+  const [isListening, setIsListening] = useState(false);
+  const [aiParsing, setAiParsing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   const memberMap = new Map(members.map(m => [m.user_id, m.profile?.display_name || 'Unknown']));
 
@@ -85,18 +88,101 @@ export default function ChatPage() {
     }
   }, [messages]);
 
+  // AI parsing: extract shopping items from message
+  const parseAndAddItems = useCallback(async (content: string) => {
+    if (!content.trim()) return;
+    setAiParsing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-shopping-items', {
+        body: { message: content },
+      });
+
+      if (error) {
+        console.error('AI parse error:', error);
+        return;
+      }
+
+      const items = data?.items;
+      if (items && items.length > 0) {
+        for (const item of items) {
+          addItem.mutate({
+            name: item.name,
+            quantity: item.quantity || 1,
+            unit: 'pieces',
+            category: item.category || 'Other',
+          });
+        }
+        toast.success(`✨ Added ${items.length} item${items.length > 1 ? 's' : ''} to shopping list`, {
+          description: items.map((i: any) => `${i.quantity} ${i.name}`).join(', '),
+        });
+      }
+    } catch (e) {
+      console.error('Failed to parse shopping items:', e);
+    } finally {
+      setAiParsing(false);
+    }
+  }, [addItem]);
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !user || !household) return;
 
+    const content = newMessage.trim();
+
     await supabase.from('chat_messages').insert({
       household_id: household.id,
       user_id: user.id,
-      content: newMessage.trim(),
+      content,
     });
 
     setNewMessage('');
+
+    // Parse message for shopping items in the background
+    parseAndAddItems(content);
   };
+
+  // Speech-to-text using Web Speech API
+  const toggleListening = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Speech recognition not supported in this browser');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join('');
+      setNewMessage(transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+      if (event.error === 'not-allowed') {
+        toast.error('Microphone access denied. Please allow microphone access.');
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [isListening]);
 
   const handleAddToList = () => {
     if (!itemName.trim()) return;
@@ -110,7 +196,14 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)] animate-fade-in">
       <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-display font-bold">Chat</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-display font-bold">Chat</h1>
+          {aiParsing && (
+            <span className="flex items-center gap-1 text-xs text-primary animate-pulse">
+              <Sparkles className="w-3.5 h-3.5" /> Adding items...
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <Button
             size="sm"
@@ -135,6 +228,9 @@ export default function ChatPage() {
             </div>
             <h3 className="font-display font-semibold">No messages yet</h3>
             <p className="text-muted-foreground text-sm mt-1">Start the conversation!</p>
+            <p className="text-muted-foreground text-xs mt-2 max-w-[260px]">
+              💡 Try: "Add 2 apples, 3 bananas to the shopping list" — items will be added automatically!
+            </p>
           </div>
         ) : (
           messages.map(msg => {
@@ -167,13 +263,22 @@ export default function ChatPage() {
       </div>
 
       <form onSubmit={sendMessage} className="flex gap-2">
+        <Button
+          type="button"
+          size="icon"
+          variant={isListening ? 'default' : 'outline'}
+          onClick={toggleListening}
+          className={`shrink-0 transition-all duration-200 active:scale-95 ${isListening ? 'bg-destructive hover:bg-destructive/90 animate-pulse' : ''}`}
+        >
+          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+        </Button>
         <Input
-          placeholder="Type a message..."
+          placeholder={isListening ? 'Listening...' : 'Type a message or say "Add 2 apples to the list"'}
           value={newMessage}
           onChange={e => setNewMessage(e.target.value)}
           className="flex-1"
         />
-        <Button type="submit" size="icon" disabled={!newMessage.trim()} className="transition-transform duration-200 active:scale-95">
+        <Button type="submit" size="icon" disabled={!newMessage.trim() || aiParsing} className="transition-transform duration-200 active:scale-95">
           <Send className="w-4 h-4" />
         </Button>
       </form>
