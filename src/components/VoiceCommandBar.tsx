@@ -177,6 +177,7 @@ export default function VoiceCommandBar() {
             quantity: i.quantity,
             unit: i.unit,
             storage_location: i.storage_location,
+            category: i.category,
           })),
           shoppingItems: shopping.map(i => ({
             name: i.name,
