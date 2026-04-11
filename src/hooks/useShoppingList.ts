@@ -54,43 +54,89 @@ export function useShoppingList() {
 
   const updateItem = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ShoppingItem> & { id: string }) => {
-      const { error } = await supabase.from('shopping_list_items').update(updates).eq('id', id);
-      if (error) throw error;
+      const item = qc.getQueryData<ShoppingItem[]>(['shopping', household?.id])?.find(i => i.id === id);
 
-      // Auto-update pantry when item is marked bought or partial
-      if ((updates.status === 'bought' || updates.status === 'partial') && household && user) {
-        const item = qc.getQueryData<ShoppingItem[]>(['shopping', household.id])?.find(i => i.id === id);
-        if (item) {
-          const qty = updates.status === 'bought'
-            ? (updates.bought_quantity ?? item.quantity)
-            : (updates.bought_quantity ?? 0);
+      // Handle partial buy: add bought qty to pantry, reduce shopping item to remainder
+      if (updates.status === 'partial' && household && user && item) {
+        const boughtQty = updates.bought_quantity ?? 0;
+        if (boughtQty > 0) {
+          // Add bought quantity to pantry
+          const { data: existing } = await supabase
+            .from('inventory_items')
+            .select('id, quantity')
+            .eq('household_id', household.id)
+            .ilike('name', item.name)
+            .maybeSingle();
 
-          if (qty > 0) {
-            const { data: existing } = await supabase
-              .from('inventory_items')
-              .select('id, quantity')
-              .eq('household_id', household.id)
-              .ilike('name', item.name)
-              .maybeSingle();
-
-            if (existing) {
-              await supabase.from('inventory_items').update({
-                quantity: existing.quantity + qty,
-              }).eq('id', existing.id);
-            } else {
-              await supabase.from('inventory_items').insert({
-                household_id: household.id,
-                name: item.name,
-                quantity: qty,
-                unit: item.unit,
-                category: item.category,
-                added_by: user.id,
-              });
-            }
-            qc.invalidateQueries({ queryKey: ['inventory'] });
+          if (existing) {
+            await supabase.from('inventory_items').update({
+              quantity: existing.quantity + boughtQty,
+            }).eq('id', existing.id);
+          } else {
+            await supabase.from('inventory_items').insert({
+              household_id: household.id,
+              name: item.name,
+              quantity: boughtQty,
+              unit: item.unit,
+              category: item.category,
+              added_by: user.id,
+            });
           }
+          qc.invalidateQueries({ queryKey: ['inventory'] });
+
+          // Update shopping item to remaining quantity, reset to pending
+          const remaining = item.quantity - boughtQty;
+          if (remaining <= 0) {
+            await supabase.from('shopping_list_items').delete().eq('id', id);
+          } else {
+            const { error } = await supabase.from('shopping_list_items').update({
+              quantity: remaining,
+              status: 'pending',
+              bought_quantity: 0,
+            }).eq('id', id);
+            if (error) throw error;
+          }
+          toast.success(`Bought ${boughtQty} ${item.unit}, ${Math.max(0, item.quantity - boughtQty)} ${item.unit} remaining`);
+          return;
         }
       }
+
+      // Handle full buy: add to pantry and remove from list
+      if (updates.status === 'bought' && household && user && item) {
+        const qty = updates.bought_quantity ?? item.quantity;
+        if (qty > 0) {
+          const { data: existing } = await supabase
+            .from('inventory_items')
+            .select('id, quantity')
+            .eq('household_id', household.id)
+            .ilike('name', item.name)
+            .maybeSingle();
+
+          if (existing) {
+            await supabase.from('inventory_items').update({
+              quantity: existing.quantity + qty,
+            }).eq('id', existing.id);
+          } else {
+            await supabase.from('inventory_items').insert({
+              household_id: household.id,
+              name: item.name,
+              quantity: qty,
+              unit: item.unit,
+              category: item.category,
+              added_by: user.id,
+            });
+          }
+          qc.invalidateQueries({ queryKey: ['inventory'] });
+        }
+        // Remove bought item from shopping list
+        await supabase.from('shopping_list_items').delete().eq('id', id);
+        toast.success(`${item.name} added to pantry`);
+        return;
+      }
+
+      // Default update for other status changes
+      const { error } = await supabase.from('shopping_list_items').update(updates).eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['shopping'] }); },
     onError: (e) => toast.error(e.message),
