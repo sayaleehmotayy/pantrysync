@@ -40,7 +40,7 @@ export default function ShoppingPage() {
 
   const handlePartialBought = (item: ShoppingItem) => {
     const qty = Number(partialQty);
-    if (qty > 0 && qty < item.quantity) {
+    if (qty > 0) {
       updateItem.mutate({ id: item.id, status: 'partial', bought_quantity: qty });
     }
     setPartialId(null);

@@ -4,6 +4,34 @@ import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+// Unit conversion map to a base unit
+const UNIT_TO_BASE: Record<string, { base: string; factor: number }> = {
+  g: { base: 'g', factor: 1 },
+  kg: { base: 'g', factor: 1000 },
+  ml: { base: 'ml', factor: 1 },
+  l: { base: 'ml', factor: 1000 },
+  pieces: { base: 'pieces', factor: 1 },
+  cups: { base: 'cups', factor: 1 },
+  tbsp: { base: 'tbsp', factor: 1 },
+  tsp: { base: 'tsp', factor: 1 },
+};
+
+function convertUnits(qty: number, fromUnit: string, toUnit: string): number | null {
+  const from = UNIT_TO_BASE[fromUnit];
+  const to = UNIT_TO_BASE[toUnit];
+  if (!from || !to || from.base !== to.base) return null; // incompatible units
+  return (qty * from.factor) / to.factor;
+}
+
+// Pick the best display unit for a quantity
+function bestDisplayUnit(qty: number, unit: string): { quantity: number; unit: string } {
+  if (unit === 'g' && qty >= 1000) return { quantity: qty / 1000, unit: 'kg' };
+  if (unit === 'ml' && qty >= 1000) return { quantity: qty / 1000, unit: 'l' };
+  if (unit === 'kg' && qty < 1) return { quantity: qty * 1000, unit: 'g' };
+  if (unit === 'l' && qty < 1) return { quantity: qty * 1000, unit: 'ml' };
+  return { quantity: qty, unit };
+}
+
 export interface ShoppingItem {
   id: string;
   household_id: string;
@@ -53,7 +81,7 @@ export function useShoppingList() {
   });
 
   const updateItem = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<ShoppingItem> & { id: string }) => {
+    mutationFn: async ({ id, bought_unit, ...updates }: Partial<ShoppingItem> & { id: string; bought_unit?: string }) => {
       // Fetch fresh item from DB to avoid stale cache issues
       const { data: item } = await supabase
         .from('shopping_list_items')
@@ -63,45 +91,70 @@ export function useShoppingList() {
 
       // Handle partial buy: add bought qty to pantry, reduce shopping item to remainder
       if (updates.status === 'partial' && household && user && item) {
-        const boughtQty = updates.bought_quantity ?? 0;
+        let boughtQty = updates.bought_quantity ?? 0;
+        const bUnit = bought_unit || item.unit;
+
         if (boughtQty > 0) {
-          // Add bought quantity to pantry
+          // Convert bought quantity to item's unit if different
+          let boughtInItemUnit = boughtQty;
+          if (bUnit !== item.unit) {
+            const converted = convertUnits(boughtQty, bUnit, item.unit);
+            if (converted !== null) {
+              boughtInItemUnit = converted;
+            } else {
+              // Incompatible units, just use raw value
+              boughtInItemUnit = boughtQty;
+            }
+          }
+
+          // Add bought quantity to pantry (in bought unit)
           const { data: existing } = await supabase
             .from('inventory_items')
-            .select('id, quantity')
+            .select('id, quantity, unit')
             .eq('household_id', household.id)
             .ilike('name', item.name)
             .maybeSingle();
 
           if (existing) {
+            // Convert to existing pantry unit if possible
+            let addQty = boughtQty;
+            if (existing.unit !== bUnit) {
+              const converted = convertUnits(boughtQty, bUnit, existing.unit);
+              if (converted !== null) addQty = converted;
+            }
             await supabase.from('inventory_items').update({
-              quantity: existing.quantity + boughtQty,
+              quantity: existing.quantity + addQty,
             }).eq('id', existing.id);
           } else {
             await supabase.from('inventory_items').insert({
               household_id: household.id,
               name: item.name,
               quantity: boughtQty,
-              unit: item.unit,
+              unit: bUnit,
               category: item.category,
               added_by: user.id,
             });
           }
           qc.invalidateQueries({ queryKey: ['inventory'] });
 
-          // Update shopping item to remaining quantity, reset to pending
-          const remaining = item.quantity - boughtQty;
+          // Update shopping item to remaining quantity
+          const remaining = item.quantity - boughtInItemUnit;
+          const display = bestDisplayUnit(Math.max(0, remaining), item.unit);
+
           if (remaining <= 0) {
             await supabase.from('shopping_list_items').delete().eq('id', id);
+            toast.success(`Bought all ${item.name} — added to pantry`);
           } else {
+            // Update the item with the remaining quantity in the best display unit
             const { error } = await supabase.from('shopping_list_items').update({
-              quantity: remaining,
+              quantity: display.quantity,
+              unit: display.unit,
               status: 'pending',
               bought_quantity: 0,
             }).eq('id', id);
             if (error) throw error;
+            toast.success(`Bought ${boughtQty} ${bUnit} of ${item.name}, ${display.quantity} ${display.unit} remaining`);
           }
-          toast.success(`Bought ${boughtQty} ${item.unit}, ${Math.max(0, item.quantity - boughtQty)} ${item.unit} remaining`);
           return;
         }
       }
