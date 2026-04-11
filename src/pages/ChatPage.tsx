@@ -21,6 +21,12 @@ interface ChatMessage {
   sender_name?: string;
 }
 
+interface ReadReceipt {
+  user_id: string;
+  last_read_message_id: string;
+  last_read_at: string;
+}
+
 interface MentionTarget {
   userId: string;
   label: string;
