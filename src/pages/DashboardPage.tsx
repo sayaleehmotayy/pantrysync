@@ -3,6 +3,7 @@ import { useInventory, InventoryItem } from '@/hooks/useInventory';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { useHousehold } from '@/contexts/HouseholdContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const { data: shopping = [], updateItem } = useShoppingList();
   const { data: activities = [], getMemberName } = useActivityLog(10);
   const { household } = useHousehold();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const lowStock = inventory.filter(i => i.min_threshold > 0 && i.quantity <= i.min_threshold);
@@ -47,7 +49,9 @@ export default function DashboardPage() {
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-accent/10 p-5 border border-primary/10">
         <div className="relative z-10">
           <p className="text-sm text-muted-foreground font-medium">{greeting()} 👋</p>
-          <h1 className="text-2xl font-display font-bold mt-0.5">{household?.name || 'PantrySync'}</h1>
+          <h1 className="text-2xl font-display font-bold mt-0.5">
+            {user?.user_metadata?.display_name?.split(' ')[0] || household?.name || 'PantrySync'}
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {inventory.length} items in pantry · {pendingShopping.length} to buy
           </p>
