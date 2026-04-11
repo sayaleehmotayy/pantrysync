@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const { data: shopping = [], updateItem } = useShoppingList();
   const { data: activities = [], getMemberName } = useActivityLog(10);
   const { household } = useHousehold();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const lowStock = inventory.filter(i => i.min_threshold > 0 && i.quantity <= i.min_threshold);
