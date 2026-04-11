@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useInventory, InventoryItem } from '@/hooks/useInventory';
 import VoiceCommandBar from '@/components/VoiceCommandBar';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
@@ -7,12 +7,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import {
   Package, ShoppingCart, AlertTriangle, Clock,
-  ChevronRight, Plus, ChefHat, MessageCircle, Check
+  ChevronRight, Plus, ChefHat, MessageCircle, Check, Trash2
 } from 'lucide-react';
-import { formatDistanceToNow, isBefore, addDays, format } from 'date-fns';
+import { formatDistanceToNow, isBefore, addDays } from 'date-fns';
+
+const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp'];
 
 function getExpiryStatus(date: string | null): 'safe' | 'expiring' | 'expired' | null {
   if (!date) return null;
@@ -25,10 +29,14 @@ function getExpiryStatus(date: string | null): 'safe' | 'expiring' | 'expired' |
 
 export default function DashboardPage() {
   const { data: inventory = [] } = useInventory();
-  const { data: shopping = [], updateItem } = useShoppingList();
+  const { data: shopping = [], updateItem, deleteItem } = useShoppingList();
   const { household } = useHousehold();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const [partialId, setPartialId] = useState<string | null>(null);
+  const [partialQty, setPartialQty] = useState('');
+  const [partialUnit, setPartialUnit] = useState('pieces');
 
   const recentlyBought = shopping
     .filter(i => i.status === 'bought')
@@ -37,13 +45,23 @@ export default function DashboardPage() {
   const lowStock = inventory.filter(i => i.min_threshold > 0 && i.quantity <= i.min_threshold);
   const expiringSoon = inventory.filter(i => getExpiryStatus(i.expiry_date) === 'expiring');
   const expired = inventory.filter(i => getExpiryStatus(i.expiry_date) === 'expired');
-  const pendingShopping = shopping.filter(i => i.status === 'pending');
+  const pendingShopping = shopping.filter(i => i.status === 'pending' || i.status === 'not_found');
 
   const greeting = () => {
     const h = new Date().getHours();
     if (h < 12) return 'Good morning';
     if (h < 17) return 'Good afternoon';
     return 'Good evening';
+  };
+
+  const handlePartialBought = (item: ShoppingItem) => {
+    const qty = Number(partialQty);
+    if (qty > 0 && qty < item.quantity) {
+      updateItem.mutate({ id: item.id, status: 'partial', bought_quantity: qty });
+    }
+    setPartialId(null);
+    setPartialQty('');
+    setPartialUnit('pieces');
   };
 
   return (
@@ -63,7 +81,6 @@ export default function DashboardPage() {
         <div className="absolute -right-2 -bottom-4 w-20 h-20 rounded-full bg-accent/10 blur-xl" />
       </div>
 
-      {/* AI Voice Command Bar */}
       <VoiceCommandBar />
 
       {/* Quick actions */}
@@ -184,42 +201,82 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Shopping preview */}
-      {pendingShopping.length > 0 && (
-        <Card className="border-border/50 overflow-hidden">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-display flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 text-info" /> Shopping List
-              </CardTitle>
-              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => navigate('/shopping')}>
-                View all <ChevronRight className="w-3 h-3 ml-1" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
+      {/* Shopping List - full interactive */}
+      <Card className="border-border/50 overflow-hidden">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-display flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-info" /> Shopping List
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => navigate('/shopping')}>
+              View all <ChevronRight className="w-3 h-3 ml-1" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          {pendingShopping.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Nothing to buy right now</p>
+          ) : (
             <div className="space-y-2">
-              {pendingShopping.slice(0, 4).map(item => (
-                <div key={item.id} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateItem.mutate({ id: item.id, status: 'bought', bought_quantity: item.quantity });
-                      }}
-                      className="w-4 h-4 rounded border border-border flex items-center justify-center hover:border-primary hover:bg-primary/10 transition-colors active:scale-90"
-                    >
-                      {item.status === 'bought' && <Check className="w-3 h-3 text-primary" />}
-                    </button>
-                    <span>{item.name}</span>
+              {pendingShopping.slice(0, 8).map(item => (
+                <div key={item.id}>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <button
+                        onClick={() => updateItem.mutate({ id: item.id, status: 'bought', bought_quantity: item.quantity })}
+                        className="text-sm cursor-pointer hover:line-through hover:text-muted-foreground transition-all truncate text-left"
+                        title="Click to mark as bought"
+                      >
+                        {item.name}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground mr-1">{item.quantity} {item.unit}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Partial buy"
+                        onClick={() => { setPartialId(partialId === item.id ? null : item.id); setPartialQty(''); setPartialUnit(item.unit); }}
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5 text-warning" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        title="Remove"
+                        onClick={() => deleteItem.mutate(item.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
+                  {partialId === item.id && (
+                    <div className="flex gap-2 mt-1.5 ml-0">
+                      <Input
+                        type="number"
+                        placeholder="Qty bought"
+                        value={partialQty}
+                        onChange={e => setPartialQty(e.target.value)}
+                        className="flex-1 h-8 text-sm"
+                        min="0.1"
+                        max={String(item.quantity)}
+                        step="any"
+                      />
+                      <Select value={partialUnit} onValueChange={setPartialUnit}>
+                        <SelectTrigger className="w-20 h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Button size="sm" className="h-8 text-xs" onClick={() => handlePartialBought(item)}>OK</Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recently bought */}
       <Card className="border-border/50 overflow-hidden">

@@ -556,29 +556,12 @@ export default function ChatPage() {
                       <ShoppingCart className="w-3 h-3" /> Add to list
                     </button>
                   </div>
-                  {/* Seen-by avatars */}
+                  {/* Seen-by names */}
                   {seenByMembers.length > 0 && (
-                    <div className={`flex items-center mt-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      <div className="flex -space-x-1.5">
-                        {seenByMembers.slice(0, 5).map((m) => (
-                          <div
-                            key={m.userId}
-                            className="w-4 h-4 rounded-full border-[1.5px] border-card overflow-hidden bg-primary/10 flex items-center justify-center animate-fade-in"
-                            title={m.name}
-                          >
-                            {m.avatar ? (
-                              <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-[7px] font-bold text-primary leading-none">
-                                {m.name.charAt(0).toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      {seenByMembers.length > 5 && (
-                        <span className="text-[9px] text-muted-foreground ml-1">+{seenByMembers.length - 5}</span>
-                      )}
+                    <div className={`flex items-center mt-0.5 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <span className="text-[9px] text-muted-foreground animate-fade-in">
+                        Seen by {seenByMembers.map(m => m.name).join(', ')}
+                      </span>
                     </div>
                   )}
                 </div>
