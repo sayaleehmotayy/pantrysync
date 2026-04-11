@@ -1,5 +1,6 @@
 import React from 'react';
 import { useInventory, InventoryItem } from '@/hooks/useInventory';
+import VoiceCommandBar from '@/components/VoiceCommandBar';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { useHousehold } from '@/contexts/HouseholdContext';
