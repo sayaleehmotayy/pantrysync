@@ -62,7 +62,9 @@ const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = "popper", ...props }, ref) => {
-  const viewportRef = React.useRef<HTMLDivElement>(null);
+  const viewportRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (node) setTimeout(() => node.scrollTo({ top: 0 }), 0);
+  }, []);
 
   return (
     <SelectPrimitive.Portal>
@@ -77,9 +79,6 @@ const SelectContent = React.forwardRef<
           className,
         )}
         position={position}
-        onOpenAutoFocus={() => {
-          setTimeout(() => viewportRef.current?.scrollTo({ top: 0 }), 0);
-        }}
         {...props}
       >
         <SelectPrimitive.Viewport
