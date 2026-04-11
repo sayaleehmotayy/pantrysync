@@ -23,12 +23,17 @@ export default function RecipesPage() {
   const [showMatching, setShowMatching] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
+  const MEAL_TYPES = useMemo(() => {
+    const cats = new Set(recipes.map(r => r.category || 'Other'));
+    return ['all', ...Array.from(cats).sort()];
+  }, [recipes]);
+
   const matched = useMemo(() => {
     if (!showMatching) return null;
     return matchRecipes(recipes, inventory);
   }, [recipes, inventory, showMatching]);
 
-  const displayRecipes = matched || recipes.map(r => ({
+  const displayRecipes = (matched || recipes.map(r => ({
     recipe: r,
     ingredients: r.ingredients,
     matches: [],
@@ -37,7 +42,7 @@ export default function RecipesPage() {
     missingIngredients: [],
     insufficientIngredients: [],
     availableIngredients: [],
-  } as RecipeMatch));
+  } as RecipeMatch))).filter(m => categoryFilter === 'all' || m.recipe.category === categoryFilter);
 
   const addMissingToShoppingList = (match: RecipeMatch) => {
     const missing = [...match.missingIngredients, ...match.insufficientIngredients];
