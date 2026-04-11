@@ -14,6 +14,7 @@ import ChatPage from "./pages/ChatPage";
 import ExpiryPage from "./pages/ExpiryPage";
 import ActivityPage from "./pages/ActivityPage";
 import SettingsPage from "./pages/SettingsPage";
+import AiPage from "./pages/AiPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import { usePushNotifications } from "./hooks/usePushNotifications";
@@ -47,6 +48,7 @@ function AppRoutes() {
         <Route path="/expiry" element={<ExpiryPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/ai" element={<AiPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
