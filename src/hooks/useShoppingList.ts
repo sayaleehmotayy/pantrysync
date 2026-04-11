@@ -4,6 +4,34 @@ import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+// Unit conversion map to a base unit
+const UNIT_TO_BASE: Record<string, { base: string; factor: number }> = {
+  g: { base: 'g', factor: 1 },
+  kg: { base: 'g', factor: 1000 },
+  ml: { base: 'ml', factor: 1 },
+  l: { base: 'ml', factor: 1000 },
+  pieces: { base: 'pieces', factor: 1 },
+  cups: { base: 'cups', factor: 1 },
+  tbsp: { base: 'tbsp', factor: 1 },
+  tsp: { base: 'tsp', factor: 1 },
+};
+
+function convertUnits(qty: number, fromUnit: string, toUnit: string): number | null {
+  const from = UNIT_TO_BASE[fromUnit];
+  const to = UNIT_TO_BASE[toUnit];
+  if (!from || !to || from.base !== to.base) return null; // incompatible units
+  return (qty * from.factor) / to.factor;
+}
+
+// Pick the best display unit for a quantity
+function bestDisplayUnit(qty: number, unit: string): { quantity: number; unit: string } {
+  if (unit === 'g' && qty >= 1000) return { quantity: qty / 1000, unit: 'kg' };
+  if (unit === 'ml' && qty >= 1000) return { quantity: qty / 1000, unit: 'l' };
+  if (unit === 'kg' && qty < 1) return { quantity: qty * 1000, unit: 'g' };
+  if (unit === 'l' && qty < 1) return { quantity: qty * 1000, unit: 'ml' };
+  return { quantity: qty, unit };
+}
+
 export interface ShoppingItem {
   id: string;
   household_id: string;
