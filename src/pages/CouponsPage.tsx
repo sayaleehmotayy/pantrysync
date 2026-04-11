@@ -104,8 +104,15 @@ export default function CouponsPage() {
       toast.error('Failed to upload image');
       return null;
     }
-    const { data: { publicUrl } } = supabase.storage.from('receipt-images').getPublicUrl(filePath);
-    return publicUrl;
+    // Store just the path; we'll create signed URLs for display
+    return filePath;
+  };
+
+  const getSignedUrl = async (filePath: string): Promise<string> => {
+    // If it's already a full URL (legacy data), return as-is
+    if (filePath.startsWith('http')) return filePath;
+    const { data } = await supabase.storage.from('receipt-images').createSignedUrl(filePath, 3600);
+    return data?.signedUrl || '';
   };
 
   const handleCodeSubmit = async () => {
