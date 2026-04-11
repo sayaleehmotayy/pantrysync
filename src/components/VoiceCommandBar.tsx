@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
+import { useShoppingList } from '@/hooks/useShoppingList';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
