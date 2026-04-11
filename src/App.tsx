@@ -23,6 +23,7 @@ const queryClient = new QueryClient();
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth();
   const { household, loading: hhLoading } = useHousehold();
+  usePushNotifications();
 
   if (authLoading || (user && hhLoading)) {
     return (
