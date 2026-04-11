@@ -27,6 +27,7 @@ export default function AuthPage() {
       setError(result.error.message);
     }
     setLoading(false);
+    // On successful signup, auto-confirm is enabled so onAuthStateChange will handle redirect
   };
 
   return (
