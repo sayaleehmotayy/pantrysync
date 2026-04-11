@@ -388,8 +388,29 @@ const runPushTokenRegistration = async ({
         });
       });
 
-      await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-        console.log('[push] notification received', notification);
+      await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+        console.log('[push] foreground notification received', notification);
+
+        // On Android, foreground notifications are suppressed by default.
+        // Show a local notification so the user sees a banner.
+        try {
+          const { LocalNotifications } = await import('@capacitor/local-notifications');
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title: notification.title || 'PantrySync',
+                body: notification.body || '',
+                id: Math.floor(Date.now() % 2147483647),
+                sound: 'default',
+                channelId: 'mentions',
+                extra: notification.data,
+              },
+            ],
+          });
+          console.log('[push] scheduled local notification for foreground display');
+        } catch (localErr) {
+          console.warn('[push] local notification fallback failed', localErr);
+        }
       });
 
       await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
