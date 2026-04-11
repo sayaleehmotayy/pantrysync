@@ -43,6 +43,19 @@ export interface RecipeMatch {
   availableIngredients: IngredientMatch[];
 }
 
+function singularize(word: string): string {
+  const w = word.toLowerCase().trim();
+  if (w.endsWith('ies')) return w.slice(0, -3) + 'y';
+  if (w.endsWith('ves')) return w.slice(0, -3) + 'f';
+  if (w.endsWith('ses') || w.endsWith('xes') || w.endsWith('zes') || w.endsWith('ches') || w.endsWith('shes')) return w.slice(0, -2);
+  if (w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  return w;
+}
+
+function normalizeItemName(name: string): string {
+  return singularize(name.toLowerCase().trim());
+}
+
 function normalizeUnit(unit: string): { normalized: string; factor: number } {
   const u = unit.toLowerCase().trim();
   if (['kg', 'kilogram', 'kilograms'].includes(u)) return { normalized: 'g', factor: 1000 };
@@ -65,7 +78,7 @@ export function matchRecipes(recipes: (Recipe & { ingredients: RecipeIngredient[
   const inventoryMap = new Map<string, { quantity: number; unit: string }>();
   
   for (const item of inventory) {
-    const key = item.name.toLowerCase().trim();
+    const key = normalizeItemName(item.name);
     const norm = normalizeQuantity(item.quantity, item.unit);
     const existing = inventoryMap.get(key);
     if (existing && existing.unit === norm.unit) {
@@ -78,7 +91,7 @@ export function matchRecipes(recipes: (Recipe & { ingredients: RecipeIngredient[
   return recipes.map(recipe => {
     const requiredIngredients = recipe.ingredients.filter(i => !i.is_optional);
     const matches: IngredientMatch[] = recipe.ingredients.map(ingredient => {
-      const key = ingredient.name.toLowerCase().trim();
+      const key = normalizeItemName(ingredient.name);
       const pantryItem = inventoryMap.get(key);
       const requiredNorm = normalizeQuantity(ingredient.quantity, ingredient.unit);
 
