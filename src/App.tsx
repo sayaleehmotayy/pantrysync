@@ -15,6 +15,7 @@ import ExpiryPage from "./pages/ExpiryPage";
 import ActivityPage from "./pages/ActivityPage";
 import SettingsPage from "./pages/SettingsPage";
 import AiPage from "./pages/AiPage";
+import CouponsPage from "./pages/CouponsPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import { usePushNotifications } from "./hooks/usePushNotifications";
@@ -49,6 +50,7 @@ function AppRoutes() {
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/ai" element={<AiPage />} />
+        <Route path="/coupons" element={<CouponsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>

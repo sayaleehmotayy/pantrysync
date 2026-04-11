@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity, MoreHorizontal, X, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity, MoreHorizontal, X, Sparkles, Tag } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
@@ -11,6 +11,7 @@ const navItems = [
 ];
 
 const moreItems = [
+  { to: '/coupons', icon: Tag, label: 'Coupons' },
   { to: '/ai', icon: Sparkles, label: 'AI Assistant' },
   { to: '/expiry', icon: Clock, label: 'Expiry' },
   { to: '/activity', icon: Activity, label: 'Activity' },
