@@ -10,7 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface VoiceAction {
-  type: 'add_inventory' | 'remove_inventory' | 'update_quantity' | 'add_shopping';
+  type: 'add_inventory' | 'remove_inventory' | 'update_quantity' | 'add_shopping' | 'remove_shopping' | 'clear_shopping';
   name: string;
   quantity: number;
   unit: string;
