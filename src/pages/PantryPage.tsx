@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Frozen', 'Sauces', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'bottles', 'packets'];
-const LOCATIONS = ['pantry', 'fridge', 'freezer', 'kitchen'];
+const LOCATIONS = ['pantry', 'fridge', 'freezer'];
 
 function ItemForm({ onSubmit, initial, submitLabel }: {
   onSubmit: (item: { name: string; quantity: number; unit: string; category: string; expiry_date?: string | null; storage_location?: string; min_threshold?: number }) => void;
@@ -34,18 +34,18 @@ function ItemForm({ onSubmit, initial, submitLabel }: {
       <div className="flex gap-3">
         <Input type="number" placeholder="Qty" value={quantity} onChange={e => setQuantity(e.target.value)} required min="0" step="any" className="flex-1" />
         <Select value={unit} onValueChange={setUnit}>
-          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-          <SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+          <SelectTrigger className="w-28"><SelectValue placeholder="Unit" /></SelectTrigger>
+          <SelectContent side="bottom">{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div className="flex gap-3">
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="flex-1"><SelectValue placeholder="Category" /></SelectTrigger>
-          <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-        </Select>
         <Select value={location} onValueChange={setLocation}>
           <SelectTrigger className="flex-1"><SelectValue placeholder="Location" /></SelectTrigger>
-          <SelectContent>{LOCATIONS.map(l => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}</SelectContent>
+          <SelectContent side="bottom">{LOCATIONS.map(l => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger className="flex-1"><SelectValue placeholder="Type of product" /></SelectTrigger>
+          <SelectContent side="bottom">{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div className="flex gap-3">
@@ -123,7 +123,26 @@ export default function PantryPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Pantry Item</DialogTitle></DialogHeader>
-            <ItemForm submitLabel="Add to Pantry" onSubmit={item => { addItem.mutate(item); setAddOpen(false); }} />
+            <ItemForm submitLabel="Add to Pantry" onSubmit={item => {
+              // Check for existing item with same name (case-insensitive) and same location
+              const normalizedName = item.name.toLowerCase().trim();
+              const existing = items.find(i =>
+                i.name.toLowerCase().trim() === normalizedName &&
+                i.storage_location === item.storage_location
+              );
+              if (existing) {
+                updateItem.mutate({
+                  id: existing.id,
+                  quantity: existing.quantity + item.quantity,
+                  _logDetails: `Added ${item.quantity} more (${existing.quantity} → ${existing.quantity + item.quantity} ${existing.unit})`,
+                  name: existing.name,
+                });
+                toast.success(`Updated ${existing.name} quantity`);
+              } else {
+                addItem.mutate(item);
+              }
+              setAddOpen(false);
+            }} />
           </DialogContent>
         </Dialog>
       </div>
