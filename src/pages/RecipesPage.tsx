@@ -68,7 +68,19 @@ export default function RecipesPage() {
         </Button>
       </div>
 
-      {recipesLoading ? (
+      <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+        <SelectTrigger className="w-full">
+          <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+          <SelectValue placeholder="Filter by meal type" />
+        </SelectTrigger>
+        <SelectContent>
+          {MEAL_TYPES.map(cat => (
+            <SelectItem key={cat} value={cat}>
+              {cat === 'all' ? 'All Categories' : cat}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
         <div className="flex items-center justify-center py-16 text-muted-foreground">Loading recipes...</div>
       ) : displayRecipes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
