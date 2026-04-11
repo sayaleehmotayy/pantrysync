@@ -13,12 +13,26 @@ export interface InventoryItem {
   category: string;
   added_by: string | null;
   updated_at: string;
+  expiry_date: string | null;
+  storage_location: string;
+  min_threshold: number;
 }
 
 export function useInventory() {
   const { household } = useHousehold();
   const { user } = useAuth();
   const qc = useQueryClient();
+
+  const logActivity = async (action: string, itemName: string, details?: string) => {
+    if (!household || !user) return;
+    await supabase.from('activity_log').insert({
+      household_id: household.id,
+      user_id: user.id,
+      action,
+      item_name: itemName,
+      details,
+    });
+  };
 
   const query = useQuery({
     queryKey: ['inventory', household?.id],
@@ -37,7 +51,7 @@ export function useInventory() {
   });
 
   const addItem = useMutation({
-    mutationFn: async (item: { name: string; quantity: number; unit: string; category: string }) => {
+    mutationFn: async (item: { name: string; quantity: number; unit: string; category: string; expiry_date?: string | null; storage_location?: string; min_threshold?: number }) => {
       if (!household || !user) throw new Error('No household');
       const { error } = await supabase.from('inventory_items').insert({
         ...item,
@@ -45,28 +59,44 @@ export function useInventory() {
         added_by: user.id,
       });
       if (error) throw error;
+      await logActivity('added', item.name, `${item.quantity} ${item.unit}`);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); toast.success('Item added to pantry'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); qc.invalidateQueries({ queryKey: ['activity'] }); toast.success('Item added to pantry'); },
     onError: (e) => toast.error(e.message),
   });
 
   const updateItem = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<InventoryItem> & { id: string }) => {
+    mutationFn: async ({ id, _logDetails, ...updates }: Partial<InventoryItem> & { id: string; _logDetails?: string }) => {
       const { error } = await supabase.from('inventory_items').update(updates).eq('id', id);
       if (error) throw error;
+      if (_logDetails && updates.name) {
+        await logActivity('updated', updates.name, _logDetails);
+      }
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); toast.success('Item updated'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); qc.invalidateQueries({ queryKey: ['activity'] }); },
     onError: (e) => toast.error(e.message),
   });
 
   const deleteItem = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, name }: { id: string; name?: string }) => {
       const { error } = await supabase.from('inventory_items').delete().eq('id', id);
       if (error) throw error;
+      if (name) await logActivity('removed', name);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); toast.success('Item removed'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); qc.invalidateQueries({ queryKey: ['activity'] }); toast.success('Item removed'); },
     onError: (e) => toast.error(e.message),
   });
 
-  return { ...query, addItem, updateItem, deleteItem };
+  const quickUse = useMutation({
+    mutationFn: async ({ item, amount, action }: { item: InventoryItem; amount: number; action: string }) => {
+      const newQty = Math.max(0, item.quantity - amount);
+      const { error } = await supabase.from('inventory_items').update({ quantity: newQty }).eq('id', item.id);
+      if (error) throw error;
+      await logActivity('used', item.name, `${action} (${item.quantity} → ${newQty} ${item.unit})`);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); qc.invalidateQueries({ queryKey: ['activity'] }); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return { ...query, addItem, updateItem, deleteItem, quickUse };
 }

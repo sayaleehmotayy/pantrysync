@@ -6,10 +6,13 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { HouseholdProvider, useHousehold } from "@/contexts/HouseholdContext";
 import AuthPage from "./pages/AuthPage";
 import HouseholdSetup from "./pages/HouseholdSetup";
+import DashboardPage from "./pages/DashboardPage";
 import PantryPage from "./pages/PantryPage";
 import ShoppingPage from "./pages/ShoppingPage";
 import RecipesPage from "./pages/RecipesPage";
 import ChatPage from "./pages/ChatPage";
+import ExpiryPage from "./pages/ExpiryPage";
+import ActivityPage from "./pages/ActivityPage";
 import SettingsPage from "./pages/SettingsPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
@@ -34,10 +37,13 @@ function AppRoutes() {
   return (
     <AppLayout>
       <Routes>
-        <Route path="/" element={<PantryPage />} />
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/pantry" element={<PantryPage />} />
         <Route path="/shopping" element={<ShoppingPage />} />
         <Route path="/recipes" element={<RecipesPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/expiry" element={<ExpiryPage />} />
+        <Route path="/activity" element={<ActivityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
