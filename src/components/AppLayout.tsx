@@ -1,12 +1,18 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Package, ShoppingCart, ChefHat, MessageCircle, Settings } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity } from 'lucide-react';
 
 const navItems = [
-  { to: '/', icon: Package, label: 'Pantry' },
-  { to: '/shopping', icon: ShoppingCart, label: 'Shopping' },
+  { to: '/', icon: LayoutDashboard, label: 'Home' },
+  { to: '/pantry', icon: Package, label: 'Pantry' },
+  { to: '/shopping', icon: ShoppingCart, label: 'Shop' },
   { to: '/recipes', icon: ChefHat, label: 'Recipes' },
   { to: '/chat', icon: MessageCircle, label: 'Chat' },
+];
+
+const sidebarOnlyItems = [
+  { to: '/expiry', icon: Clock, label: 'Expiry' },
+  { to: '/activity', icon: Activity, label: 'Activity' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -23,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <span className="font-display font-bold text-lg">PantrySync</span>
         </div>
-        {navItems.map(item => {
+        {[...navItems, ...sidebarOnlyItems].map(item => {
           const active = location.pathname === item.to;
           return (
             <NavLink
@@ -46,7 +52,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-2 py-1 z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-1 py-1 z-50">
         <div className="flex justify-around">
           {navItems.map(item => {
             const active = location.pathname === item.to;
@@ -54,7 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center gap-0.5 py-2 px-3 text-[10px] font-medium transition-colors ${
+                className={`flex flex-col items-center gap-0.5 py-2 px-2 text-[10px] font-medium transition-colors ${
                   active ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
