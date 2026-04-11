@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PantrySync</string>
+    <string name="title_activity_main">PantrySync</string>
+    <string name="package_name">com.pantrysync.app</string>
+    <string name="custom_url_scheme">com.pantrysync.app</string>
+</resources>
