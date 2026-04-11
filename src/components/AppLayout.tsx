@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity, MoreHorizontal, X } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
@@ -10,14 +10,19 @@ const navItems = [
   { to: '/chat', icon: MessageCircle, label: 'Chat' },
 ];
 
-const sidebarOnlyItems = [
+const moreItems = [
   { to: '/expiry', icon: Clock, label: 'Expiry' },
   { to: '/activity', icon: Activity, label: 'Activity' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
+const allSidebarItems = [...navItems, ...moreItems];
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const moreActive = moreItems.some(i => i.to === location.pathname);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-background">
@@ -29,13 +34,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <span className="font-display font-bold text-lg">PantrySync</span>
         </div>
-        {[...navItems, ...sidebarOnlyItems].map(item => {
+        {allSidebarItems.map(item => {
           const active = location.pathname === item.to;
           return (
             <NavLink
               key={item.to}
               to={item.to}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
@@ -51,8 +56,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
+      {/* Mobile "More" overlay */}
+      {moreOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex items-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMoreOpen(false)} />
+          <div className="relative w-full bg-card rounded-t-2xl p-4 pb-8 animate-slide-up shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-semibold text-sm">More</h3>
+              <button onClick={() => setMoreOpen(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {moreItems.map(item => {
+                const active = location.pathname === item.to;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMoreOpen(false)}
+                    className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-medium transition-all duration-200 ${
+                      active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-1 py-1 z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border px-1 py-1 z-40">
         <div className="flex justify-around">
           {navItems.map(item => {
             const active = location.pathname === item.to;
@@ -60,15 +98,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center gap-0.5 py-2 px-2 text-[10px] font-medium transition-colors ${
+                className={`flex flex-col items-center gap-0.5 py-2 px-2 text-[10px] font-medium transition-all duration-200 ${
                   active ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
-                <item.icon className={`w-5 h-5 ${active ? 'text-primary' : ''}`} />
+                <item.icon className={`w-5 h-5 transition-transform duration-200 ${active ? 'text-primary scale-110' : ''}`} />
                 {item.label}
               </NavLink>
             );
           })}
+          <button
+            onClick={() => setMoreOpen(true)}
+            className={`flex flex-col items-center gap-0.5 py-2 px-2 text-[10px] font-medium transition-all duration-200 ${
+              moreActive ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            <MoreHorizontal className={`w-5 h-5 transition-transform duration-200 ${moreActive ? 'text-primary scale-110' : ''}`} />
+            More
+          </button>
         </div>
       </nav>
     </div>
