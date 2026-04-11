@@ -3,6 +3,7 @@ import { useInventory, InventoryItem } from '@/hooks/useInventory';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { useHousehold } from '@/contexts/HouseholdContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
