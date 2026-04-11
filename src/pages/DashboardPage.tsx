@@ -219,36 +219,36 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Recent activity */}
+      {/* Recently bought */}
       <Card className="border-border/50 overflow-hidden">
         <CardHeader className="pb-2 pt-4 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-display flex items-center gap-2">
-              <Activity className="w-4 h-4" /> Recent Activity
+              <ShoppingCart className="w-4 h-4 text-primary" /> Recently Bought
             </CardTitle>
-            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => navigate('/activity')}>
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => navigate('/shopping')}>
               View all <ChevronRight className="w-3 h-3 ml-1" />
             </Button>
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-4">
-          {activities.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
+          {recentlyBought.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No recently bought items</p>
           ) : (
-            <div className="space-y-3">
-              {activities.slice(0, 6).map(a => (
-                <div key={a.id} className="flex items-start gap-2.5 text-sm">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm">
-                      <span className="font-medium">{getMemberName(a.user_id)}</span>{' '}
-                      <span className="text-muted-foreground">{a.action}</span>{' '}
-                      {a.item_name && <span className="font-medium">{a.item_name}</span>}
-                    </p>
-                    {a.details && <p className="text-xs text-muted-foreground">{a.details}</p>}
-                    <p className="text-[10px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
-                    </p>
+            <div className="space-y-2.5">
+              {recentlyBought.slice(0, 6).map(item => (
+                <div key={item.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-primary" />
+                    </div>
+                    <span>{item.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{item.bought_quantity || item.quantity} {item.unit}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
+                    </span>
                   </div>
                 </div>
               ))}

@@ -22,7 +22,7 @@ function ItemForm({ onSubmit, initial, submitLabel }: {
 }) {
   const [name, setName] = useState(initial?.name || '');
   const [quantity, setQuantity] = useState(String(initial?.quantity || ''));
-  const [unit, setUnit] = useState(initial?.unit || 'pieces');
+  const [unit, setUnit] = useState(initial?.unit || '');
   const [category, setCategory] = useState(initial?.category || 'Other');
   const [expiryDate, setExpiryDate] = useState(initial?.expiry_date || '');
   const [location, setLocation] = useState(initial?.storage_location || 'pantry');
@@ -34,7 +34,7 @@ function ItemForm({ onSubmit, initial, submitLabel }: {
       <div className="flex gap-3">
         <Input type="number" placeholder="Qty" value={quantity} onChange={e => setQuantity(e.target.value)} required min="0" step="any" className="flex-1" />
         <Select value={unit} onValueChange={setUnit}>
-          <SelectTrigger className="w-28"><SelectValue placeholder="Unit" /></SelectTrigger>
+          <SelectTrigger className="w-28"><SelectValue placeholder="Units" /></SelectTrigger>
           <SelectContent side="bottom" position="popper">{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
         </Select>
       </div>
