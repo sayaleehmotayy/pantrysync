@@ -20,7 +20,24 @@ interface ChatMessage {
   sender_name?: string;
 }
 
+interface MentionTarget {
+  userId: string;
+  label: string;
+}
+
+interface MentionOption {
+  id: string;
+  label: string;
+  isEveryone?: boolean;
+  normalizedLabel: string;
+}
+
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
+
+const normalizeDisplayName = (value: string | null | undefined) =>
+  (value ?? '').trim().replace(/\s+/g, ' ');
+
+const isMentionBoundary = (value?: string) => !value || /[\s.,!?;:()\[\]{}"']/.test(value);
 
 export default function ChatPage() {
   const { user } = useAuth();
@@ -43,18 +60,26 @@ export default function ChatPage() {
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const memberMap = new Map(members.map(m => [m.user_id, m.profile?.display_name || 'Unknown']));
+  const memberMap = new Map(
+    members.map((member) => [member.user_id, normalizeDisplayName(member.profile?.display_name) || 'Unknown'])
+  );
 
-  // Build mention options
-  const mentionOptions = [
-    { id: 'everyone', label: 'Everyone', isEveryone: true },
+  const mentionOptions: MentionOption[] = [
+    { id: 'everyone', label: 'Everyone', isEveryone: true, normalizedLabel: 'everyone' },
     ...members
-      .filter(m => m.user_id !== user?.id)
-      .map(m => ({ id: m.user_id, label: m.profile?.display_name || 'Unknown' })),
+      .filter((member) => member.user_id !== user?.id)
+      .map((member) => {
+        const label = normalizeDisplayName(member.profile?.display_name) || 'Unknown';
+        return {
+          id: member.user_id,
+          label,
+          normalizedLabel: label.toLowerCase(),
+        };
+      }),
   ];
 
   useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 30000);
+    const interval = setInterval(() => setTick((tick) => tick + 1), 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -62,36 +87,55 @@ export default function ChatPage() {
     if (!household) return;
 
     const fetchMessages = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('household_id', household.id)
         .order('created_at', { ascending: true })
         .limit(200);
 
+      if (error) {
+        console.error('[chat] failed to load messages', error);
+        setLoading(false);
+        return;
+      }
+
+      console.log('[chat] loaded messages', { householdId: household.id, count: data?.length ?? 0 });
+
       if (data) {
-        setMessages(data.map(m => ({ ...m, sender_name: memberMap.get(m.user_id) || 'Unknown' })));
+        setMessages(data.map((message) => ({ ...message, sender_name: memberMap.get(message.user_id) || 'Unknown' })));
       }
       setLoading(false);
     };
 
-    fetchMessages();
+    void fetchMessages();
 
     const channel = supabase
       .channel(`chat-${household.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages',
-        filter: `household_id=eq.${household.id}`,
-      }, (payload) => {
-        const msg = payload.new as ChatMessage;
-        msg.sender_name = memberMap.get(msg.user_id) || 'Unknown';
-        setMessages(prev => [...prev, msg]);
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `household_id=eq.${household.id}`,
+        },
+        (payload) => {
+          const message = payload.new as ChatMessage;
+          message.sender_name = memberMap.get(message.user_id) || 'Unknown';
+          console.log('[chat] realtime message received', {
+            chatMessageId: message.id,
+            householdId: message.household_id,
+            userId: message.user_id,
+          });
+          setMessages((prev) => [...prev, message]);
+        },
+      )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [household, members]);
 
   useEffect(() => {
@@ -127,103 +171,151 @@ export default function ChatPage() {
           description: items.map((i: any) => `${i.quantity} ${i.unit} ${i.name}`).join(', '),
         });
       }
-    } catch (e) {
-      console.error('Failed to parse shopping items:', e);
+    } catch (error) {
+      console.error('Failed to parse shopping items:', error);
     } finally {
       setAiParsing(false);
     }
   }, [addItem]);
 
-  // Extract @mentions from message content
-  const extractMentions = useCallback((content: string): string[] => {
-    const mentionRegex = /@(\w+(?:\s\w+)*)/g;
-    const mentionedIds: string[] = [];
-    let match;
+  const extractMentions = useCallback((content: string): MentionTarget[] => {
+    const mentionTargets: MentionTarget[] = [];
+    const mentionStartPattern = /(^|\s)@/g;
+    const sortedOptions = [...mentionOptions].sort(
+      (left, right) => right.normalizedLabel.length - left.normalizedLabel.length,
+    );
+    let mentionStart: RegExpExecArray | null;
 
-    while ((match = mentionRegex.exec(content)) !== null) {
-      const mentionName = match[1].toLowerCase();
-      if (mentionName === 'everyone') {
-        // Add all other members
-        members.forEach(m => {
-          if (m.user_id !== user?.id) mentionedIds.push(m.user_id);
+    while ((mentionStart = mentionStartPattern.exec(content)) !== null) {
+      const rawAfterAt = content.slice(mentionStart.index + mentionStart[0].length);
+      const normalizedAfterAt = rawAfterAt.replace(/\s+/g, ' ').trimStart().toLowerCase();
+      const matchedOption = sortedOptions.find(
+        (option) =>
+          normalizedAfterAt.startsWith(option.normalizedLabel) &&
+          isMentionBoundary(normalizedAfterAt[option.normalizedLabel.length]),
+      );
+
+      if (!matchedOption) continue;
+
+      if (matchedOption.isEveryone) {
+        members.forEach((member) => {
+          if (member.user_id === user?.id) return;
+          mentionTargets.push({
+            userId: member.user_id,
+            label: normalizeDisplayName(member.profile?.display_name) || 'Unknown',
+          });
         });
-      } else {
-        // Find matching member
-        const member = members.find(m =>
-          (m.profile?.display_name || '').toLowerCase() === mentionName
-        );
-        if (member && member.user_id !== user?.id) {
-          mentionedIds.push(member.user_id);
-        }
+        continue;
+      }
+
+      if (matchedOption.id !== user?.id) {
+        mentionTargets.push({ userId: matchedOption.id, label: matchedOption.label });
       }
     }
 
-    return [...new Set(mentionedIds)];
-  }, [members, user]);
+    const uniqueMentionTargets = Array.from(
+      new Map(mentionTargets.map((target) => [target.userId, target])).values(),
+    );
 
-  // Send push notifications for mentions
-  const sendMentionNotifications = useCallback(async (content: string, chatMessageId?: string) => {
-    const mentionedUserIds = extractMentions(content);
-    if (mentionedUserIds.length === 0) return;
+    console.log('[chat] mention detection', {
+      content,
+      mentions: uniqueMentionTargets,
+    });
 
-    const senderName = memberMap.get(user?.id || '') || 'Someone';
+    return uniqueMentionTargets;
+  }, [members, mentionOptions, user?.id]);
 
-    try {
-      await supabase.functions.invoke('send-push-notification', {
-        body: {
-          mentioned_user_ids: mentionedUserIds,
-          sender_name: senderName,
-          message: content,
-          household_id: household?.id,
-          chat_message_id: chatMessageId,
-          sender_id: user?.id,
-        },
-      });
-    } catch (e) {
-      console.error('Failed to send push notifications:', e);
+  const sendMentionNotifications = useCallback(async (content: string, chatMessageId: string) => {
+    if (!user?.id || !household?.id) return;
+
+    const mentionTargets = extractMentions(content);
+    if (mentionTargets.length === 0) {
+      console.log('[chat] no valid mentions detected, skipping push', { content });
+      return;
     }
 
-    // Also show browser notification for web users
-    if ('Notification' in window && Notification.permission === 'granted') {
-      // Only show if user is mentioned (for testing on same device)
+    const senderName = memberMap.get(user.id) || 'Someone';
+    console.log('[chat] calling send-push-notification', {
+      chatMessageId,
+      householdId: household.id,
+      senderId: user.id,
+      senderName,
+      mentionTargets,
+      content,
+    });
+
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: {
+        mentioned_user_ids: mentionTargets.map((target) => target.userId),
+        sender_name: senderName,
+        message: content,
+        household_id: household.id,
+        chat_message_id: chatMessageId,
+        sender_id: user.id,
+      },
+    });
+
+    if (error) {
+      console.error('[chat] send-push-notification failed', error);
+      return;
     }
-  }, [extractMentions, memberMap, user, household]);
+
+    console.log('[chat] send-push-notification result', data);
+  }, [extractMentions, household?.id, memberMap, user?.id]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !user || !household) return;
 
     const content = newMessage.trim();
-
-    const { data: insertedMsg } = await supabase.from('chat_messages').insert({
-      household_id: household.id,
-      user_id: user.id,
+    console.log('[chat] sending message', {
+      userId: user.id,
+      householdId: household.id,
       content,
-    }).select('id').single();
+    });
+
+    const { data: insertedMsg, error } = await supabase
+      .from('chat_messages')
+      .insert({
+        household_id: household.id,
+        user_id: user.id,
+        content,
+      })
+      .select('id')
+      .single();
+
+    if (error || !insertedMsg) {
+      console.error('[chat] failed to save message', error);
+      toast.error('Failed to send message');
+      return;
+    }
+
+    console.log('[chat] message saved', {
+      chatMessageId: insertedMsg.id,
+      householdId: household.id,
+      userId: user.id,
+    });
 
     setNewMessage('');
     setShowMentions(false);
 
-    // Parse for shopping items and send mention notifications in parallel
-    parseAndAddItems(content);
-    sendMentionNotifications(content, insertedMsg?.id);
+    void parseAndAddItems(content);
+    void sendMentionNotifications(content, insertedMsg.id);
   };
 
-  // Handle input change with @mention detection
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const cursorPos = e.target.selectionStart || 0;
     setNewMessage(value);
 
-    // Check if we're in an @mention context
     const textBeforeCursor = value.slice(0, cursorPos);
     const atIndex = textBeforeCursor.lastIndexOf('@');
 
     if (atIndex !== -1) {
       const charBeforeAt = atIndex > 0 ? textBeforeCursor[atIndex - 1] : ' ';
-      const textAfterAt = textBeforeCursor.slice(atIndex + 1);
-      const hasSpace = textAfterAt.includes(' ') && !mentionOptions.some(o =>
-        o.label.toLowerCase().startsWith(textAfterAt.toLowerCase())
+      const textAfterAt = textBeforeCursor.slice(atIndex + 1).replace(/\s+/g, ' ').trimStart();
+      const hasSpace = textAfterAt.includes(' ') && !mentionOptions.some((option) =>
+        option.normalizedLabel.startsWith(textAfterAt.toLowerCase()),
       );
 
       if ((charBeforeAt === ' ' || atIndex === 0) && !hasSpace) {
@@ -238,18 +330,18 @@ export default function ChatPage() {
   };
 
   const handleMentionSelect = (option: { id: string; label: string }) => {
+    const selectedLabel = normalizeDisplayName(option.label) || option.label.trim();
     const textBefore = newMessage.slice(0, mentionCursorPos);
     const textAfterCursor = newMessage.slice(inputRef.current?.selectionStart || mentionCursorPos);
-    // Find end of current mention text
-    const afterAt = textAfterCursor.replace(/^\S*/, '');
-    const newValue = `${textBefore}@${option.label} ${afterAt}`;
+    const remainder = textAfterCursor.replace(/^\S*/, '').trimStart();
+    const newValue = `${textBefore}@${selectedLabel}${remainder ? ` ${remainder}` : ' '}`;
+
     setNewMessage(newValue);
     setShowMentions(false);
 
-    // Refocus input
     setTimeout(() => {
       inputRef.current?.focus();
-      const pos = textBefore.length + option.label.length + 2;
+      const pos = textBefore.length + selectedLabel.length + 2;
       inputRef.current?.setSelectionRange(pos, pos);
     }, 0);
   };
