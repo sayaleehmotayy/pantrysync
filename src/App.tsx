@@ -16,6 +16,7 @@ import ActivityPage from "./pages/ActivityPage";
 import SettingsPage from "./pages/SettingsPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
+import { usePushNotifications } from "./hooks/usePushNotifications";
 
 const queryClient = new QueryClient();
 
