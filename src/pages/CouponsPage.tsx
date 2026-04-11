@@ -38,6 +38,7 @@ export default function CouponsPage() {
   const { user } = useAuth();
   const { household, members } = useHousehold();
   const [codes, setCodes] = useState<DiscountCode[]>([]);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [codeDialogOpen, setCodeDialogOpen] = useState(false);
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
@@ -82,6 +83,12 @@ export default function CouponsPage() {
       console.error('Failed to fetch codes:', error);
     } else {
       setCodes(data || []);
+      // Resolve signed URLs for receipt images
+      const urls: Record<string, string> = {};
+      await Promise.all((data || []).filter(d => d.receipt_image_url).map(async (d) => {
+        urls[d.id] = await getSignedUrl(d.receipt_image_url!);
+      }));
+      setSignedUrls(urls);
     }
     setLoading(false);
   };
@@ -104,8 +111,15 @@ export default function CouponsPage() {
       toast.error('Failed to upload image');
       return null;
     }
-    const { data: { publicUrl } } = supabase.storage.from('receipt-images').getPublicUrl(filePath);
-    return publicUrl;
+    // Store just the path; we'll create signed URLs for display
+    return filePath;
+  };
+
+  const getSignedUrl = async (filePath: string): Promise<string> => {
+    // If it's already a full URL (legacy data), return as-is
+    if (filePath.startsWith('http')) return filePath;
+    const { data } = await supabase.storage.from('receipt-images').createSignedUrl(filePath, 3600);
+    return data?.signedUrl || '';
   };
 
   const handleCodeSubmit = async () => {
@@ -257,12 +271,12 @@ export default function CouponsPage() {
               <Card key={item.id} className={`border-border/50 overflow-hidden ${isExpired(item.expiry_date) ? 'opacity-50' : ''}`}>
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
-                    {item.receipt_image_url && (
+                    {item.receipt_image_url && signedUrls[item.id] && (
                       <button
-                        onClick={() => setPreviewImage(item.receipt_image_url)}
+                        onClick={() => setPreviewImage(signedUrls[item.id])}
                         className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted"
                       >
-                        <img src={item.receipt_image_url} alt="Receipt" className="w-full h-full object-cover" />
+                        <img src={signedUrls[item.id]} alt="Receipt" className="w-full h-full object-cover" />
                       </button>
                     )}
                     <div className="flex-1 min-w-0">
