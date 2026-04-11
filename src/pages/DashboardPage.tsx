@@ -24,7 +24,7 @@ function getExpiryStatus(date: string | null): 'safe' | 'expiring' | 'expired' |
 
 export default function DashboardPage() {
   const { data: inventory = [] } = useInventory();
-  const { data: shopping = [] } = useShoppingList();
+  const { data: shopping = [], updateItem } = useShoppingList();
   const { data: activities = [], getMemberName } = useActivityLog(10);
   const { household } = useHousehold();
   const navigate = useNavigate();
