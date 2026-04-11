@@ -1,5 +1,6 @@
 import React from 'react';
 import { useInventory, InventoryItem } from '@/hooks/useInventory';
+import VoiceCommandBar from '@/components/VoiceCommandBar';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { useHousehold } from '@/contexts/HouseholdContext';
@@ -59,6 +60,9 @@ export default function DashboardPage() {
         <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-primary/10 blur-2xl" />
         <div className="absolute -right-2 -bottom-4 w-20 h-20 rounded-full bg-accent/10 blur-xl" />
       </div>
+
+      {/* AI Voice Command Bar */}
+      <VoiceCommandBar />
 
       {/* Quick actions */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
