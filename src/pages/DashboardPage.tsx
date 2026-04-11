@@ -58,8 +58,8 @@ export default function DashboardPage() {
 
   const handlePartialBought = (item: ShoppingItem) => {
     const qty = Number(partialQty);
-    if (qty > 0 && qty < item.quantity) {
-      updateItem.mutate({ id: item.id, status: 'partial', bought_quantity: qty });
+    if (qty > 0) {
+      updateItem.mutate({ id: item.id, status: 'partial', bought_quantity: qty, bought_unit: partialUnit });
     }
     setPartialId(null);
     setPartialQty('');
