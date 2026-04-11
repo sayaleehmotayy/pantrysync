@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: string | null
+          household_id: string
+          id: string
+          item_name: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: string | null
+          household_id: string
+          id?: string
+          item_name?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: string | null
+          household_id?: string
+          id?: string
+          item_name?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string
@@ -110,10 +148,13 @@ export type Database = {
           added_by: string | null
           category: string
           created_at: string
+          expiry_date: string | null
           household_id: string
           id: string
+          min_threshold: number | null
           name: string
           quantity: number
+          storage_location: string
           unit: string
           updated_at: string
         }
@@ -121,10 +162,13 @@ export type Database = {
           added_by?: string | null
           category?: string
           created_at?: string
+          expiry_date?: string | null
           household_id: string
           id?: string
+          min_threshold?: number | null
           name: string
           quantity?: number
+          storage_location?: string
           unit?: string
           updated_at?: string
         }
@@ -132,10 +176,13 @@ export type Database = {
           added_by?: string | null
           category?: string
           created_at?: string
+          expiry_date?: string | null
           household_id?: string
           id?: string
+          min_threshold?: number | null
           name?: string
           quantity?: number
+          storage_location?: string
           unit?: string
           updated_at?: string
         }
