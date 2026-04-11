@@ -46,8 +46,22 @@ apply from: 'capacitor.build.gradle'
 
 try {
     def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
+    if (!servicesJSON.exists()) {
+        def repoServicesJSON = file('../../public/google-services.json')
+        if (repoServicesJSON.exists()) {
+            copy {
+                from repoServicesJSON
+                into projectDir
+                rename { 'google-services.json' }
+            }
+            servicesJSON = file('google-services.json')
+            logger.info("Copied google-services.json from public/ into android/app")
+        }
+    }
+    if (servicesJSON.exists() && servicesJSON.text) {
         apply plugin: 'com.google.gms.google-services'
+    } else {
+        logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
