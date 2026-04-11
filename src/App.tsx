@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { HouseholdProvider, useHousehold } from "@/contexts/HouseholdContext";
+import { ProGate } from "@/components/ProGate";
 import AuthPage from "./pages/AuthPage";
 import HouseholdSetup from "./pages/HouseholdSetup";
 import DashboardPage from "./pages/DashboardPage";
@@ -44,13 +45,13 @@ function AppRoutes() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/pantry" element={<PantryPage />} />
         <Route path="/shopping" element={<ShoppingPage />} />
-        <Route path="/recipes" element={<RecipesPage />} />
-        <Route path="/chat" element={<ChatPage />} />
         <Route path="/expiry" element={<ExpiryPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/ai" element={<AiPage />} />
-        <Route path="/coupons" element={<CouponsPage />} />
+        <Route path="/recipes" element={<ProGate feature="Recipe Suggestions"><RecipesPage /></ProGate>} />
+        <Route path="/chat" element={<ProGate feature="Group Chat"><ChatPage /></ProGate>} />
+        <Route path="/ai" element={<ProGate feature="AI Assistant"><AiPage /></ProGate>} />
+        <Route path="/coupons" element={<ProGate feature="Discount Code Scanner"><CouponsPage /></ProGate>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
