@@ -21,6 +21,7 @@ export default function RecipesPage() {
   const { addItem: addShoppingItem } = useShoppingList();
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeMatch | null>(null);
   const [showMatching, setShowMatching] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   const matched = useMemo(() => {
     if (!showMatching) return null;
