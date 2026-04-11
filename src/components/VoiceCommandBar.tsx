@@ -26,6 +26,7 @@ export default function VoiceCommandBar() {
   const { household } = useHousehold();
   const { user } = useAuth();
   const { data: inventory = [] } = useInventory();
+  const { data: shopping = [] } = useShoppingList();
   const qc = useQueryClient();
 
   const executeActions = useCallback(async (actions: VoiceAction[]) => {
