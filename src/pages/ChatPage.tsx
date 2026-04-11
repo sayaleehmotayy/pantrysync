@@ -4,12 +4,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, MessageCircle, ShoppingCart } from 'lucide-react';
+import { Send, MessageCircle, ShoppingCart, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useShoppingList } from '@/hooks/useShoppingList';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ChatMessage {
   id: string;
@@ -18,6 +18,8 @@ interface ChatMessage {
   created_at: string;
   sender_name?: string;
 }
+
+const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
 
 export default function ChatPage() {
   const { user } = useAuth();
@@ -29,9 +31,17 @@ export default function ChatPage() {
   const [addToListMsg, setAddToListMsg] = useState<ChatMessage | null>(null);
   const [itemName, setItemName] = useState('');
   const [itemQty, setItemQty] = useState('1');
+  const [itemCategory, setItemCategory] = useState('Other');
+  const [, setTick] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const memberMap = new Map(members.map(m => [m.user_id, m.profile?.display_name || 'Unknown']));
+
+  // Auto-refresh timestamps every 30s
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!household) return;
@@ -90,17 +100,29 @@ export default function ChatPage() {
 
   const handleAddToList = () => {
     if (!itemName.trim()) return;
-    addItem.mutate({ name: itemName, quantity: Number(itemQty) || 1, unit: 'pieces', category: 'Other' });
+    addItem.mutate({ name: itemName, quantity: Number(itemQty) || 1, unit: 'pieces', category: itemCategory });
     setAddToListMsg(null);
     setItemName('');
     setItemQty('1');
+    setItemCategory('Other');
   };
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)] animate-fade-in">
       <div className="flex items-center justify-between mb-3">
         <h1 className="text-xl font-display font-bold">Chat</h1>
-        <span className="text-xs text-muted-foreground">{members.length} members</span>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { setAddToListMsg({ id: '', user_id: '', content: '', created_at: '' }); setItemName(''); }}
+            className="h-8 text-xs"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            <ShoppingCart className="w-3.5 h-3.5" />
+          </Button>
+          <span className="text-xs text-muted-foreground">{members.length} members</span>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1 mb-3">
@@ -123,21 +145,19 @@ export default function ChatPage() {
                   {!isMe && (
                     <p className="text-[10px] text-muted-foreground mb-0.5 px-1">{msg.sender_name}</p>
                   )}
-                  <div className={`rounded-2xl px-3 py-2 text-sm ${isMe ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm'}`}>
+                  <div className={`rounded-2xl px-3 py-2 text-sm transition-all duration-200 ${isMe ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm'}`}>
                     {msg.content}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 px-1">
                     <span className="text-[10px] text-muted-foreground">
                       {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                     </span>
-                    {!isMe && (
-                      <button
-                        onClick={() => { setAddToListMsg(msg); setItemName(msg.content.slice(0, 50)); }}
-                        className="text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5"
-                      >
-                        <ShoppingCart className="w-3 h-3" /> Add to list
-                      </button>
-                    )}
+                    <button
+                      onClick={() => { setAddToListMsg(msg); setItemName(msg.content.slice(0, 50)); }}
+                      className="text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-0.5"
+                    >
+                      <ShoppingCart className="w-3 h-3" /> Add to list
+                    </button>
                   </div>
                 </div>
               </div>
@@ -153,7 +173,7 @@ export default function ChatPage() {
           onChange={e => setNewMessage(e.target.value)}
           className="flex-1"
         />
-        <Button type="submit" size="icon" disabled={!newMessage.trim()}>
+        <Button type="submit" size="icon" disabled={!newMessage.trim()} className="transition-transform duration-200 active:scale-95">
           <Send className="w-4 h-4" />
         </Button>
       </form>
@@ -163,7 +183,13 @@ export default function ChatPage() {
           <DialogHeader><DialogTitle>Add to Shopping List</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Input placeholder="Item name" value={itemName} onChange={e => setItemName(e.target.value)} />
-            <Input type="number" placeholder="Quantity" value={itemQty} onChange={e => setItemQty(e.target.value)} min="1" />
+            <div className="flex gap-3">
+              <Input type="number" placeholder="Quantity" value={itemQty} onChange={e => setItemQty(e.target.value)} min="1" className="flex-1" />
+              <Select value={itemCategory} onValueChange={setItemCategory}>
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Category" /></SelectTrigger>
+                <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             <Button className="w-full" onClick={handleAddToList}>Add to Shopping List</Button>
           </div>
         </DialogContent>

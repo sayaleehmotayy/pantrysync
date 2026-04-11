@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import {
   Package, ShoppingCart, AlertTriangle, Clock, Activity,
-  ChevronRight, Plus, Thermometer
+  ChevronRight, Plus, ChefHat, MessageCircle, Sparkles
 } from 'lucide-react';
-import { formatDistanceToNow, differenceInDays, isAfter, isBefore, addDays } from 'date-fns';
+import { formatDistanceToNow, isBefore, addDays, format } from 'date-fns';
 
 function getExpiryStatus(date: string | null): 'safe' | 'expiring' | 'expired' | null {
   if (!date) return null;
@@ -34,62 +34,80 @@ export default function DashboardPage() {
   const expired = inventory.filter(i => getExpiryStatus(i.expiry_date) === 'expired');
   const pendingShopping = shopping.filter(i => i.status === 'pending');
 
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-display font-bold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">{household?.name}</p>
+      {/* Hero greeting */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-accent/10 p-5 border border-primary/10">
+        <div className="relative z-10">
+          <p className="text-sm text-muted-foreground font-medium">{greeting()} 👋</p>
+          <h1 className="text-2xl font-display font-bold mt-0.5">{household?.name || 'PantrySync'}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {inventory.length} items in pantry · {pendingShopping.length} to buy
+          </p>
         </div>
-        <Button size="sm" onClick={() => navigate('/pantry')}>
-          <Plus className="w-4 h-4 mr-1" /> Add Item
+        <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-primary/10 blur-2xl" />
+        <div className="absolute -right-2 -bottom-4 w-20 h-20 rounded-full bg-accent/10 blur-xl" />
+      </div>
+
+      {/* Quick actions */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <Button size="sm" onClick={() => navigate('/pantry')} className="rounded-full gap-1.5 flex-shrink-0 shadow-sm transition-all duration-200 active:scale-95">
+          <Plus className="w-3.5 h-3.5" /> Add Item
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => navigate('/shopping')} className="rounded-full gap-1.5 flex-shrink-0 transition-all duration-200 active:scale-95">
+          <ShoppingCart className="w-3.5 h-3.5" /> Shopping
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => navigate('/recipes')} className="rounded-full gap-1.5 flex-shrink-0 transition-all duration-200 active:scale-95">
+          <ChefHat className="w-3.5 h-3.5" /> Recipes
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => navigate('/chat')} className="rounded-full gap-1.5 flex-shrink-0 transition-all duration-200 active:scale-95">
+          <MessageCircle className="w-3.5 h-3.5" /> Chat
         </Button>
       </div>
 
-      {/* Summary cards */}
+      {/* Summary grid */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="border-border/50 cursor-pointer hover:shadow-sm transition-shadow" onClick={() => navigate('/pantry')}>
+        <Card className="border-border/50 cursor-pointer hover:shadow-md transition-all duration-200 active:scale-[0.98]" onClick={() => navigate('/pantry')}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Package className="w-4 h-4 text-primary" />
-              </div>
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
+              <Package className="w-4.5 h-4.5 text-primary" />
             </div>
             <p className="text-2xl font-display font-bold">{inventory.length}</p>
             <p className="text-xs text-muted-foreground">Pantry Items</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50 cursor-pointer hover:shadow-sm transition-shadow" onClick={() => navigate('/shopping')}>
+        <Card className="border-border/50 cursor-pointer hover:shadow-md transition-all duration-200 active:scale-[0.98]" onClick={() => navigate('/shopping')}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-xl bg-info/10 flex items-center justify-center">
-                <ShoppingCart className="w-4 h-4 text-info" />
-              </div>
+            <div className="w-9 h-9 rounded-xl bg-info/10 flex items-center justify-center mb-2">
+              <ShoppingCart className="w-4.5 h-4.5 text-info" />
             </div>
             <p className="text-2xl font-display font-bold">{pendingShopping.length}</p>
             <p className="text-xs text-muted-foreground">To Buy</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50 cursor-pointer hover:shadow-sm transition-shadow" onClick={() => navigate('/expiry')}>
+        <Card className="border-border/50 cursor-pointer hover:shadow-md transition-all duration-200 active:scale-[0.98]" onClick={() => navigate('/expiry')}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-xl bg-warning/10 flex items-center justify-center">
-                <Clock className="w-4 h-4 text-warning" />
-              </div>
+            <div className="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center mb-2">
+              <Clock className="w-4.5 h-4.5 text-warning" />
             </div>
             <p className="text-2xl font-display font-bold">{expiringSoon.length}</p>
             <p className="text-xs text-muted-foreground">Expiring Soon</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50">
+        <Card className="border-border/50 cursor-pointer hover:shadow-md transition-all duration-200 active:scale-[0.98]" onClick={() => navigate('/expiry')}>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-xl bg-destructive/10 flex items-center justify-center">
-                <AlertTriangle className="w-4 h-4 text-destructive" />
-              </div>
+            <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center mb-2">
+              <AlertTriangle className="w-4.5 h-4.5 text-destructive" />
             </div>
             <p className="text-2xl font-display font-bold">{lowStock.length + expired.length}</p>
             <p className="text-xs text-muted-foreground">Needs Attention</p>
@@ -99,18 +117,21 @@ export default function DashboardPage() {
 
       {/* Low stock alerts */}
       {lowStock.length > 0 && (
-        <Card className="border-warning/30 bg-warning/5">
+        <Card className="border-warning/20 bg-warning/5 overflow-hidden">
           <CardHeader className="pb-2 pt-4 px-4">
             <CardTitle className="text-sm font-display flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-warning" /> Low Stock
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {lowStock.slice(0, 5).map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
-                  <span>{item.name}</span>
-                  <span className="text-warning font-medium">{item.quantity} {item.unit}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-warning" />
+                    <span>{item.name}</span>
+                  </div>
+                  <span className="text-warning font-semibold text-xs">{item.quantity} {item.unit}</span>
                 </div>
               ))}
             </div>
@@ -120,23 +141,29 @@ export default function DashboardPage() {
 
       {/* Expiring soon */}
       {(expiringSoon.length > 0 || expired.length > 0) && (
-        <Card className="border-destructive/30 bg-destructive/5">
+        <Card className="border-destructive/20 bg-destructive/5 overflow-hidden">
           <CardHeader className="pb-2 pt-4 px-4">
             <CardTitle className="text-sm font-display flex items-center gap-2">
               <Clock className="w-4 h-4 text-destructive" /> Expiry Alerts
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {expired.map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
-                  <span>{item.name}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                    <span>{item.name}</span>
+                  </div>
                   <Badge variant="destructive" className="text-[10px]">Expired</Badge>
                 </div>
               ))}
               {expiringSoon.map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
-                  <span>{item.name}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-warning" />
+                    <span>{item.name}</span>
+                  </div>
                   <Badge variant="outline" className="text-[10px] border-warning text-warning">
                     {item.expiry_date && formatDistanceToNow(new Date(item.expiry_date), { addSuffix: true })}
                   </Badge>
@@ -147,8 +174,37 @@ export default function DashboardPage() {
         </Card>
       )}
 
+      {/* Shopping preview */}
+      {pendingShopping.length > 0 && (
+        <Card className="border-border/50 overflow-hidden">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-display flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-info" /> Shopping List
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => navigate('/shopping')}>
+                View all <ChevronRight className="w-3 h-3 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="space-y-2">
+              {pendingShopping.slice(0, 4).map(item => (
+                <div key={item.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded border border-border" />
+                    <span>{item.name}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recent activity */}
-      <Card className="border-border/50">
+      <Card className="border-border/50 overflow-hidden">
         <CardHeader className="pb-2 pt-4 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-display flex items-center gap-2">
@@ -165,7 +221,7 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               {activities.slice(0, 6).map(a => (
-                <div key={a.id} className="flex items-start gap-2 text-sm">
+                <div key={a.id} className="flex items-start gap-2.5 text-sm">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm">

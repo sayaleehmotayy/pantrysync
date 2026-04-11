@@ -69,7 +69,7 @@ function QuickActions({ item, onUse, onAddToShoppingList }: { item: InventoryIte
       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUse(1, 'Used 1')}>
         <Minus className="w-3 h-3 mr-1" /> 1
       </Button>
-      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUse(item.quantity / 2, 'Used half')}>
+      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUse(0.5, 'Used half')}>
         Half
       </Button>
       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUse(item.quantity, 'Finished')}>
