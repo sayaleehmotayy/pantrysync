@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "735763952204",
+    "project_id": "pantrysync-448a4",
+    "storage_bucket": "pantrysync-448a4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:735763952204:android:7bd30d5bb98c883e227ae9",
+        "android_client_info": {
+          "package_name": "com.pantrysync.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmmE3h4L2Ll_pWVnHKKpV7MPp9xArR_vE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

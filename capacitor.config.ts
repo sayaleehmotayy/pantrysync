@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.476afb28ffc747dfb3d145c8b13771c6',
+  appId: 'com.pantrysync.app',
   appName: 'PantrySync',
   webDir: 'dist',
   server: {
