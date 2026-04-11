@@ -56,6 +56,41 @@ export function useShoppingList() {
     mutationFn: async ({ id, ...updates }: Partial<ShoppingItem> & { id: string }) => {
       const { error } = await supabase.from('shopping_list_items').update(updates).eq('id', id);
       if (error) throw error;
+
+      // Auto-update pantry when item is marked bought or partial
+      if ((updates.status === 'bought' || updates.status === 'partial') && household && user) {
+        const item = qc.getQueryData<ShoppingItem[]>(['shopping', household.id])?.find(i => i.id === id);
+        if (item) {
+          const qty = updates.status === 'bought'
+            ? (updates.bought_quantity ?? item.quantity)
+            : (updates.bought_quantity ?? 0);
+
+          if (qty > 0) {
+            const { data: existing } = await supabase
+              .from('inventory_items')
+              .select('id, quantity')
+              .eq('household_id', household.id)
+              .ilike('name', item.name)
+              .maybeSingle();
+
+            if (existing) {
+              await supabase.from('inventory_items').update({
+                quantity: existing.quantity + qty,
+              }).eq('id', existing.id);
+            } else {
+              await supabase.from('inventory_items').insert({
+                household_id: household.id,
+                name: item.name,
+                quantity: qty,
+                unit: item.unit,
+                category: item.category,
+                added_by: user.id,
+              });
+            }
+            qc.invalidateQueries({ queryKey: ['inventory'] });
+          }
+        }
+      }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['shopping'] }); },
     onError: (e) => toast.error(e.message),

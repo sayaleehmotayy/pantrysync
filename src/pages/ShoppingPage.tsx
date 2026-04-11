@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ShoppingCart, Check, AlertTriangle, X, ArrowUpToLine, Trash2 } from 'lucide-react';
+import { Plus, ShoppingCart, Check, AlertTriangle, X, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 };
 
 export default function ShoppingPage() {
-  const { data: items = [], isLoading, addItem, updateItem, deleteItem, updatePantryFromShopping } = useShoppingList();
+  const { data: items = [], isLoading, addItem, updateItem, deleteItem } = useShoppingList();
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -47,18 +47,13 @@ export default function ShoppingPage() {
     setPartialQty('');
   };
 
-  const hasBoughtItems = completedItems.length > 0;
+  
 
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-display font-bold">Shopping List</h1>
         <div className="flex gap-2">
-          {hasBoughtItems && (
-            <Button size="sm" variant="outline" onClick={() => updatePantryFromShopping(completedItems)}>
-              <ArrowUpToLine className="w-4 h-4 mr-1" /> Update Pantry
-            </Button>
-          )}
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add</Button>
