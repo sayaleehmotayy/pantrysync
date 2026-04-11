@@ -38,6 +38,7 @@ export default function CouponsPage() {
   const { user } = useAuth();
   const { household, members } = useHousehold();
   const [codes, setCodes] = useState<DiscountCode[]>([]);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [codeDialogOpen, setCodeDialogOpen] = useState(false);
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
