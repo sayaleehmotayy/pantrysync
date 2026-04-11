@@ -122,6 +122,42 @@ export default function VoiceCommandBar() {
           qc.invalidateQueries({ queryKey: ['shopping'] });
           break;
         }
+
+        case 'remove_shopping': {
+          const { data: match } = await supabase
+            .from('shopping_list_items')
+            .select('id')
+            .eq('household_id', household.id)
+            .ilike('name', action.name)
+            .maybeSingle();
+
+          if (match) {
+            await supabase.from('shopping_list_items').delete().eq('id', match.id);
+            toast.success(`Removed ${action.name} from shopping list`);
+          } else {
+            toast.info(`${action.name} not found in shopping list`);
+          }
+          qc.invalidateQueries({ queryKey: ['shopping'] });
+          break;
+        }
+
+        case 'clear_shopping': {
+          const { data: allItems } = await supabase
+            .from('shopping_list_items')
+            .select('id')
+            .eq('household_id', household.id);
+
+          if (allItems && allItems.length > 0) {
+            for (const item of allItems) {
+              await supabase.from('shopping_list_items').delete().eq('id', item.id);
+            }
+            toast.success(`Cleared ${allItems.length} items from shopping list`);
+          } else {
+            toast.info('Shopping list is already empty');
+          }
+          qc.invalidateQueries({ queryKey: ['shopping'] });
+          break;
+        }
       }
     }
 
