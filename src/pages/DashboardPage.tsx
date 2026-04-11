@@ -4,6 +4,8 @@ import VoiceCommandBar from '@/components/VoiceCommandBar';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { STRIPE_CONFIG, PRO_FEATURES } from '@/config/subscription';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNavigate } from 'react-router-dom';
 import {
   Package, ShoppingCart, AlertTriangle, Clock,
-  ChevronRight, Plus, ChefHat, MessageCircle, Check, Trash2
+  ChevronRight, Plus, ChefHat, MessageCircle, Check, Trash2, Sparkles
 } from 'lucide-react';
 import { formatDistanceToNow, isBefore, addDays } from 'date-fns';
 
@@ -31,7 +33,7 @@ export default function DashboardPage() {
   const { data: inventory = [] } = useInventory();
   const { data: shopping = [], updateItem, deleteItem } = useShoppingList();
   const { household } = useHousehold();
-  const { user } = useAuth();
+  const { user, subscription } = useAuth();
   const navigate = useNavigate();
 
   const [partialId, setPartialId] = useState<string | null>(null);
@@ -98,6 +100,40 @@ export default function DashboardPage() {
           <MessageCircle className="w-3.5 h-3.5" /> Chat
         </Button>
       </div>
+
+      {/* Pro Upgrade Card */}
+      {!subscription.subscribed && !subscription.loading && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 overflow-hidden">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-display font-bold text-sm">Upgrade to PantrySync Pro</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Unlock AI assistant, recipes, group chat, discount scanner & more
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {PRO_FEATURES.slice(0, 4).map(f => (
+                    <Badge key={f.key} variant="secondary" className="text-[10px]">{f.label}</Badge>
+                  ))}
+                </div>
+                <Button
+                  size="sm"
+                  className="mt-3 gap-1.5"
+                  onClick={async () => {
+                    const { data } = await supabase.functions.invoke('create-checkout');
+                    if (data?.url) window.open(data.url, '_blank');
+                  }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> Upgrade — {STRIPE_CONFIG.monthlyPrice}/mo
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary grid */}
       <div className="grid grid-cols-2 gap-3">
