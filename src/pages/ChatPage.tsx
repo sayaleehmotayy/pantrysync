@@ -146,6 +146,59 @@ export default function ChatPage() {
     };
   }, [household, members]);
 
+  // Fetch and subscribe to read receipts
+  useEffect(() => {
+    if (!household) return;
+
+    const fetchReceipts = async () => {
+      const { data } = await supabase
+        .from('chat_read_receipts')
+        .select('user_id, last_read_message_id, last_read_at')
+        .eq('household_id', household.id);
+      if (data) setReadReceipts(data);
+    };
+    void fetchReceipts();
+
+    const channel = supabase
+      .channel(`read-receipts-${household.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_read_receipts',
+        filter: `household_id=eq.${household.id}`,
+      }, (payload) => {
+        const updated = payload.new as any;
+        setReadReceipts(prev => {
+          const filtered = prev.filter(r => r.user_id !== updated.user_id);
+          return [...filtered, { user_id: updated.user_id, last_read_message_id: updated.last_read_message_id, last_read_at: updated.last_read_at }];
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [household]);
+
+  // Update own read receipt when messages change
+  useEffect(() => {
+    if (!household || !user || messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    // Don't mark own messages
+    const myReceipt = readReceipts.find(r => r.user_id === user.id);
+    if (myReceipt?.last_read_message_id === lastMsg.id) return;
+
+    const updateReceipt = async () => {
+      await supabase
+        .from('chat_read_receipts')
+        .upsert({
+          household_id: household.id,
+          user_id: user.id,
+          last_read_message_id: lastMsg.id,
+          last_read_at: new Date().toISOString(),
+        }, { onConflict: 'household_id,user_id' });
+    };
+    void updateReceipt();
+  }, [household, user, messages]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
