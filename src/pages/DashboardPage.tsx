@@ -192,7 +192,15 @@ export default function DashboardPage() {
               {pendingShopping.slice(0, 4).map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded border border-border" />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateItem.mutate({ id: item.id, status: 'bought', bought_quantity: item.quantity });
+                      }}
+                      className="w-4 h-4 rounded border border-border flex items-center justify-center hover:border-primary hover:bg-primary/10 transition-colors active:scale-90"
+                    >
+                      {item.status === 'bought' && <Check className="w-3 h-3 text-primary" />}
+                    </button>
                     <span>{item.name}</span>
                   </div>
                   <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
