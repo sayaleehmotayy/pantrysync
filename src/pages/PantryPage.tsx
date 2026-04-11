@@ -35,17 +35,17 @@ function ItemForm({ onSubmit, initial, submitLabel }: {
         <Input type="number" placeholder="Qty" value={quantity} onChange={e => setQuantity(e.target.value)} required min="0" step="any" className="flex-1" />
         <Select value={unit} onValueChange={setUnit}>
           <SelectTrigger className="w-28"><SelectValue placeholder="Unit" /></SelectTrigger>
-          <SelectContent side="bottom">{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+          <SelectContent side="bottom" position="popper">{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div className="flex gap-3">
         <Select value={location} onValueChange={setLocation}>
           <SelectTrigger className="flex-1"><SelectValue placeholder="Location" /></SelectTrigger>
-          <SelectContent side="bottom">{LOCATIONS.map(l => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}</SelectContent>
+          <SelectContent side="bottom" position="popper">{LOCATIONS.map(l => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}</SelectContent>
         </Select>
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="flex-1"><SelectValue placeholder="Type of product" /></SelectTrigger>
-          <SelectContent side="bottom">{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+          <SelectTrigger className="flex-1"><SelectValue placeholder="Type of item" /></SelectTrigger>
+          <SelectContent side="bottom" position="popper">{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div className="flex gap-3">

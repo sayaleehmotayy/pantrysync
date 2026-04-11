@@ -105,9 +105,9 @@ export default function RecipesPage() {
       )}
 
       <Dialog open={!!selectedRecipe} onOpenChange={open => !open && setSelectedRecipe(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border-none p-0 bg-transparent shadow-2xl">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border-none p-0 shadow-2xl bg-[#fdf6e3] dark:bg-[#3d2e1a] [&>button]:text-amber-800 dark:[&>button]:text-amber-200">
           {selectedRecipe && (
-            <div className="bg-gradient-to-b from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 rounded-2xl overflow-hidden" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\' opacity=\'0.04\'/%3E%3C/svg%3E")' }}>
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(180deg, #fef9ef 0%, #fdf0d5 40%, #f5e6c8 100%)', backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'200\' height=\'200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'paper\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.04\' numOctaves=\'5\' stitchTiles=\'stitch\'/%3E%3CfeColorMatrix type=\'saturate\' values=\'0\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23paper)\' opacity=\'0.06\'/%3E%3C/svg%3E")' }}>
               {/* Header */}
               <div className="px-6 pt-6 pb-4">
                 <DialogHeader>
