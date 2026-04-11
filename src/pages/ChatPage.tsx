@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, MessageCircle, ShoppingCart, Plus, Mic, MicOff, Sparkles, CheckCheck } from 'lucide-react';
+import { Send, MessageCircle, ShoppingCart, Plus, Mic, MicOff, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useShoppingList } from '@/hooks/useShoppingList';
 import { toast } from 'sonner';
@@ -526,7 +526,7 @@ export default function ChatPage() {
             const isMe = msg.user_id === user?.id;
             // Find members whose last_read_message_id is THIS message (excluding sender)
             const seenByMembers = readReceipts
-              .filter(r => r.last_read_message_id === msg.id && r.user_id !== msg.user_id)
+              .filter(r => r.last_read_message_id === msg.id && r.user_id !== msg.user_id && r.user_id !== user?.id)
               .map(r => {
                 const member = members.find(m => m.user_id === r.user_id);
                 return {
@@ -549,11 +549,6 @@ export default function ChatPage() {
                     <span className="text-[10px] text-muted-foreground">
                       {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                     </span>
-                    {isMe && (
-                      <span className="flex items-center gap-0.5">
-                        <CheckCheck className={`w-3 h-3 ${seenByMembers.length > 0 ? 'text-primary' : 'text-muted-foreground/50'}`} />
-                      </span>
-                    )}
                     <button
                       onClick={() => { setAddToListMsg(msg); setItemName(msg.content.slice(0, 50)); }}
                       className="text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-0.5"
