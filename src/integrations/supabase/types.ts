@@ -84,6 +84,30 @@ export type Database = {
           },
         ]
       }
+      device_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          platform: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform?: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       household_members: {
         Row: {
           household_id: string
@@ -195,6 +219,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          chat_message_id: string | null
+          created_at: string
+          household_id: string
+          id: string
+          message: string
+          read: boolean
+          sender_id: string
+          user_id: string
+        }
+        Insert: {
+          chat_message_id?: string | null
+          created_at?: string
+          household_id: string
+          id?: string
+          message: string
+          read?: boolean
+          sender_id: string
+          user_id: string
+        }
+        Update: {
+          chat_message_id?: string | null
+          created_at?: string
+          household_id?: string
+          id?: string
+          message?: string
+          read?: boolean
+          sender_id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
