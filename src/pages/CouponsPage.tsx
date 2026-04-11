@@ -83,6 +83,12 @@ export default function CouponsPage() {
       console.error('Failed to fetch codes:', error);
     } else {
       setCodes(data || []);
+      // Resolve signed URLs for receipt images
+      const urls: Record<string, string> = {};
+      await Promise.all((data || []).filter(d => d.receipt_image_url).map(async (d) => {
+        urls[d.id] = await getSignedUrl(d.receipt_image_url!);
+      }));
+      setSignedUrls(urls);
     }
     setLoading(false);
   };
