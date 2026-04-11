@@ -490,6 +490,11 @@ export type Database = {
           name: string
         }[]
       }
+      realtime_topic_household_id: { Args: { _topic: string }; Returns: string }
+      shares_household: {
+        Args: { _user_a: string; _user_b: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
