@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import {
   Package, ShoppingCart, AlertTriangle, Clock, Activity,
-  ChevronRight, Plus, ChefHat, MessageCircle, Sparkles
+  ChevronRight, Plus, ChefHat, MessageCircle, Sparkles, Check
 } from 'lucide-react';
 import { formatDistanceToNow, isBefore, addDays, format } from 'date-fns';
 
