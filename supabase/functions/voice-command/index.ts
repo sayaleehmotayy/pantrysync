@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, inventoryItems } = await req.json();
+    const { text, inventoryItems, shoppingItems } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -20,12 +20,17 @@ serve(async (req) => {
       .map((i: any) => `${i.name} (${i.quantity} ${i.unit}, ${i.storage_location})`)
       .join(", ");
 
+    const shoppingSummary = (shoppingItems || [])
+      .map((i: any) => `${i.name} (${i.quantity} ${i.unit}, status: ${i.status})`)
+      .join(", ");
+
     const systemPrompt = `You are a smart pantry assistant. Parse the user's voice command about their food/groceries and return structured actions.
 
 Current pantry items: ${inventorySummary || "empty"}
+Current shopping list: ${shoppingSummary || "empty"}
 
 Return a JSON array of actions. Each action has:
-- "type": one of "add_inventory", "remove_inventory", "update_quantity", "add_shopping"
+- "type": one of "add_inventory", "remove_inventory", "update_quantity", "add_shopping", "remove_shopping", "clear_shopping"
 - "name": item name (string)
 - "quantity": number
 - "unit": one of "pieces", "g", "kg", "ml", "l", "cups", "tbsp", "tsp", "boxes", "packs", "bottles", "cans"
@@ -37,11 +42,18 @@ Examples:
 - "I bought 2 boxes of ice cream" → [{"type":"add_inventory","name":"Ice Cream","quantity":2,"unit":"boxes","storage_location":"freezer","category":"Frozen"}]
 - "We need more milk" → [{"type":"add_shopping","name":"Milk","quantity":1,"unit":"l","storage_location":"fridge","category":"Dairy"}]
 - "I used 500g of rice" → [{"type":"update_quantity","name":"Rice","quantity":500,"unit":"g","storage_location":"pantry","category":"Grains"}]
+- "Remove milk from the shopping list" → [{"type":"remove_shopping","name":"Milk","quantity":0,"unit":"pieces","storage_location":"fridge","category":"Dairy"}]
+- "Delete sugar from pantry" → [{"type":"remove_inventory","name":"Sugar","quantity":0,"unit":"kg","storage_location":"pantry","category":"Other"}]
+- "Clear the shopping list" → [{"type":"clear_shopping","name":"all","quantity":0,"unit":"pieces","storage_location":"pantry","category":"Other"}]
+- "Take out the eggs from the fridge" → [{"type":"remove_inventory","name":"Eggs","quantity":0,"unit":"pieces","storage_location":"fridge","category":"Dairy"}]
 
-If a user says they "finished" or "ate" something, use "remove_inventory".
+If a user says they "finished", "ate", or "threw away" something, use "remove_inventory".
+If they say "delete" or "remove" something from the pantry/fridge/freezer, use "remove_inventory" with quantity 0 (meaning remove entirely).
 If they say they "bought" or "got" something, use "add_inventory".
 If they say they "used" some amount, use "update_quantity" (to reduce by that amount).
 If they say they "need" something, use "add_shopping".
+If they say "remove" or "delete" something from the shopping list, use "remove_shopping".
+If they say "clear the shopping list" or "empty the shopping list", use "clear_shopping".
 
 Always respond with ONLY the JSON array, no other text.`;
 
@@ -71,7 +83,7 @@ Always respond with ONLY the JSON array, no other text.`;
                     items: {
                       type: "object",
                       properties: {
-                        type: { type: "string", enum: ["add_inventory", "remove_inventory", "update_quantity", "add_shopping"] },
+                        type: { type: "string", enum: ["add_inventory", "remove_inventory", "update_quantity", "add_shopping", "remove_shopping", "clear_shopping"] },
                         name: { type: "string" },
                         quantity: { type: "number" },
                         unit: { type: "string" },

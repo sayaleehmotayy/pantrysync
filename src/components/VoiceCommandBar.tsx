@@ -5,11 +5,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
+import { useShoppingList } from '@/hooks/useShoppingList';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface VoiceAction {
-  type: 'add_inventory' | 'remove_inventory' | 'update_quantity' | 'add_shopping';
+  type: 'add_inventory' | 'remove_inventory' | 'update_quantity' | 'add_shopping' | 'remove_shopping' | 'clear_shopping';
   name: string;
   quantity: number;
   unit: string;
@@ -25,6 +26,7 @@ export default function VoiceCommandBar() {
   const { household } = useHousehold();
   const { user } = useAuth();
   const { data: inventory = [] } = useInventory();
+  const { data: shopping = [] } = useShoppingList();
   const qc = useQueryClient();
 
   const executeActions = useCallback(async (actions: VoiceAction[]) => {
@@ -120,6 +122,42 @@ export default function VoiceCommandBar() {
           qc.invalidateQueries({ queryKey: ['shopping'] });
           break;
         }
+
+        case 'remove_shopping': {
+          const { data: match } = await supabase
+            .from('shopping_list_items')
+            .select('id')
+            .eq('household_id', household.id)
+            .ilike('name', action.name)
+            .maybeSingle();
+
+          if (match) {
+            await supabase.from('shopping_list_items').delete().eq('id', match.id);
+            toast.success(`Removed ${action.name} from shopping list`);
+          } else {
+            toast.info(`${action.name} not found in shopping list`);
+          }
+          qc.invalidateQueries({ queryKey: ['shopping'] });
+          break;
+        }
+
+        case 'clear_shopping': {
+          const { data: allItems } = await supabase
+            .from('shopping_list_items')
+            .select('id')
+            .eq('household_id', household.id);
+
+          if (allItems && allItems.length > 0) {
+            for (const item of allItems) {
+              await supabase.from('shopping_list_items').delete().eq('id', item.id);
+            }
+            toast.success(`Cleared ${allItems.length} items from shopping list`);
+          } else {
+            toast.info('Shopping list is already empty');
+          }
+          qc.invalidateQueries({ queryKey: ['shopping'] });
+          break;
+        }
       }
     }
 
@@ -140,6 +178,12 @@ export default function VoiceCommandBar() {
             unit: i.unit,
             storage_location: i.storage_location,
           })),
+          shoppingItems: shopping.map(i => ({
+            name: i.name,
+            quantity: i.quantity,
+            unit: i.unit,
+            status: i.status,
+          })),
         },
       });
 
@@ -159,7 +203,7 @@ export default function VoiceCommandBar() {
       setIsProcessing(false);
       setTranscript('');
     }
-  }, [inventory, executeActions]);
+  }, [inventory, shopping, executeActions]);
 
   const toggleListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
