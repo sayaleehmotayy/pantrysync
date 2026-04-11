@@ -178,6 +178,12 @@ export default function VoiceCommandBar() {
             unit: i.unit,
             storage_location: i.storage_location,
           })),
+          shoppingItems: shopping.map(i => ({
+            name: i.name,
+            quantity: i.quantity,
+            unit: i.unit,
+            status: i.status,
+          })),
         },
       });
 
