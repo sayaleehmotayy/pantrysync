@@ -17,6 +17,7 @@ interface ChatMessage {
   user_id: string;
   content: string;
   created_at: string;
+  household_id: string;
   sender_name?: string;
 }
 
@@ -433,7 +434,7 @@ export default function ChatPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => { setAddToListMsg({ id: '', user_id: '', content: '', created_at: '' }); setItemName(''); }}
+            onClick={() => { setAddToListMsg({ id: '', user_id: '', content: '', created_at: '', household_id: '' }); setItemName(''); }}
             className="h-8 text-xs"
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
