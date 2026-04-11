@@ -180,7 +180,7 @@ export default function PantryPage() {
             {catItems.map(item => (
               <Card
                 key={item.id}
-                className={`border-border/50 shadow-none hover:shadow-sm transition-shadow cursor-pointer ${isLowStock(item) ? 'border-l-2 border-l-warning' : ''} ${isExpiringSoon(item) ? 'border-l-2 border-l-destructive' : ''}`}
+                className={`border-border/50 shadow-none hover:shadow-sm transition-shadow cursor-pointer ${isLowStock(item) ? 'border-l-[3px] border-l-warning' : ''} ${isExpiringSoon(item) ? 'border-l-[3px] border-l-destructive' : ''}`}
                 onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
               >
                 <CardContent className="p-3">
@@ -188,7 +188,12 @@ export default function PantryPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm truncate">{item.name}</p>
-                        {isLowStock(item) && <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />}
+                        {isLowStock(item) && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-warning/15 text-warning text-[10px] font-semibold leading-none flex-shrink-0">
+                            <AlertTriangle className="w-3 h-3" />
+                            Low
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                         <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
