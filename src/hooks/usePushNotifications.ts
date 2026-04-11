@@ -15,7 +15,6 @@ export function usePushNotifications() {
     if (!user) return;
 
     const registerToken = async () => {
-      // Check if running in Capacitor (native app)
       if (window.Capacitor?.isNativePlatform?.()) {
         try {
           const { PushNotifications } = await import('@capacitor/push-notifications');
@@ -27,7 +26,7 @@ export function usePushNotifications() {
 
           PushNotifications.addListener('registration', async (token) => {
             const platform = window.Capacitor.getPlatform?.() || 'web';
-            await supabase.from('device_tokens').upsert(
+            await (supabase.from('device_tokens' as any) as any).upsert(
               { user_id: user.id, token: token.value, platform },
               { onConflict: 'user_id,token' }
             );
@@ -48,7 +47,6 @@ export function usePushNotifications() {
           console.log('Push notifications not available:', e);
         }
       } else {
-        // Web: request notification permission for in-browser notifications
         if ('Notification' in window && Notification.permission === 'default') {
           Notification.requestPermission();
         }
