@@ -17,6 +17,7 @@ interface ChatMessage {
   user_id: string;
   content: string;
   created_at: string;
+  household_id: string;
   sender_name?: string;
 }
 
