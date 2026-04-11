@@ -32,7 +32,7 @@ export default function DashboardPage() {
 
   const recentlyBought = shopping
     .filter(i => i.status === 'bought')
-    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const lowStock = inventory.filter(i => i.min_threshold > 0 && i.quantity <= i.min_threshold);
   const expiringSoon = inventory.filter(i => getExpiryStatus(i.expiry_date) === 'expiring');
@@ -249,7 +249,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{item.bought_quantity || item.quantity} {item.unit}</span>
                     <span className="text-[10px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(item.updated_at), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                     </span>
                   </div>
                 </div>
