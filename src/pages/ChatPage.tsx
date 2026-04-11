@@ -108,12 +108,12 @@ export default function ChatPage() {
           addItem.mutate({
             name: item.name,
             quantity: item.quantity || 1,
-            unit: 'pieces',
+            unit: item.unit || 'pieces',
             category: item.category || 'Other',
           });
         }
         toast.success(`✨ Added ${items.length} item${items.length > 1 ? 's' : ''} to shopping list`, {
-          description: items.map((i: any) => `${i.quantity} ${i.name}`).join(', '),
+          description: items.map((i: any) => `${i.quantity} ${i.unit} ${i.name}`).join(', '),
         });
       }
     } catch (e) {
