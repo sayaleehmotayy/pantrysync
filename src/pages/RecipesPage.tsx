@@ -105,34 +105,38 @@ export default function RecipesPage() {
       )}
 
       <Dialog open={!!selectedRecipe} onOpenChange={open => !open && setSelectedRecipe(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border-none p-0 bg-transparent shadow-2xl">
           {selectedRecipe && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="font-display">{selectedRecipe.recipe.name}</DialogTitle>
-                {selectedRecipe.recipe.description && (
-                  <p className="text-sm text-muted-foreground">{selectedRecipe.recipe.description}</p>
-                )}
-              </DialogHeader>
+            <div className="bg-gradient-to-b from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 rounded-2xl overflow-hidden" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\' opacity=\'0.04\'/%3E%3C/svg%3E")' }}>
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4">
+                <DialogHeader>
+                  <DialogTitle className="font-display text-xl text-amber-900 dark:text-amber-100">{selectedRecipe.recipe.name}</DialogTitle>
+                  {selectedRecipe.recipe.description && (
+                    <p className="text-sm text-amber-700/80 dark:text-amber-200/70 italic mt-1">{selectedRecipe.recipe.description}</p>
+                  )}
+                </DialogHeader>
 
-              <div className="flex items-center gap-4 text-sm text-muted-foreground py-2">
-                <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {(selectedRecipe.recipe.prep_time || 0) + (selectedRecipe.recipe.cook_time || 0)} min</span>
-                <span className="flex items-center gap-1"><Users className="w-4 h-4" /> {selectedRecipe.recipe.servings} servings</span>
-                <Badge variant="secondary">{selectedRecipe.recipe.difficulty}</Badge>
+                <div className="flex items-center gap-3 text-sm text-amber-800/70 dark:text-amber-200/60 mt-4 pb-4 border-b border-amber-200/50 dark:border-amber-800/30">
+                  <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {(selectedRecipe.recipe.prep_time || 0) + (selectedRecipe.recipe.cook_time || 0)} min</span>
+                  <span className="flex items-center gap-1"><Users className="w-4 h-4" /> {selectedRecipe.recipe.servings} servings</span>
+                  <Badge variant="secondary" className="bg-amber-200/50 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200 border-none">{selectedRecipe.recipe.difficulty}</Badge>
+                </div>
+
+                {showMatching && (
+                  <div className="flex items-center gap-3 pt-3">
+                    <MatchBadge pct={selectedRecipe.matchPercentage} />
+                    {selectedRecipe.possibleServings > 0 && (
+                      <span className="text-sm text-amber-700/70 dark:text-amber-200/60">Can make ~{selectedRecipe.possibleServings} servings</span>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {showMatching && (
-                <div className="flex items-center gap-3 py-2">
-                  <MatchBadge pct={selectedRecipe.matchPercentage} />
-                  {selectedRecipe.possibleServings > 0 && (
-                    <span className="text-sm text-muted-foreground">Can make ~{selectedRecipe.possibleServings} servings</span>
-                  )}
-                </div>
-              )}
-
-              <div>
-                <h4 className="font-display font-semibold text-sm mb-2">Ingredients</h4>
-                <div className="space-y-1.5">
+              {/* Ingredients */}
+              <div className="px-6 py-4">
+                <h4 className="font-display font-semibold text-sm mb-3 text-amber-900 dark:text-amber-100 uppercase tracking-wider text-xs">Ingredients</h4>
+                <div className="space-y-2 bg-white/40 dark:bg-black/10 rounded-xl p-4 backdrop-blur-sm shadow-inner">
                   {selectedRecipe.ingredients.map(ing => {
                     const match = selectedRecipe.matches.find(m => m.ingredient.id === ing.id);
                     const icon = !showMatching ? null :
@@ -141,9 +145,9 @@ export default function RecipesPage() {
                       <X className="w-3.5 h-3.5 text-destructive" />;
 
                     return (
-                      <div key={ing.id} className="flex items-center gap-2 text-sm">
+                      <div key={ing.id} className="flex items-center gap-2 text-sm text-amber-900 dark:text-amber-100">
                         {icon}
-                        <span className={ing.is_optional ? 'text-muted-foreground italic' : ''}>
+                        <span className={ing.is_optional ? 'text-amber-600/60 dark:text-amber-300/50 italic' : ''}>
                           {ing.quantity} {ing.unit} {ing.name}
                           {ing.is_optional && ' (optional)'}
                         </span>
@@ -156,26 +160,30 @@ export default function RecipesPage() {
                 </div>
               </div>
 
+              {/* Instructions */}
               {selectedRecipe.recipe.instructions && selectedRecipe.recipe.instructions.length > 0 && (
-                <div>
-                  <h4 className="font-display font-semibold text-sm mb-2">Instructions</h4>
-                  <ol className="space-y-2">
+                <div className="px-6 py-4 pt-0">
+                  <h4 className="font-display font-semibold text-sm mb-3 text-amber-900 dark:text-amber-100 uppercase tracking-wider text-xs">Instructions</h4>
+                  <ol className="space-y-3">
                     {selectedRecipe.recipe.instructions.map((step, i) => (
-                      <li key={i} className="flex gap-3 text-sm">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">{i + 1}</span>
-                        <span>{step}</span>
+                      <li key={i} className="flex gap-3 text-sm text-amber-900 dark:text-amber-100">
+                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-200/60 dark:bg-amber-800/40 flex items-center justify-center text-xs font-bold text-amber-800 dark:text-amber-200 shadow-sm">{i + 1}</span>
+                        <span className="pt-1">{step}</span>
                       </li>
                     ))}
                   </ol>
                 </div>
               )}
 
+              {/* Add missing button */}
               {showMatching && (selectedRecipe.missingIngredients.length > 0 || selectedRecipe.insufficientIngredients.length > 0) && (
-                <Button className="w-full mt-2" onClick={() => { addMissingToShoppingList(selectedRecipe); setSelectedRecipe(null); }}>
-                  <Plus className="w-4 h-4 mr-1" /> Add Missing to Shopping List
-                </Button>
+                <div className="px-6 pb-6">
+                  <Button className="w-full rounded-xl shadow-md" onClick={() => { addMissingToShoppingList(selectedRecipe); setSelectedRecipe(null); }}>
+                    <Plus className="w-4 h-4 mr-1" /> Add Missing to Shopping List
+                  </Button>
+                </div>
               )}
-            </>
+            </div>
           )}
         </DialogContent>
       </Dialog>
