@@ -113,15 +113,14 @@ export default function AiPage() {
 
         <Card className="border-border/50">
           <CardContent className="p-4">
-            <ScrollArea className="max-h-[calc(100vh-14rem)]">
-              {result ? (
-                <MarkdownContent content={result} />
-              ) : (
-                <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <p className="text-sm">Analyzing your pantry...</p>
-                </div>
-              )}
+            {result ? (
+              <MarkdownContent content={result} />
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-sm">Analyzing your pantry...</p>
+              </div>
+            )}
             </ScrollArea>
           </CardContent>
         </Card>
