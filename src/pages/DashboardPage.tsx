@@ -115,7 +115,7 @@ export default function DashboardPage() {
                   Unlock AI assistant, recipes, group chat, discount scanner & more
                 </p>
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {PRO_FEATURES.slice(0, 4).map(f => (
+                  {PRO_FEATURES.slice(0, 5).map(f => (
                     <Badge key={f.key} variant="secondary" className="text-[10px]">{f.label}</Badge>
                   ))}
                 </div>
