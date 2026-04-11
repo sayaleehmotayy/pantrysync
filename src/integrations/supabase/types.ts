@@ -482,6 +482,14 @@ export type Database = {
         Args: { _household_id: string; _user_id: string }
         Returns: boolean
       }
+      lookup_household_by_invite_code: {
+        Args: { _invite_code: string }
+        Returns: {
+          id: string
+          invite_code: string
+          name: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

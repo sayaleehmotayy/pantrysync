@@ -113,13 +113,11 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const joinHousehold = async (inviteCode: string) => {
     if (!user) return { error: new Error('Not authenticated') };
 
-    const { data: hh, error: findError } = await supabase
-      .from('households')
-      .select('id')
-      .eq('invite_code', inviteCode.trim())
-      .maybeSingle();
+    const { data: results, error: findError } = await supabase
+      .rpc('lookup_household_by_invite_code', { _invite_code: inviteCode.trim() });
 
-    if (findError || !hh) return { error: new Error('Invalid invite code') };
+    if (findError || !results || results.length === 0) return { error: new Error('Invalid invite code') };
+    const hh = results[0];
 
     const { error } = await supabase.from('household_members').insert({
       household_id: hh.id,
