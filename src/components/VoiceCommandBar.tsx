@@ -270,41 +270,48 @@ export default function VoiceCommandBar() {
 
   return (
     <div className="relative group">
-      {/* Ambient glow behind the bar */}
-      <div className={`absolute -inset-1 rounded-3xl transition-all duration-500 blur-xl ${
+      {/* Breathing glow behind bar */}
+      <div className={`absolute -inset-1.5 rounded-3xl transition-all duration-700 blur-2xl ${
         isListening
-          ? 'bg-primary/20 animate-pulse'
+          ? 'bg-primary/25'
           : isProcessing
-          ? 'bg-accent/15 animate-pulse'
-          : 'bg-primary/5 group-hover:bg-primary/10'
-      }`} />
+          ? 'bg-accent/20'
+          : 'bg-primary/0 group-hover:bg-primary/8'
+      } ${(isListening || isProcessing) ? 'animate-glow-breathe' : ''}`} />
 
-      <div className={`relative flex items-center gap-3 rounded-2xl border px-4 py-3.5 transition-all duration-500 backdrop-blur-md ${
+      <div className={`relative flex items-center gap-3 rounded-2xl border px-4 py-3.5 transition-all duration-500 backdrop-blur-md overflow-hidden ${
         isListening
           ? 'border-primary/40 bg-primary/5 shadow-lg shadow-primary/15'
           : isProcessing
           ? 'border-accent/40 bg-accent/5 shadow-lg shadow-accent/10'
           : 'border-primary/15 bg-gradient-to-r from-card/80 to-primary/[0.03] shadow-md hover:shadow-lg hover:border-primary/25'
       }`}>
+        {/* Shimmer overlay when processing */}
+        {isProcessing && (
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, hsl(var(--accent)) 50%, transparent 100%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 2s linear infinite',
+            }}
+          />
+        )}
+
         {/* Animated mic button */}
         <div className="relative shrink-0">
-          {/* Orbiting dots when idle */}
-          {!isListening && !isProcessing && (
+          {/* Ripple rings when listening */}
+          {isListening && (
             <>
-              <div className="absolute -inset-2 rounded-full">
-                <div className="absolute w-1.5 h-1.5 rounded-full bg-primary/40 animate-[spin_4s_linear_infinite]" style={{ top: '0', left: '50%', transformOrigin: '0 16px' }} />
-                <div className="absolute w-1 h-1 rounded-full bg-accent/40 animate-[spin_6s_linear_infinite_reverse]" style={{ top: '50%', right: '0', transformOrigin: '-12px 0' }} />
-              </div>
+              <div className="absolute -inset-3 rounded-full border-2 border-primary/30 animate-voice-ripple" />
+              <div className="absolute -inset-3 rounded-full border-2 border-primary/20 animate-voice-ripple" style={{ animationDelay: '0.6s' }} />
+              <div className="absolute -inset-3 rounded-full border-2 border-primary/10 animate-voice-ripple" style={{ animationDelay: '1.2s' }} />
             </>
           )}
 
-          {/* Pulsing rings when listening */}
-          {isListening && (
-            <>
-              <div className="absolute -inset-3 rounded-full border border-primary/30 animate-ping" style={{ animationDuration: '1.5s' }} />
-              <div className="absolute -inset-5 rounded-full border border-primary/15 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
-              <div className="absolute -inset-7 rounded-full border border-primary/10 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.6s' }} />
-            </>
+          {/* Subtle idle glow ring */}
+          {!isListening && !isProcessing && (
+            <div className="absolute -inset-1.5 rounded-xl bg-primary/8 animate-glow-breathe" />
           )}
 
           <Button
@@ -323,7 +330,7 @@ export default function VoiceCommandBar() {
             {isProcessing ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : isListening ? (
-              <MicOff className="w-5 h-5 animate-pulse" />
+              <MicOff className="w-5 h-5" />
             ) : (
               <Mic className="w-5 h-5" />
             )}
@@ -332,22 +339,47 @@ export default function VoiceCommandBar() {
 
         <div className="flex-1 min-w-0">
           {isProcessing ? (
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="flex items-center gap-2.5">
+              {/* Audio wave bars */}
+              <div className="flex items-center gap-[3px] h-5">
+                {[0, 1, 2, 3, 4].map(i => (
+                  <div
+                    key={i}
+                    className="w-[3px] rounded-full bg-accent"
+                    style={{
+                      animation: `voice-wave 0.8s ease-in-out infinite`,
+                      animationDelay: `${i * 0.12}s`,
+                      height: '4px',
+                    }}
+                  />
+                ))}
               </div>
-              <p className="text-sm text-muted-foreground truncate">AI is thinking...</p>
+              <p className="text-sm text-muted-foreground truncate">Processing your command...</p>
             </div>
           ) : isListening ? (
             <div>
-              <p className="text-sm font-medium text-primary truncate">
-                {transcript || 'Listening...'}
-              </p>
+              <div className="flex items-center gap-2">
+                {/* Live wave visualizer */}
+                <div className="flex items-center gap-[2px] h-4">
+                  {[0, 1, 2, 3, 4, 5, 6].map(i => (
+                    <div
+                      key={i}
+                      className="w-[2.5px] rounded-full bg-primary"
+                      style={{
+                        animation: `voice-wave 0.6s ease-in-out infinite`,
+                        animationDelay: `${i * 0.08}s`,
+                        height: '3px',
+                      }}
+                    />
+                  ))}
+                </div>
+                <p className="text-sm font-medium text-primary truncate">
+                  {transcript || 'Listening...'}
+                </p>
+              </div>
               {!transcript && (
                 <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                  Try "I bought 2 kg of rice" or "remove milk"
+                  Speak naturally — I'll catch everything
                 </p>
               )}
             </div>
@@ -355,19 +387,25 @@ export default function VoiceCommandBar() {
             <div>
               <p className="text-sm font-medium text-foreground/80 truncate flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-primary/60" />
-                AI Voice Assistant
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                Tap to add, remove, or manage items
+                Tap the mic to add items by voice
               </p>
             </div>
           )}
         </div>
 
-        {/* Sparkle indicator */}
-        {!isListening && !isProcessing && (
-          <div className="shrink-0 w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary/40 animate-pulse" style={{ animationDuration: '3s' }} />
+        {/* Floating particles when listening */}
+        {isListening && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1.5">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-1.5 h-1.5 rounded-full bg-primary/50"
+                style={{
+                  animation: `float-particle 1.2s ease-in-out infinite`,
+                  animationDelay: `${i * 0.3}s`,
+                }}
+              />
+            ))}
           </div>
         )}
       </div>
