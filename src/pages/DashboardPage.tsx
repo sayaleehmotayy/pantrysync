@@ -1,6 +1,6 @@
 import React from 'react';
 import { useInventory, InventoryItem } from '@/hooks/useInventory';
-import { useShoppingList } from '@/hooks/useShoppingList';
+import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import {
   Package, ShoppingCart, AlertTriangle, Clock, Activity,
-  ChevronRight, Plus, ChefHat, MessageCircle, Sparkles
+  ChevronRight, Plus, ChefHat, MessageCircle, Sparkles, Check
 } from 'lucide-react';
 import { formatDistanceToNow, isBefore, addDays, format } from 'date-fns';
 
@@ -24,7 +24,7 @@ function getExpiryStatus(date: string | null): 'safe' | 'expiring' | 'expired' |
 
 export default function DashboardPage() {
   const { data: inventory = [] } = useInventory();
-  const { data: shopping = [] } = useShoppingList();
+  const { data: shopping = [], updateItem } = useShoppingList();
   const { data: activities = [], getMemberName } = useActivityLog(10);
   const { household } = useHousehold();
   const navigate = useNavigate();
@@ -192,7 +192,15 @@ export default function DashboardPage() {
               {pendingShopping.slice(0, 4).map(item => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded border border-border" />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateItem.mutate({ id: item.id, status: 'bought', bought_quantity: item.quantity });
+                      }}
+                      className="w-4 h-4 rounded border border-border flex items-center justify-center hover:border-primary hover:bg-primary/10 transition-colors active:scale-90"
+                    >
+                      {item.status === 'bought' && <Check className="w-3 h-3 text-primary" />}
+                    </button>
                     <span>{item.name}</span>
                   </div>
                   <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
