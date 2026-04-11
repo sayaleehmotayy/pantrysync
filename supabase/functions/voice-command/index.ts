@@ -83,7 +83,7 @@ Always respond with ONLY the JSON array, no other text.`;
                     items: {
                       type: "object",
                       properties: {
-                        type: { type: "string", enum: ["add_inventory", "remove_inventory", "update_quantity", "add_shopping"] },
+                        type: { type: "string", enum: ["add_inventory", "remove_inventory", "update_quantity", "add_shopping", "remove_shopping", "clear_shopping"] },
                         name: { type: "string" },
                         quantity: { type: "number" },
                         unit: { type: "string" },
