@@ -276,7 +276,7 @@ export default function VoiceCommandBar() {
           ? 'bg-primary/25'
           : isProcessing
           ? 'bg-accent/20'
-          : 'bg-primary/0 group-hover:bg-primary/8'
+          : 'bg-primary/6 animate-glow-breathe'
       } ${(isListening || isProcessing) ? 'animate-glow-breathe' : ''}`} />
 
       <div className={`relative flex items-center gap-3 rounded-2xl border px-4 py-3.5 transition-all duration-500 backdrop-blur-md overflow-hidden ${
@@ -286,17 +286,16 @@ export default function VoiceCommandBar() {
           ? 'border-accent/40 bg-accent/5 shadow-lg shadow-accent/10'
           : 'border-primary/15 bg-gradient-to-r from-card/80 to-primary/[0.03] shadow-md hover:shadow-lg hover:border-primary/25'
       }`}>
-        {/* Shimmer overlay when processing */}
-        {isProcessing && (
-          <div
-            className="absolute inset-0 opacity-10"
-            style={{
-              background: 'linear-gradient(90deg, transparent 0%, hsl(var(--accent)) 50%, transparent 100%)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 2s linear infinite',
-            }}
-          />
-        )}
+        {/* Shimmer overlay — always on, faster when processing */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `linear-gradient(90deg, transparent 0%, hsl(var(${isProcessing ? '--accent' : '--primary'})) 50%, transparent 100%)`,
+            backgroundSize: '300% 100%',
+            animation: isProcessing ? 'shimmer 2s linear infinite' : 'shimmer-idle 6s linear infinite',
+            opacity: isProcessing ? 0.1 : 0.04,
+          }}
+        />
 
         {/* Animated mic button */}
         <div className="relative shrink-0">
@@ -340,7 +339,6 @@ export default function VoiceCommandBar() {
         <div className="flex-1 min-w-0">
           {isProcessing ? (
             <div className="flex items-center gap-2.5">
-              {/* Audio wave bars */}
               <div className="flex items-center gap-[3px] h-5">
                 {[0, 1, 2, 3, 4].map(i => (
                   <div
@@ -359,7 +357,6 @@ export default function VoiceCommandBar() {
           ) : isListening ? (
             <div>
               <div className="flex items-center gap-2">
-                {/* Live wave visualizer */}
                 <div className="flex items-center gap-[2px] h-4">
                   {[0, 1, 2, 3, 4, 5, 6].map(i => (
                     <div
@@ -384,14 +381,43 @@ export default function VoiceCommandBar() {
               )}
             </div>
           ) : (
-            <div>
-              <p className="text-sm font-medium text-foreground/80 truncate flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-primary/60" />
+            <div className="flex items-center gap-2.5">
+              {/* Live idle waveform */}
+              <div className="flex items-center gap-[2px] h-4 shrink-0">
+                {[0, 1, 2, 3, 4].map(i => (
+                  <div
+                    key={i}
+                    className="w-[2px] rounded-full bg-primary/30"
+                    style={{
+                      animation: `voice-wave-idle 2.4s ease-in-out infinite`,
+                      animationDelay: `${i * 0.35}s`,
+                      height: '3px',
+                    }}
+                  />
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground truncate">
                 Tap the mic to add items by voice
               </p>
             </div>
           )}
         </div>
+
+        {/* Right side indicator */}
+        {!isListening && !isProcessing && (
+          <div className="shrink-0 flex items-center gap-1">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-1.5 h-1.5 rounded-full bg-primary/30"
+                style={{
+                  animation: `dot-pulse 2s ease-in-out infinite`,
+                  animationDelay: `${i * 0.4}s`,
+                }}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Floating particles when listening */}
         {isListening && (
