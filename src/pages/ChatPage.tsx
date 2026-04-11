@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, MessageCircle, ShoppingCart, Plus, Mic, MicOff, Sparkles } from 'lucide-react';
+import { Send, MessageCircle, ShoppingCart, Plus, Mic, MicOff, Sparkles, CheckCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useShoppingList } from '@/hooks/useShoppingList';
 import { toast } from 'sonner';
