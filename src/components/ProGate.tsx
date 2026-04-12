@@ -81,7 +81,7 @@ export function ProUpgradeWall({ feature }: { feature: string }) {
           return (
             <button
               key={tier.key}
-              onClick={() => setSelectedTier(tier.key)}
+              onClick={() => setSelectedTier(tier.key as Exclude<TierKey, 'free'>)}
               className={`relative p-3 rounded-xl border-2 text-left transition-all ${
                 isSelected
                   ? 'border-primary bg-primary/5 shadow-sm'
