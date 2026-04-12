@@ -50,48 +50,71 @@ export default function AuthPage() {
 
         <Card className="border-border/50 shadow-lg">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">{isSignUp ? 'Create Account' : 'Welcome Back'}</CardTitle>
-            <CardDescription>{isSignUp ? 'Sign up to get started' : 'Sign in to your account'}</CardDescription>
+            <CardTitle className="text-lg">
+              {verifyEmail ? 'Check Your Email' : isSignUp ? 'Create Account' : 'Welcome Back'}
+            </CardTitle>
+            <CardDescription>
+              {verifyEmail
+                ? 'Verify through email inbox'
+                : isSignUp ? 'Sign up to get started' : 'Sign in to your account'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {isSignUp && (
-                <Input
-                  placeholder="Display name"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  required
-                />
-              )}
-              <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
-              </Button>
-            </form>
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-              </button>
-            </div>
+            {verifyEmail ? (
+              <div className="space-y-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  We've sent a verification link to <strong>{email}</strong>. Please check your inbox and click the link to activate your account.
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => { setVerifyEmail(false); setIsSignUp(false); setError(''); }}
+                >
+                  Back to Sign In
+                </Button>
+              </div>
+            ) : (
+              <>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {isSignUp && (
+                    <Input
+                      placeholder="Display name"
+                      value={displayName}
+                      onChange={e => setDisplayName(e.target.value)}
+                      required
+                    />
+                  )}
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
+                  </Button>
+                </form>
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+                  </button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
