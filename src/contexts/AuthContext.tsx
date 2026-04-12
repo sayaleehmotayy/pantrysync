@@ -26,21 +26,32 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const createSubscriptionState = (overrides: Partial<SubscriptionState> = {}): SubscriptionState => ({
+  subscribed: false,
+  productId: null,
+  subscriptionEnd: null,
+  loading: false,
+  trial: false,
+  householdPro: false,
+  ...overrides,
+});
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [subscription, setSubscription] = useState<SubscriptionState>({
-    subscribed: false,
-    productId: null,
-    subscriptionEnd: null,
-    loading: true,
-    trial: false,
-    householdPro: false,
-  });
+  const [subscription, setSubscription] = useState<SubscriptionState>(createSubscriptionState({ loading: true }));
 
   // Use a ref to always have the latest user email available
   const userEmailRef = useRef<string | null>(null);
+
+  const clearAuthState = useCallback(async () => {
+    await supabase.auth.signOut({ scope: 'local' });
+    setSession(null);
+    setUser(null);
+    userEmailRef.current = null;
+    setSubscription(createSubscriptionState());
+  }, []);
 
   const checkSubscription = useCallback(async (emailOverride?: string) => {
     const email = emailOverride ?? userEmailRef.current;
@@ -48,8 +59,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSubscription({ subscribed: true, productId: 'admin', subscriptionEnd: null, loading: false, trial: false, householdPro: false });
       return;
     }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setSubscription(createSubscriptionState());
+      return;
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const authUser = authData.user;
+    if (authError || !authUser?.email) {
+      await clearAuthState();
+      return;
+    }
+
     try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       if (error) throw error;
       setSubscription({
         subscribed: data?.subscribed ?? false,
@@ -59,10 +89,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         trial: data?.trial ?? false,
         householdPro: data?.household_pro ?? false,
       });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('Auth session missing')) {
+        await clearAuthState();
+        return;
+      }
       setSubscription(prev => ({ ...prev, loading: false }));
     }
-  }, []);
+  }, [clearAuthState]);
 
   useEffect(() => {
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
