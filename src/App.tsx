@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ import AiPage from "./pages/AiPage";
 import CouponsPage from "./pages/CouponsPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
+import WelcomePage from "./pages/WelcomePage";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 
 const queryClient = new QueryClient();
@@ -26,7 +27,13 @@ const queryClient = new QueryClient();
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth();
   const { household, loading: hhLoading } = useHousehold();
+  const location = useLocation();
   usePushNotifications();
+
+  // Allow /welcome to render without auth (verification landing)
+  if (location.pathname === '/welcome') {
+    return <WelcomePage />;
+  }
 
   if (authLoading || (user && hhLoading)) {
     return (
