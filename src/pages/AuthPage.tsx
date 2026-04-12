@@ -13,6 +13,7 @@ export default function AuthPage() {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [verifyEmail, setVerifyEmail] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,10 +25,16 @@ export default function AuthPage() {
       : await signIn(email, password);
 
     if (result.error) {
-      setError(result.error.message);
+      const msg = result.error.message;
+      if (msg.includes('security purposes') || msg.includes('after')) {
+        setError('Please check your email inbox to verify your account before signing in.');
+      } else {
+        setError(msg);
+      }
+    } else if (isSignUp) {
+      setVerifyEmail(true);
     }
     setLoading(false);
-    // On successful signup, auto-confirm is enabled so onAuthStateChange will handle redirect
   };
 
   return (
