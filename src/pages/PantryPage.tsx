@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, format, isBefore, addDays } from 'date-fns';
 import { toast } from 'sonner';
+import ProductScanner from '@/components/ProductScanner';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Frozen', 'Sauces', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'bottles', 'packets'];
@@ -88,6 +89,7 @@ export default function PantryPage() {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -113,38 +115,66 @@ export default function PantryPage() {
     return isBefore(new Date(item.expiry_date), addDays(new Date(), 3));
   };
 
+  const handleScanToPantry = (item: {
+    name: string; quantity: number; unit: string; category: string;
+    expiry_date?: string | null; storage_location?: string; min_threshold?: number;
+  }) => {
+    // Check for existing item with same name and location
+    const normalizedName = item.name.toLowerCase().trim();
+    const existing = items.find(i =>
+      i.name.toLowerCase().trim() === normalizedName &&
+      i.storage_location === (item.storage_location || 'pantry')
+    );
+    if (existing) {
+      updateItem.mutate({
+        id: existing.id,
+        quantity: existing.quantity + item.quantity,
+        _logDetails: `Scanned & added ${item.quantity} more (${existing.quantity} → ${existing.quantity + item.quantity} ${existing.unit})`,
+        name: existing.name,
+      });
+      toast.success(`Updated ${existing.name} quantity via scan`);
+    } else {
+      addItem.mutate(item);
+      toast.success(`${item.name} scanned & added to pantry!`);
+    }
+  };
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-display font-bold">Pantry</h1>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add Item</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add Pantry Item</DialogTitle></DialogHeader>
-            <ItemForm submitLabel="Add to Pantry" onSubmit={item => {
-              // Check for existing item with same name (case-insensitive) and same location
-              const normalizedName = item.name.toLowerCase().trim();
-              const existing = items.find(i =>
-                i.name.toLowerCase().trim() === normalizedName &&
-                i.storage_location === item.storage_location
-              );
-              if (existing) {
-                updateItem.mutate({
-                  id: existing.id,
-                  quantity: existing.quantity + item.quantity,
-                  _logDetails: `Added ${item.quantity} more (${existing.quantity} → ${existing.quantity + item.quantity} ${existing.unit})`,
-                  name: existing.name,
-                });
-                toast.success(`Updated ${existing.name} quantity`);
-              } else {
-                addItem.mutate(item);
-              }
-              setAddOpen(false);
-            }} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setScannerOpen(true)}>
+            <Camera className="w-4 h-4 mr-1" /> Scan
+          </Button>
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add Item</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Add Pantry Item</DialogTitle></DialogHeader>
+              <ItemForm submitLabel="Add to Pantry" onSubmit={item => {
+                const normalizedName = item.name.toLowerCase().trim();
+                const existing = items.find(i =>
+                  i.name.toLowerCase().trim() === normalizedName &&
+                  i.storage_location === item.storage_location
+                );
+                if (existing) {
+                  updateItem.mutate({
+                    id: existing.id,
+                    quantity: existing.quantity + item.quantity,
+                    _logDetails: `Added ${item.quantity} more (${existing.quantity} → ${existing.quantity + item.quantity} ${existing.unit})`,
+                    name: existing.name,
+                  });
+                  toast.success(`Updated ${existing.name} quantity`);
+                } else {
+                  addItem.mutate(item);
+                }
+                setAddOpen(false);
+              }} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -170,6 +200,14 @@ export default function PantryPage() {
           </div>
           <h3 className="font-display font-semibold text-foreground">Your pantry is empty</h3>
           <p className="text-muted-foreground text-sm mt-1">Start adding items to track your inventory</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 gap-1"
+            onClick={() => setScannerOpen(true)}
+          >
+            <Camera className="w-4 h-4" /> Scan a product
+          </Button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground text-sm">No items match your search</div>
@@ -250,6 +288,12 @@ export default function PantryPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ProductScanner
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onAddToPantry={handleScanToPantry}
+      />
     </div>
   );
 }
