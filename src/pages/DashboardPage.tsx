@@ -127,7 +127,7 @@ export default function DashboardPage() {
                     if (data?.url) window.open(data.url, '_blank');
                   }}
                 >
-                  <Sparkles className="w-3.5 h-3.5" /> Upgrade — {STRIPE_CONFIG.monthlyPrice}/mo
+                  <Sparkles className="w-3.5 h-3.5" /> Upgrade — {STRIPE_CONFIG.monthly.price}/mo
                 </Button>
               </div>
             </div>

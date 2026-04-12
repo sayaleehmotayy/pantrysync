@@ -9,6 +9,8 @@ interface SubscriptionState {
   productId: string | null;
   subscriptionEnd: string | null;
   loading: boolean;
+  trial: boolean;
+  householdPro: boolean;
 }
 
 interface AuthContextType {
