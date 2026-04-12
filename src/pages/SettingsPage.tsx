@@ -97,6 +97,8 @@ export default function SettingsPage() {
   const tierLabel = currentTier === 'free' ? 'Free' : currentTier.charAt(0).toUpperCase() + currentTier.slice(1);
   const tiers = Object.values(TIERS);
 
+  if (!household) return null;
+
   return (
     <div className="space-y-4 animate-fade-in">
       <h1 className="text-xl font-display font-bold">Settings</h1>
