@@ -35,10 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
   });
 
-  const isAdmin = user?.email === ADMIN_EMAIL;
-
   const checkSubscription = useCallback(async () => {
-    if (isAdmin) {
+    if (user?.email === ADMIN_EMAIL) {
       setSubscription({ subscribed: true, productId: 'admin', subscriptionEnd: null, loading: false });
       return;
     }
@@ -54,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       setSubscription(prev => ({ ...prev, loading: false }));
     }
-  }, []);
+  }, [user?.email]);
 
   useEffect(() => {
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
