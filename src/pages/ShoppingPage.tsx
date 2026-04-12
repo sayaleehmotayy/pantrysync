@@ -1,12 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
+import { useInventory } from '@/hooks/useInventory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ShoppingCart, Check, AlertTriangle, X, Trash2 } from 'lucide-react';
+import { Plus, ShoppingCart, Check, AlertTriangle, X, Trash2, Camera } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import ProductScanner from '@/components/ProductScanner';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp'];
@@ -20,7 +23,9 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 
 export default function ShoppingPage() {
   const { data: items = [], isLoading, addItem, updateItem, deleteItem } = useShoppingList();
+  const { addItem: addPantryItem } = useInventory();
   const [addOpen, setAddOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState('pieces');
@@ -47,13 +52,27 @@ export default function ShoppingPage() {
     setPartialQty('');
   };
 
-  
+  const handleScanToPantry = (item: {
+    name: string; quantity: number; unit: string; category: string;
+    expiry_date?: string | null; storage_location?: string; min_threshold?: number;
+  }) => {
+    addPantryItem.mutate(item);
+    toast.success(`${item.name} added to pantry via scan!`);
+  };
 
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-display font-bold">Shopping List</h1>
         <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setScannerOpen(true)}
+            className="gap-1"
+          >
+            <Camera className="w-4 h-4" /> Scan
+          </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add</Button>
@@ -89,6 +108,14 @@ export default function ShoppingPage() {
           </div>
           <h3 className="font-display font-semibold">Nothing to buy</h3>
           <p className="text-muted-foreground text-sm mt-1">Your shopping list is empty</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 gap-1"
+            onClick={() => setScannerOpen(true)}
+          >
+            <Camera className="w-4 h-4" /> Scan a product to pantry
+          </Button>
         </div>
       ) : (
         <>
@@ -146,7 +173,17 @@ export default function ShoppingPage() {
 
           {completedItems.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Bought ({completedItems.length})</h3>
+              <div className="flex items-center justify-between px-1">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bought ({completedItems.length})</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => setScannerOpen(true)}
+                >
+                  <Camera className="w-3.5 h-3.5" /> Scan to Pantry
+                </Button>
+              </div>
               {completedItems.map(item => (
                 <Card key={item.id} className="border-border/50 shadow-none opacity-70">
                   <CardContent className="p-3 flex items-center justify-between">
@@ -168,6 +205,12 @@ export default function ShoppingPage() {
           )}
         </>
       )}
+
+      <ProductScanner
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onAddToPantry={handleScanToPantry}
+      />
     </div>
   );
 }
