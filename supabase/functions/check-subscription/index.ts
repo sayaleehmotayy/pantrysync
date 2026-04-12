@@ -131,7 +131,7 @@ serve(async (req) => {
       });
     }
 
-    // 2. Check if the household OWNER has a subscription (household-based Pro)
+    // 2. Check if ANY household member has a subscription (household-based Pro)
     const { data: membership } = await supabaseClient
       .from("household_members")
       .select("household_id")
@@ -140,32 +140,31 @@ serve(async (req) => {
       .maybeSingle();
 
     if (membership) {
-      // Find the household owner (admin)
-      const { data: adminMember } = await supabaseClient
+      // Get all other members in the household
+      const { data: allMembers } = await supabaseClient
         .from("household_members")
         .select("user_id")
         .eq("household_id", membership.household_id)
-        .eq("role", "admin")
-        .limit(1)
-        .maybeSingle();
+        .neq("user_id", user.id);
 
-      if (adminMember && adminMember.user_id !== user.id) {
-        // Get admin's email from profiles or auth
-        const { data: adminUser } = await supabaseClient.auth.admin.getUserById(adminMember.user_id);
-        const adminEmail = adminUser?.user?.email;
+      if (allMembers && allMembers.length > 0) {
+        for (const member of allMembers) {
+          const { data: memberUser } = await supabaseClient.auth.admin.getUserById(member.user_id);
+          const memberEmail = memberUser?.user?.email;
 
-        if (adminEmail) {
-          logStep("Checking household owner subscription", { adminEmail });
-          const ownerSub = await checkStripeSubscription(stripe, adminEmail);
-          if (ownerSub) {
-            logStep("Household owner has subscription — granting access", ownerSub);
-            return new Response(JSON.stringify({
-              ...ownerSub,
-              household_pro: true,
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200,
-            });
+          if (memberEmail) {
+            logStep("Checking household member subscription", { memberEmail });
+            const memberSub = await checkStripeSubscription(stripe, memberEmail);
+            if (memberSub) {
+              logStep("Household member has subscription — granting access", memberSub);
+              return new Response(JSON.stringify({
+                ...memberSub,
+                household_pro: true,
+              }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+              });
+            }
           }
         }
       }
