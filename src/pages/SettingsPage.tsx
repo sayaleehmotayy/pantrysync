@@ -66,24 +66,33 @@ export default function SettingsPage() {
           {subscription.loading ? (
             <p className="text-sm text-muted-foreground">Checking subscription...</p>
           ) : subscription.subscribed ? (
-            <>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-primary text-primary-foreground">Active</Badge>
-                <span className="text-sm text-muted-foreground">
-                  Renews {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : '—'}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">You have access to all premium features including AI assistant, unlimited households, and priority support.</p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
-                  <CreditCard className="w-3.5 h-3.5 mr-1" />
-                  {portalLoading ? 'Loading...' : 'Manage Subscription'}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={checkSubscription}>
-                  Refresh Status
-                </Button>
-              </div>
-            </>
+            subscription.productId === 'admin' ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary text-primary-foreground">Admin</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">You have full access to all features as the app administrator.</p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary text-primary-foreground">Active</Badge>
+                  <span className="text-sm text-muted-foreground">
+                    Renews {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : '—'}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">You have access to all premium features including AI assistant, unlimited households, and priority support.</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
+                    <CreditCard className="w-3.5 h-3.5 mr-1" />
+                    {portalLoading ? 'Loading...' : 'Manage Subscription'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={checkSubscription}>
+                    Refresh Status
+                  </Button>
+                </div>
+              </>
+            )
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
