@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity, MoreHorizontal, X, Sparkles, Tag } from 'lucide-react';
+import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
