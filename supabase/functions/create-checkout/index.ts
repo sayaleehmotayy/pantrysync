@@ -7,6 +7,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Tier → price mapping
+const PRICE_MAP: Record<string, Record<string, string>> = {
+  duo: {
+    monthly: "price_1TL9BJAjA7ulr1iaMtf4tEQd",
+    yearly: "price_1TLOC5AjA7ulr1iaKTx0JYLW",
+  },
+  family: {
+    monthly: "price_1TLPc0AjA7ulr1iaR0FwLhvv",
+    yearly: "price_1TLPdIAjA7ulr1iaEPvH2o9Y",
+  },
+  unlimited: {
+    monthly: "price_1TLPcxAjA7ulr1iatcyMNX3K",
+    yearly: "price_1TLPdjAjA7ulr1iasVS8Yy2B",
+  },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -24,18 +40,18 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
-    // Parse request body for plan selection
-    let plan = "monthly";
+    // Parse request body for tier + interval
+    let tier = "duo";
+    let interval = "monthly";
     try {
       const body = await req.json();
-      if (body?.plan === "yearly") plan = "yearly";
+      if (body?.tier && PRICE_MAP[body.tier]) tier = body.tier;
+      if (body?.plan === "yearly" || body?.interval === "yearly") interval = "yearly";
     } catch {
-      // Default to monthly if no body
+      // defaults
     }
 
-    const priceId = plan === "yearly"
-      ? "price_1TLOC5AjA7ulr1iaKTx0JYLW"
-      : "price_1TL9BJAjA7ulr1iaMtf4tEQd";
+    const priceId = PRICE_MAP[tier]?.[interval] ?? PRICE_MAP.duo.monthly;
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
