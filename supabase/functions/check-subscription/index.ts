@@ -12,6 +12,43 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CHECK-SUBSCRIPTION] ${step}${detailsStr}`);
 };
 
+function toIsoDate(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value * 1000).toISOString();
+  }
+
+  if (typeof value === "string") {
+    const numericValue = Number(value);
+    if (value.trim() !== "" && Number.isFinite(numericValue)) {
+      return new Date(numericValue * 1000).toISOString();
+    }
+
+    const parsedDate = new Date(value);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString();
+    }
+  }
+
+  return null;
+}
+
+function getProductId(subscription: Stripe.Subscription): string | null {
+  const product = subscription.items.data[0]?.price?.product;
+  return typeof product === "string" ? product : product?.id ?? null;
+}
+
+function getSubscriptionEnd(subscription: Stripe.Subscription): string | null {
+  const rawEnd = (subscription as Stripe.Subscription & {
+    current_period_end?: unknown;
+    trial_end?: unknown;
+    ended_at?: unknown;
+  }).current_period_end
+    ?? (subscription as Stripe.Subscription & { trial_end?: unknown }).trial_end
+    ?? (subscription as Stripe.Subscription & { ended_at?: unknown }).ended_at;
+
+  return toIsoDate(rawEnd);
+}
+
 async function checkStripeSubscription(stripe: Stripe, email: string) {
   const customers = await stripe.customers.list({ email, limit: 1 });
   if (customers.data.length === 0) return null;
@@ -19,33 +56,28 @@ async function checkStripeSubscription(stripe: Stripe, email: string) {
   const customerId = customers.data[0].id;
   const subscriptions = await stripe.subscriptions.list({
     customer: customerId,
-    status: "active",
-    limit: 1,
+    status: "all",
+    limit: 10,
   });
 
-  if (subscriptions.data.length === 0) {
-    // Check for trialing subscriptions too
-    const trialSubs = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "trialing",
-      limit: 1,
-    });
-    if (trialSubs.data.length === 0) return null;
-    const sub = trialSubs.data[0];
-    return {
-      subscribed: true,
-      product_id: sub.items.data[0].price.product as string,
-      subscription_end: new Date(sub.current_period_end * 1000).toISOString(),
-      trial: true,
-    };
-  }
+  const subscription = subscriptions.data.find((sub) => sub.status === "active" || sub.status === "trialing");
+  if (!subscription) return null;
 
-  const sub = subscriptions.data[0];
+  const productId = getProductId(subscription);
+  const subscriptionEnd = getSubscriptionEnd(subscription);
+
+  logStep("Subscription matched", {
+    email,
+    status: subscription.status,
+    productId,
+    subscriptionEnd,
+  });
+
   return {
     subscribed: true,
-    product_id: sub.items.data[0].price.product as string,
-    subscription_end: new Date(sub.current_period_end * 1000).toISOString(),
-    trial: false,
+    product_id: productId,
+    subscription_end: subscriptionEnd,
+    trial: subscription.status === "trialing",
   };
 }
 
