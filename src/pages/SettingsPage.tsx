@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard } from 'lucide-react';
+import { STRIPE_CONFIG } from '@/config/subscription';
 
 export default function SettingsPage() {
   const { household, members, userRole, leaveHousehold } = useHousehold();
   const { signOut, user, subscription, checkSubscription } = useAuth();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [plan, setPlan] = useState<'monthly' | 'yearly'>('monthly');
 
   if (!household) return null;
 
@@ -24,7 +26,9 @@ export default function SettingsPage() {
   const handleCheckout = async () => {
     setCheckoutLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout');
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { plan },
+      });
       if (error) throw error;
       if (data?.url) {
         window.open(data.url, '_blank');
@@ -75,38 +79,70 @@ export default function SettingsPage() {
               </>
             ) : (
               <>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-primary text-primary-foreground">Active</Badge>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge className="bg-primary text-primary-foreground">
+                    {subscription.trial ? 'Free Trial' : 'Active'}
+                  </Badge>
+                  {subscription.householdPro && (
+                    <Badge variant="secondary">Via Household</Badge>
+                  )}
                   <span className="text-sm text-muted-foreground">
-                    Renews {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : '—'}
+                    {subscription.trial ? 'Trial ends' : 'Renews'}{' '}
+                    {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : '—'}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">You have access to all premium features including AI assistant, unlimited households, and priority support.</p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
-                    <CreditCard className="w-3.5 h-3.5 mr-1" />
-                    {portalLoading ? 'Loading...' : 'Manage Subscription'}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={checkSubscription}>
-                    Refresh Status
-                  </Button>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  {subscription.householdPro
+                    ? 'Your household owner has Pro — you have access to all premium features!'
+                    : 'You have access to all premium features. Your entire household benefits from your subscription!'}
+                </p>
+                {!subscription.householdPro && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
+                      <CreditCard className="w-3.5 h-3.5 mr-1" />
+                      {portalLoading ? 'Loading...' : 'Manage Subscription'}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={checkSubscription}>
+                      Refresh Status
+                    </Button>
+                  </div>
+                )}
               </>
             )
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                Upgrade to Pro for $4.99/month and unlock AI-powered features, unlimited households, and more.
+                Upgrade to Pro and unlock AI-powered features, unlimited households, and more — for your entire household!
               </p>
               <ul className="text-sm space-y-1 text-muted-foreground">
-                <li>✨ AI pantry assistant</li>
+                <li>✨ AI pantry assistant & voice commands</li>
                 <li>👥 Unlimited household members</li>
-                <li>📊 Advanced analytics</li>
-                <li>🔔 Priority support</li>
+                <li>📊 Advanced analytics & recipes</li>
+                <li>🎉 7-day free trial included</li>
               </ul>
+
+              {/* Plan toggle */}
+              <div className="flex items-center gap-2 bg-muted rounded-lg p-1 w-fit">
+                <button
+                  onClick={() => setPlan('monthly')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${plan === 'monthly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setPlan('yearly')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${plan === 'yearly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                >
+                  Yearly
+                  <span className="ml-1 text-xs text-primary font-semibold">Save 33%</span>
+                </button>
+              </div>
+
               <Button onClick={handleCheckout} disabled={checkoutLoading} className="w-full">
                 <Sparkles className="w-4 h-4 mr-1" />
-                {checkoutLoading ? 'Loading...' : 'Upgrade to Pro — $4.99/mo'}
+                {checkoutLoading
+                  ? 'Loading...'
+                  : `Start Free Trial — then ${plan === 'yearly' ? STRIPE_CONFIG.yearly.price + '/yr' : STRIPE_CONFIG.monthly.price + '/mo'}`}
               </Button>
             </>
           )}

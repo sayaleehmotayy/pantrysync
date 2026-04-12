@@ -21,9 +21,19 @@ export const PRO_FEATURES = [
 export const PRO_GATED_ROUTES = ['/ai', '/recipes', '/coupons', '/chat'] as const;
 
 export const STRIPE_CONFIG = {
-  priceId: 'price_1TL9BJAjA7ulr1iaMtf4tEQd',
-  productId: 'prod_UJmkcGNlIWvfoh',
-  monthlyPrice: '$4.99',
+  monthly: {
+    priceId: 'price_1TL9BJAjA7ulr1iaMtf4tEQd',
+    productId: 'prod_UJmkcGNlIWvfoh',
+    price: '$4.99',
+    interval: 'month' as const,
+  },
+  yearly: {
+    priceId: 'price_1TLOC5AjA7ulr1iaKTx0JYLW',
+    productId: 'prod_UK2GPSlm6dNKbC',
+    price: '$39.99',
+    interval: 'year' as const,
+  },
+  trialDays: 7,
 };
 
 export function isProFeature(routeOrKey: string): boolean {
