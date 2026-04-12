@@ -12,6 +12,43 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CHECK-SUBSCRIPTION] ${step}${detailsStr}`);
 };
 
+async function checkStripeSubscription(stripe: Stripe, email: string) {
+  const customers = await stripe.customers.list({ email, limit: 1 });
+  if (customers.data.length === 0) return null;
+
+  const customerId = customers.data[0].id;
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "active",
+    limit: 1,
+  });
+
+  if (subscriptions.data.length === 0) {
+    // Check for trialing subscriptions too
+    const trialSubs = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "trialing",
+      limit: 1,
+    });
+    if (trialSubs.data.length === 0) return null;
+    const sub = trialSubs.data[0];
+    return {
+      subscribed: true,
+      product_id: sub.items.data[0].price.product as string,
+      subscription_end: new Date(sub.current_period_end * 1000).toISOString(),
+      trial: true,
+    };
+  }
+
+  const sub = subscriptions.data[0];
+  return {
+    subscribed: true,
+    product_id: sub.items.data[0].price.product as string,
+    subscription_end: new Date(sub.current_period_end * 1000).toISOString(),
+    trial: false,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -40,43 +77,59 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
 
-    if (customers.data.length === 0) {
-      logStep("No customer found");
-      return new Response(JSON.stringify({ subscribed: false }), {
+    // 1. Check if THIS user has a subscription
+    const ownSub = await checkStripeSubscription(stripe, user.email);
+    if (ownSub) {
+      logStep("User has own subscription", ownSub);
+      return new Response(JSON.stringify(ownSub), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    const customerId = customers.data[0].id;
-    logStep("Found Stripe customer", { customerId });
+    // 2. Check if the household OWNER has a subscription (household-based Pro)
+    const { data: membership } = await supabaseClient
+      .from("household_members")
+      .select("household_id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
 
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "active",
-      limit: 1,
-    });
+    if (membership) {
+      // Find the household owner (admin)
+      const { data: adminMember } = await supabaseClient
+        .from("household_members")
+        .select("user_id")
+        .eq("household_id", membership.household_id)
+        .eq("role", "admin")
+        .limit(1)
+        .maybeSingle();
 
-    const hasActiveSub = subscriptions.data.length > 0;
-    let productId = null;
-    let subscriptionEnd = null;
+      if (adminMember && adminMember.user_id !== user.id) {
+        // Get admin's email from profiles or auth
+        const { data: adminUser } = await supabaseClient.auth.admin.getUserById(adminMember.user_id);
+        const adminEmail = adminUser?.user?.email;
 
-    if (hasActiveSub) {
-      const subscription = subscriptions.data[0];
-      subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-      productId = subscription.items.data[0].price.product;
-      logStep("Active subscription found", { subscriptionId: subscription.id, endDate: subscriptionEnd });
-    } else {
-      logStep("No active subscription found");
+        if (adminEmail) {
+          logStep("Checking household owner subscription", { adminEmail });
+          const ownerSub = await checkStripeSubscription(stripe, adminEmail);
+          if (ownerSub) {
+            logStep("Household owner has subscription — granting access", ownerSub);
+            return new Response(JSON.stringify({
+              ...ownerSub,
+              household_pro: true,
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            });
+          }
+        }
+      }
     }
 
-    return new Response(JSON.stringify({
-      subscribed: hasActiveSub,
-      product_id: productId,
-      subscription_end: subscriptionEnd,
-    }), {
+    logStep("No subscription found (user or household owner)");
+    return new Response(JSON.stringify({ subscribed: false }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
