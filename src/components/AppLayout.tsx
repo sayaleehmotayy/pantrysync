@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity, MoreHorizontal, X, Sparkles, Tag } from 'lucide-react';
+import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
@@ -31,8 +32,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-56 border-r border-border bg-card p-4 gap-1">
         <div className="flex items-center gap-2 px-3 py-4 mb-4">
-          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Package className="w-4 h-4 text-primary" />
+          <div className="w-8 h-8 rounded-xl overflow-hidden">
+            <img src={pantrySyncLogo} alt="PantrySync" className="w-8 h-8 object-contain" />
           </div>
           <span className="font-display font-bold text-lg">PantrySync</span>
         </div>
