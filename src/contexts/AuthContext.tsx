@@ -137,12 +137,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, checkSubscription]);
 
   const signUp = async (email: string, password: string, displayName: string) => {
+    const currentOrigin = window.location.origin;
+    const authOrigin = currentOrigin.includes('lovableproject.com') || currentOrigin.includes('id-preview--')
+      ? 'https://pantrysync.lovable.app'
+      : currentOrigin;
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { display_name: displayName },
-        emailRedirectTo: `${window.location.origin}/welcome`,
+        emailRedirectTo: `${authOrigin}/welcome`,
       },
     });
     return { error: error as Error | null };
