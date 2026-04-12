@@ -35,6 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     productId: null,
     subscriptionEnd: null,
     loading: true,
+    trial: false,
+    householdPro: false,
   });
 
   // Use a ref to always have the latest user email available
@@ -43,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkSubscription = useCallback(async (emailOverride?: string) => {
     const email = emailOverride ?? userEmailRef.current;
     if (email === ADMIN_EMAIL) {
-      setSubscription({ subscribed: true, productId: 'admin', subscriptionEnd: null, loading: false });
+      setSubscription({ subscribed: true, productId: 'admin', subscriptionEnd: null, loading: false, trial: false, householdPro: false });
       return;
     }
     try {
@@ -54,6 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         productId: data?.product_id ?? null,
         subscriptionEnd: data?.subscription_end ?? null,
         loading: false,
+        trial: data?.trial ?? false,
+        householdPro: data?.household_pro ?? false,
       });
     } catch {
       setSubscription(prev => ({ ...prev, loading: false }));
@@ -70,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentUser) {
         setTimeout(() => checkSubscription(currentUser.email ?? undefined), 0);
       } else {
-        setSubscription({ subscribed: false, productId: null, subscriptionEnd: null, loading: false });
+        setSubscription({ subscribed: false, productId: null, subscriptionEnd: null, loading: false, trial: false, householdPro: false });
       }
     });
 
