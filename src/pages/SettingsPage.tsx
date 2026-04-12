@@ -20,8 +20,6 @@ export default function SettingsPage() {
   const currentTier = getTierByProductId(subscription.productId);
   const memberLimit = getMemberLimit(currentTier);
 
-  if (!household) return null;
-
   const copyInviteCode = () => {
     navigator.clipboard.writeText(household.invite_code);
     toast.success('Invite code copied!');
