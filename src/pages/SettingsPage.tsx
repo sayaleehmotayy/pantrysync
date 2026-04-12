@@ -6,17 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard } from 'lucide-react';
-import { STRIPE_CONFIG } from '@/config/subscription';
+import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check } from 'lucide-react';
+import { TIERS, TRIAL_DAYS, getTierByProductId, getMemberLimit, type TierKey } from '@/config/subscription';
 
 export default function SettingsPage() {
   const { household, members, userRole, leaveHousehold } = useHousehold();
   const { signOut, user, subscription, checkSubscription } = useAuth();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [plan, setPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
+  const [selectedTier, setSelectedTier] = useState<Exclude<TierKey, 'free'>>('duo');
 
-  if (!household) return null;
+  const currentTier = getTierByProductId(subscription.productId);
+  const memberLimit = getMemberLimit(currentTier);
 
   const copyInviteCode = () => {
     navigator.clipboard.writeText(household.invite_code);
@@ -27,7 +29,7 @@ export default function SettingsPage() {
     setCheckoutLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { plan },
+        body: { tier: selectedTier, interval },
       });
       if (error) throw error;
       if (data?.url) {
@@ -92,6 +94,11 @@ export default function SettingsPage() {
     };
   }, [checkSubscription]);
 
+  const tierLabel = currentTier === 'free' ? 'Free' : currentTier.charAt(0).toUpperCase() + currentTier.slice(1);
+  const tiers = Object.values(TIERS);
+
+  if (!household) return null;
+
   return (
     <div className="space-y-4 animate-fade-in">
       <h1 className="text-xl font-display font-bold">Settings</h1>
@@ -118,7 +125,7 @@ export default function SettingsPage() {
               <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge className="bg-primary text-primary-foreground">
-                    {subscription.trial ? 'Free Trial' : 'Active'}
+                    {subscription.trial ? 'Free Trial' : tierLabel}
                   </Badge>
                   {subscription.householdPro && (
                     <Badge variant="secondary">Via Household</Badge>
@@ -129,9 +136,10 @@ export default function SettingsPage() {
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
+                  {tierLabel} plan — {memberLimit === null ? 'unlimited' : `up to ${memberLimit}`} household members.
                   {subscription.householdPro
-                    ? 'Your household owner has Pro — you have access to all premium features!'
-                    : 'You have access to all premium features. Your entire household benefits from your subscription!'}
+                    ? ' Your household owner has Pro — you have access to all premium features!'
+                    : ' Your entire household benefits from your subscription!'}
                 </p>
                 {!subscription.householdPro && (
                   <div className="flex gap-2">
@@ -149,37 +157,61 @@ export default function SettingsPage() {
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                Upgrade to Pro and unlock AI-powered features, unlimited households, and more — for your entire household!
+                Upgrade to Pro and unlock AI-powered features, group chat, and more!
               </p>
-              <ul className="text-sm space-y-1 text-muted-foreground">
-                <li>✨ AI pantry assistant & voice commands</li>
-                <li>👥 Unlimited household members</li>
-                <li>📊 Advanced analytics & recipes</li>
-                <li>🎉 7-day free trial included</li>
-              </ul>
 
-              {/* Plan toggle */}
+              {/* Interval toggle */}
               <div className="flex items-center gap-2 bg-muted rounded-lg p-1 w-fit">
                 <button
-                  onClick={() => setPlan('monthly')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${plan === 'monthly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                  onClick={() => setInterval('monthly')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${interval === 'monthly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   Monthly
                 </button>
                 <button
-                  onClick={() => setPlan('yearly')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${plan === 'yearly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+                  onClick={() => setInterval('yearly')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${interval === 'yearly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   Yearly
                   <span className="ml-1 text-xs text-primary font-semibold">Save 33%</span>
                 </button>
               </div>
 
+              {/* Tier cards */}
+              <div className="grid grid-cols-3 gap-2">
+                {tiers.map((tier) => {
+                  const price = interval === 'yearly' ? tier.yearly.price : tier.monthly.price;
+                  const suffix = interval === 'yearly' ? '/yr' : '/mo';
+                  const isSelected = selectedTier === tier.key;
+
+                  return (
+                    <button
+                      key={tier.key}
+                      onClick={() => setSelectedTier(tier.key as Exclude<TierKey, 'free'>)}
+                      className={`relative p-2.5 rounded-xl border-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-primary bg-primary/5 shadow-sm'
+                          : 'border-border/50 hover:border-border'
+                      }`}
+                    >
+                      {isSelected && (
+                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                        </div>
+                      )}
+                      <p className="font-display font-bold text-xs">{tier.label}</p>
+                      <p className="text-sm font-bold mt-0.5">{price}<span className="text-[10px] font-normal text-muted-foreground">{suffix}</span></p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {tier.memberLimit === null ? '∞ members' : `${tier.memberLimit} members`}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
               <Button onClick={handleCheckout} disabled={checkoutLoading} className="w-full">
                 <Sparkles className="w-4 h-4 mr-1" />
-                {checkoutLoading
-                  ? 'Loading...'
-                  : `Start Free Trial — then ${plan === 'yearly' ? STRIPE_CONFIG.yearly.price + '/yr' : STRIPE_CONFIG.monthly.price + '/mo'}`}
+                {checkoutLoading ? 'Loading...' : `Start ${TRIAL_DAYS}-Day Free Trial`}
               </Button>
             </>
           )}
@@ -211,7 +243,7 @@ export default function SettingsPage() {
       <Card className="border-border/50">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-display flex items-center gap-2">
-            <Users className="w-4 h-4" /> Members ({members.length})
+            <Users className="w-4 h-4" /> Members ({members.length}{memberLimit !== null ? `/${memberLimit}` : ''})
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
