@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Leaf } from 'lucide-react';
+import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth();
