@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { Home, UserPlus, LogOut } from 'lucide-react';
+import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 
 export default function HouseholdSetup() {
   const { createHousehold, joinHousehold } = useHousehold();
@@ -35,6 +36,9 @@ export default function HouseholdSetup() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-sm animate-fade-in">
         <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl overflow-hidden mb-4">
+            <img src={pantrySyncLogo} alt="PantrySync" className="w-14 h-14 object-cover rounded-2xl" />
+          </div>
           <h1 className="text-2xl font-display font-bold">Set Up Your Household</h1>
           <p className="text-muted-foreground text-sm mt-1">Create a new household or join one</p>
         </div>
