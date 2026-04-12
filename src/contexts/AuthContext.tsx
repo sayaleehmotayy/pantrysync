@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+
+const ADMIN_EMAIL = "pantrysync9@gmail.com";
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -33,7 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
   });
 
+  const isAdmin = user?.email === ADMIN_EMAIL;
+
   const checkSubscription = useCallback(async () => {
+    if (isAdmin) {
+      setSubscription({ subscribed: true, productId: 'admin', subscriptionEnd: null, loading: false });
+      return;
+    }
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription');
       if (error) throw error;
