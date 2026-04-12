@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 
 const ADMIN_EMAIL = "pantrysync9@gmail.com";
 import { Session, User } from '@supabase/supabase-js';
@@ -35,8 +35,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
   });
 
-  const checkSubscription = useCallback(async () => {
-    if (user?.email === ADMIN_EMAIL) {
+  // Use a ref to always have the latest user email available
+  const userEmailRef = useRef<string | null>(null);
+
+  const checkSubscription = useCallback(async (emailOverride?: string) => {
+    const email = emailOverride ?? userEmailRef.current;
+    if (email === ADMIN_EMAIL) {
       setSubscription({ subscribed: true, productId: 'admin', subscriptionEnd: null, loading: false });
       return;
     }
@@ -52,26 +56,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       setSubscription(prev => ({ ...prev, loading: false }));
     }
-  }, [user?.email]);
+  }, []);
 
   useEffect(() => {
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user ?? null;
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(currentUser);
+      userEmailRef.current = currentUser?.email ?? null;
       setLoading(false);
-      if (session?.user) {
-        setTimeout(() => checkSubscription(), 0);
+      if (currentUser) {
+        setTimeout(() => checkSubscription(currentUser.email ?? undefined), 0);
       } else {
         setSubscription({ subscribed: false, productId: null, subscriptionEnd: null, loading: false });
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      const currentUser = session?.user ?? null;
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(currentUser);
+      userEmailRef.current = currentUser?.email ?? null;
       setLoading(false);
-      if (session?.user) {
-        checkSubscription();
+      if (currentUser) {
+        checkSubscription(currentUser.email ?? undefined);
       } else {
         setSubscription(prev => ({ ...prev, loading: false }));
       }
@@ -83,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Periodic check every 60 seconds
   useEffect(() => {
     if (!user) return;
-    const interval = setInterval(checkSubscription, 60000);
+    const interval = setInterval(() => checkSubscription(), 60000);
     return () => clearInterval(interval);
   }, [user, checkSubscription]);
 
@@ -105,8 +113,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  // Expose checkSubscription without args for external use
+  const publicCheckSubscription = useCallback(async () => {
+    await checkSubscription();
+  }, [checkSubscription]);
+
   return (
-    <AuthContext.Provider value={{ session, user, loading, subscription, checkSubscription, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user, loading, subscription, checkSubscription: publicCheckSubscription, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
