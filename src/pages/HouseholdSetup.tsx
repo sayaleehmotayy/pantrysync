@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { Home, UserPlus, LogOut } from 'lucide-react';
+import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 
 export default function HouseholdSetup() {
   const { createHousehold, joinHousehold } = useHousehold();
