@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,43 @@ export default function SettingsPage() {
       setPortalLoading(false);
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutState = params.get('checkout');
+    if (!checkoutState) return;
+
+    const clearCheckoutParam = () => {
+      params.delete('checkout');
+      const search = params.toString();
+      window.history.replaceState({}, '', `${window.location.pathname}${search ? `?${search}` : ''}`);
+    };
+
+    let retryTimer: number | null = null;
+
+    if (checkoutState === 'cancel') {
+      toast.error('Checkout was cancelled');
+      clearCheckoutParam();
+      return;
+    }
+
+    const syncSubscription = async () => {
+      toast.success('Checkout complete — updating your Pro access...');
+      await checkSubscription();
+      retryTimer = window.setTimeout(() => {
+        void checkSubscription();
+      }, 2500);
+      clearCheckoutParam();
+    };
+
+    void syncSubscription();
+
+    return () => {
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer);
+      }
+    };
+  }, [checkSubscription]);
 
   return (
     <div className="space-y-4 animate-fade-in">
