@@ -173,6 +173,15 @@ export function useReceiptScanner() {
     setCurrency('USD');
   };
 
+  const deleteReceipt = async (id: string) => {
+    // Delete receipt items first, then the scan
+    await supabase.from('receipt_items').delete().eq('receipt_id', id);
+    await supabase.from('receipt_scans').delete().eq('id', id);
+    qc.invalidateQueries({ queryKey: ['receipt-scans'] });
+    qc.invalidateQueries({ queryKey: ['receipt-analytics'] });
+    toast.success('Receipt deleted');
+  };
+
   // Fetch receipt history
   const historyQuery = useQuery({
     queryKey: ['receipt-scans', household?.id],
