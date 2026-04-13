@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { format } from 'date-fns';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useInventory } from '@/hooks/useInventory';
 import { Button } from '@/components/ui/button';
@@ -130,17 +131,20 @@ export default function ShoppingPage() {
               {pendingItems.map(item => (
                 <Card key={item.id} className="border-border/50 shadow-none">
                   <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
+                    <div
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => toggleExpand(item.id)}
+                    >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm truncate">{item.name}</p>
-                          <Badge variant={STATUS_CONFIG[item.status].variant} className="text-[10px] h-5">
+                          <p className={`font-medium text-sm ${expandedId === item.id ? '' : 'truncate'}`}>{item.name}</p>
+                          <Badge variant={STATUS_CONFIG[item.status].variant} className="text-[10px] h-5 shrink-0">
                             {STATUS_CONFIG[item.status].label}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">{item.quantity} {item.unit} · {item.category}</p>
                       </div>
-                      <div className="flex gap-1 ml-2">
+                      <div className="flex gap-1 ml-2 shrink-0" onClick={e => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => updateItem.mutate({ id: item.id, status: 'bought', bought_quantity: item.quantity })}>
                           <Check className="w-4 h-4" />
                         </Button>
@@ -155,6 +159,14 @@ export default function ShoppingPage() {
                         </Button>
                       </div>
                     </div>
+                    {expandedId === item.id && (
+                      <div className="mt-2 pt-2 border-t border-border/50 space-y-1 text-xs text-muted-foreground">
+                        <p><span className="font-medium text-foreground">Item:</span> {item.name}</p>
+                        <p><span className="font-medium text-foreground">Quantity:</span> {item.quantity} {item.unit}</p>
+                        <p><span className="font-medium text-foreground">Category:</span> {item.category}</p>
+                        <p><span className="font-medium text-foreground">Added:</span> {format(new Date(item.created_at), 'MMM d, yyyy h:mm a')}</p>
+                      </div>
+                    )}
                     {partialId === item.id && (
                       <div className="flex gap-2 mt-2">
                         <Input
