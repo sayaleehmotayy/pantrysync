@@ -394,33 +394,45 @@ export type Database = {
         Row: {
           created_at: string
           currency: string | null
+          error_message: string | null
           household_id: string
           id: string
           image_url: string | null
+          photo_count: number | null
+          processing_result: Json | null
           receipt_date: string | null
           scanned_by: string
+          status: string
           store_name: string | null
           total_amount: number | null
         }
         Insert: {
           created_at?: string
           currency?: string | null
+          error_message?: string | null
           household_id: string
           id?: string
           image_url?: string | null
+          photo_count?: number | null
+          processing_result?: Json | null
           receipt_date?: string | null
           scanned_by: string
+          status?: string
           store_name?: string | null
           total_amount?: number | null
         }
         Update: {
           created_at?: string
           currency?: string | null
+          error_message?: string | null
           household_id?: string
           id?: string
           image_url?: string | null
+          photo_count?: number | null
+          processing_result?: Json | null
           receipt_date?: string | null
           scanned_by?: string
+          status?: string
           store_name?: string | null
           total_amount?: number | null
         }
