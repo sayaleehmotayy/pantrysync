@@ -16,20 +16,61 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isRecovery, setIsRecovery] = useState(false);
+  const [verifying, setVerifying] = useState(true);
 
   useEffect(() => {
-    // Listen for PASSWORD_RECOVERY event
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecovery(true);
+    let handled = false;
+
+    const handleRecovery = async () => {
+      // 1) Check URL query params for PKCE flow (token_hash + type=recovery)
+      const params = new URLSearchParams(window.location.search);
+      const tokenHash = params.get('token_hash');
+      const type = params.get('type');
+
+      if (tokenHash && type === 'recovery') {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'recovery',
+        });
+        if (!error) {
+          handled = true;
+          setIsRecovery(true);
+        } else {
+          setError('This reset link has expired or is invalid. Please request a new one.');
+        }
+        setVerifying(false);
+        return;
       }
-    });
-    // Also check hash for type=recovery
-    const hash = window.location.hash;
-    if (hash.includes('type=recovery')) {
-      setIsRecovery(true);
-    }
-    return () => subscription.unsubscribe();
+
+      // 2) Check hash fragment for implicit flow (older / alternative)
+      const hash = window.location.hash;
+      if (hash.includes('type=recovery')) {
+        handled = true;
+        setIsRecovery(true);
+        setVerifying(false);
+        return;
+      }
+
+      // 3) Listen for PASSWORD_RECOVERY event (fires when session is restored from hash)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          handled = true;
+          setIsRecovery(true);
+          setVerifying(false);
+        }
+      });
+
+      // Give the auth listener a moment to fire
+      setTimeout(() => {
+        if (!handled) {
+          setVerifying(false);
+        }
+      }, 3000);
+
+      return () => subscription.unsubscribe();
+    };
+
+    handleRecovery();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,11 +95,29 @@ export default function ResetPasswordPage() {
     setLoading(false);
   };
 
+  if (verifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <div className="w-full max-w-sm text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl overflow-hidden mb-4">
+            <img src={pantrySyncLogo} alt="PantrySync" className="w-14 h-14 object-cover rounded-2xl" />
+          </div>
+          <p className="text-muted-foreground">Verifying reset link...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isRecovery) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <div className="w-full max-w-sm text-center">
-          <p className="text-muted-foreground">Verifying reset link...</p>
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl overflow-hidden mb-4">
+            <img src={pantrySyncLogo} alt="PantrySync" className="w-14 h-14 object-cover rounded-2xl" />
+          </div>
+          <h1 className="text-xl font-display font-bold text-foreground mb-2">Link Expired</h1>
+          <p className="text-muted-foreground mb-4">{error || 'This reset link is invalid or has expired.'}</p>
+          <Button onClick={() => navigate('/')} variant="outline">Back to Login</Button>
         </div>
       </div>
     );
