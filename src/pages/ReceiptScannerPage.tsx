@@ -217,21 +217,7 @@ export default function ReceiptScannerPage() {
 
           {/* PROCESSING — background */}
           {isProcessing && captureStep !== 'capture' && (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
-                <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                <p className="font-display font-semibold">Processing {photoCount} photo{photoCount > 1 ? 's' : ''}...</p>
-                <p className="text-sm text-muted-foreground text-center max-w-xs">
-                  This runs in the background — you can use other features or close the app. Come back anytime to see results.
-                </p>
-                <div className="w-48 h-1.5 bg-muted rounded-full overflow-hidden mt-2">
-                  <div className="h-full bg-primary rounded-full animate-pulse w-2/3" />
-                </div>
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => setTab('history')}>
-                  Check History
-                </Button>
-              </CardContent>
-            </Card>
+            <ProcessingCard photoCount={photoCount} scanStatus={scanStatus} onCheckHistory={() => setTab('history')} />
           )}
 
           {/* CAPTURE — Camera */}
