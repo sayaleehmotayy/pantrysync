@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { ShoppingItem } from '@/hooks/useShoppingList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,17 +27,44 @@ interface TrackedItem {
 
 export default function ShoppingMode({ items, onMarkBought, onExit, currency }: ShoppingModeProps) {
   const curr = currency || detectCurrencyFromLocale();
-  const [budget, setBudget] = useState<number | null>(null);
+  const SESSION_KEY = 'pantrysync_shopping_session';
+
+  // Restore session from sessionStorage
+  const savedSession = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw) return JSON.parse(raw) as { budget: number | null; trackedItems: TrackedItem[] };
+    } catch {}
+    return null;
+  }, []);
+
+  const [budget, setBudget] = useState<number | null>(savedSession?.budget ?? null);
   const [budgetInput, setBudgetInput] = useState('');
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [priceInput, setPriceInput] = useState('');
-  const [trackedItems, setTrackedItems] = useState<TrackedItem[]>([]);
+  const [trackedItems, setTrackedItems] = useState<TrackedItem[]>(savedSession?.trackedItems ?? []);
+  const initialized = useRef(!!savedSession);
 
+  // Initialize tracked items from pending shopping items (only if no saved session)
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
     const pending = items.filter(i => i.status === 'pending' || i.status === 'not_found');
     setTrackedItems(pending.map(i => ({
       id: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null,
     })));
+  }, []);
+
+  // Persist session to sessionStorage on every change
+  useEffect(() => {
+    if (budget === null && trackedItems.length === 0) return;
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ budget, trackedItems }));
+    } catch {}
+  }, [budget, trackedItems]);
+
+  const clearSession = useCallback(() => {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
   }, []);
 
   const totalSpent = useMemo(() =>
@@ -206,8 +233,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   // Main shopping mode view
   return (
     <div className="space-y-4 animate-fade-in">
-      <button onClick={onExit} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Exit Shopping Mode
+      <button onClick={() => { /* don't clear session — just go back to list view while keeping session alive */ onExit(); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="w-4 h-4" /> Back to list (session saved)
       </button>
 
       {/* Budget tracker */}
@@ -333,7 +360,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                 : <span className="text-primary"> ({fmt(remaining)} under budget)</span>
             )}
           </p>
-          <Button className="mt-4 gap-2" onClick={onExit}>
+          <Button className="mt-4 gap-2" onClick={() => { clearSession(); onExit(); }}>
             <ShoppingCart className="w-4 h-4" /> Finish Shopping
           </Button>
         </div>
