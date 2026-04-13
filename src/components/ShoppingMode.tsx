@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { ShoppingItem } from '@/hooks/useShoppingList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
