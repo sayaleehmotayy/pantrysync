@@ -265,6 +265,7 @@ export function useReceiptScanner() {
     submitPhotos,
     addSelectedToPantry,
     resetScan,
+    deleteReceipt,
     history: historyQuery.data || [],
     analytics: analyticsQuery.data,
     isLoadingHistory: historyQuery.isLoading,
