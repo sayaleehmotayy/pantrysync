@@ -27,15 +27,17 @@ serve(async (req) => {
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     if (userError || !userData.user) throw new Error("Not authenticated");
 
-    const { image_base64, household_id } = await req.json();
+    const { image_base64, household_id, existing_items } = await req.json();
     if (!image_base64 || !household_id) throw new Error("Missing image_base64 or household_id");
 
     // SECURITY: We never log, store, or transmit the receipt image beyond this function call.
-    // The base64 image is sent to AI for extraction only and immediately discarded after.
-    // We explicitly instruct AI to IGNORE all sensitive data (card numbers, bank details, etc).
-    console.log("[SCAN-RECEIPT] Processing receipt for household:", household_id);
+    console.log("[SCAN-RECEIPT] Processing receipt photo for household:", household_id);
 
-    // Call AI with vision to extract receipt data
+    // Build context about already-extracted items so AI can skip duplicates
+    const existingItemsContext = Array.isArray(existing_items) && existing_items.length > 0
+      ? `\n\nITEMS ALREADY EXTRACTED FROM PREVIOUS PHOTOS OF THIS RECEIPT (DO NOT include these again, only extract NEW items not in this list):\n${existing_items.map((i: any) => `- ${i.name} (${i.quantity} ${i.unit}, $${i.total_price})`).join('\n')}`
+      : '';
+
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -47,13 +49,13 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a receipt scanning AI that extracts ONLY grocery/shopping item data. Be precise with prices and quantities.
+            content: `You are a receipt scanning AI that extracts ONLY grocery/shopping item data and coupon/discount codes. Be precise with prices and quantities.
 
 CRITICAL PRIVACY & SECURITY RULES — FOLLOW THESE EXACTLY:
 - NEVER extract, return, or acknowledge any payment information (card numbers, last 4 digits, bank details, account numbers, payment method, authorization codes, transaction IDs, terminal IDs, merchant IDs)
 - NEVER extract personal information (customer name, phone number, email, loyalty card numbers, membership IDs, addresses)
 - NEVER extract any financial data beyond individual item prices and the receipt total
-- IGNORE all text on the receipt that is not: store name, date, item names, item quantities, item prices, subtotal/total, or currency
+- IGNORE all text on the receipt that is not: store name, date, item names, item quantities, item prices, subtotal/total, currency, or coupon/promo codes
 - If you see any sensitive data, DO NOT include it in your response under any circumstances
 
 EXTRACTION RULES:
@@ -62,12 +64,26 @@ EXTRACTION RULES:
 - If a quantity isn't clear, default to 1
 - Extract ONLY the store name (brand/company name only, no address), date, and total
 - Currency should be the 3-letter ISO code (USD, EUR, GBP, etc)
-- Clean up item names to be human-readable (e.g., "BNL BNNA" → "Banana")`,
+- Clean up item names to be human-readable (e.g., "BNL BNNA" → "Banana")
+
+COUPON/DISCOUNT CODE RULES:
+- Look for any promotional codes, coupon codes, discount codes, voucher codes, or promo references on the receipt
+- These may appear as: "PROMO:", "COUPON:", "CODE:", "VOUCHER:", "DISCOUNT CODE:", or similar labels
+- They may also appear as alphanumeric codes near discount line items
+- Extract the code text and any description of what the coupon is for
+- Do NOT confuse transaction IDs, receipt numbers, or barcodes with coupon codes
+- Only extract codes that are clearly promotional/discount codes
+
+MULTI-PHOTO DEDUPLICATION:
+- This may be one photo of a multi-photo scan of a long receipt
+- If items have already been extracted from previous photos, they will be listed below
+- ONLY extract items that are NEW and not already in the existing list
+- If you see overlapping items from a previous photo, SKIP them${existingItemsContext}`,
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Extract ONLY the grocery/shopping items, their prices, store name, date, and total from this receipt. DO NOT extract any payment details, card numbers, personal info, or sensitive data." },
+              { type: "text", text: "Extract ONLY NEW grocery/shopping items (skip any already extracted), their prices, store name, date, total, and any coupon/promo codes from this receipt section. DO NOT extract any payment details, card numbers, personal info, or sensitive data." },
               { type: "image_url", image_url: { url: `data:image/jpeg;base64,${image_base64}` } },
             ],
           },
@@ -98,6 +114,18 @@ EXTRACTION RULES:
                         category: { type: "string", description: "Food/product category" },
                       },
                       required: ["name", "total_price", "category"],
+                    },
+                  },
+                  coupon_codes: {
+                    type: "array",
+                    description: "Any coupon, promo, or discount codes found on the receipt",
+                    items: {
+                      type: "object",
+                      properties: {
+                        code: { type: "string", description: "The coupon/promo code text" },
+                        description: { type: "string", description: "What the coupon is for, if mentioned" },
+                      },
+                      required: ["code"],
                     },
                   },
                 },
@@ -133,8 +161,7 @@ EXTRACTION RULES:
 
     const receiptData = JSON.parse(toolCall.function.arguments);
 
-    // SECURITY: Sanitize AI output — strip anything that looks like sensitive data
-    // Remove any field that isn't in our expected schema
+    // SECURITY: Sanitize AI output
     const sanitizedData = {
       store_name: typeof receiptData.store_name === 'string' ? receiptData.store_name.substring(0, 100) : null,
       receipt_date: typeof receiptData.receipt_date === 'string' ? receiptData.receipt_date.substring(0, 10) : null,
@@ -148,71 +175,36 @@ EXTRACTION RULES:
         total_price: typeof item.total_price === 'number' ? item.total_price : null,
         category: typeof item.category === 'string' ? item.category.substring(0, 50) : 'Other',
       })) : [],
+      coupon_codes: Array.isArray(receiptData.coupon_codes) ? receiptData.coupon_codes
+        .filter((c: any) => typeof c.code === 'string' && c.code.trim().length > 0)
+        .map((c: any) => ({
+          code: c.code.substring(0, 100).trim(),
+          description: typeof c.description === 'string' ? c.description.substring(0, 500) : null,
+        })) : [],
     };
 
-    // SECURITY: Detect and reject if AI accidentally included card/bank data in store name
+    // SECURITY: Detect and reject if AI accidentally included card/bank data
     const sensitivePatterns = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b|\b\d{4}\s?[*]{4,}\b|card|visa|mastercard|debit|credit|account\s*#/i;
     if (sanitizedData.store_name && sensitivePatterns.test(sanitizedData.store_name)) {
-      sanitizedData.store_name = null; // Strip store name if it contains sensitive patterns
+      sanitizedData.store_name = null;
     }
-
-    // SECURITY: The original image (image_base64) is NEVER stored — it exists only in memory
-    // during this function execution and is garbage collected after the response.
-    console.log("[SCAN-RECEIPT] Extracted items:", sanitizedData.items.length);
-
-    // Save receipt scan to DB
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
+    // Also sanitize coupon codes — reject any that look like card numbers
+    sanitizedData.coupon_codes = sanitizedData.coupon_codes.filter(
+      (c: any) => !sensitivePatterns.test(c.code)
     );
 
-    const { data: scan, error: scanError } = await serviceClient
-      .from("receipt_scans")
-      .insert({
-        household_id,
-        scanned_by: userData.user.id,
-        store_name: sanitizedData.store_name,
-        receipt_date: sanitizedData.receipt_date,
-        total_amount: sanitizedData.total_amount,
-        currency: sanitizedData.currency,
-        // SECURITY: image_url is intentionally left null — we NEVER store receipt images
-      })
-      .select("id")
-      .single();
+    console.log("[SCAN-RECEIPT] Extracted items:", sanitizedData.items.length, "coupons:", sanitizedData.coupon_codes.length);
 
-    if (scanError) {
-      console.error("[SCAN-RECEIPT] DB error:", scanError);
-      throw new Error("Failed to save receipt");
-    }
-
-    // Save receipt items (only safe, sanitized data)
-    if (sanitizedData.items.length > 0) {
-      const itemsToInsert = sanitizedData.items.map((item: any) => ({
-        receipt_id: scan.id,
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        unit_price: item.unit_price,
-        total_price: item.total_price,
-        category: item.category,
-      }));
-
-      const { error: itemsError } = await serviceClient
-        .from("receipt_items")
-        .insert(itemsToInsert);
-
-      if (itemsError) console.error("[SCAN-RECEIPT] Items error:", itemsError);
-    }
-
+    // Return extracted data WITHOUT saving to DB yet (the client accumulates multi-photo results
+    // and saves once the user confirms they're done scanning)
     return new Response(
       JSON.stringify({
-        receipt_id: scan.id,
         store_name: sanitizedData.store_name,
         receipt_date: sanitizedData.receipt_date,
         total_amount: sanitizedData.total_amount,
         currency: sanitizedData.currency,
         items: sanitizedData.items,
+        coupon_codes: sanitizedData.coupon_codes,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );

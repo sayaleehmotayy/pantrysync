@@ -1,10 +1,10 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import { useReceiptScanner, ReceiptItem } from '@/hooks/useReceiptScanner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Camera, Upload, Receipt, ShoppingBasket, BarChart3, Loader2, ArrowLeft, Store, Calendar, DollarSign } from 'lucide-react';
+import { Camera, Upload, Receipt, ShoppingBasket, BarChart3, Loader2, ArrowLeft, Store, Calendar, DollarSign, Plus, Tag, ImagePlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -14,12 +14,14 @@ type Tab = 'scan' | 'history' | 'analytics';
 
 export default function ReceiptScannerPage() {
   const {
-    scanning, scanResult, setScanResult, scanReceipt,
-    addSelectedToPantry, history, analytics, isLoadingHistory,
+    scanning, scanActive, photoCount,
+    accumulatedItems, setAccumulatedItems, accumulatedCoupons,
+    storeName, receiptDate, totalAmount, currency,
+    scanReceiptPhoto, addSelectedToPantry, resetScan,
+    history, analytics, isLoadingHistory,
   } = useReceiptScanner();
 
   const [tab, setTab] = useState<Tab>('scan');
-  const [items, setItems] = useState<ReceiptItem[]>([]);
   const [adding, setAdding] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,8 +30,7 @@ export default function ReceiptScannerPage() {
     reader.onload = async () => {
       const base64 = (reader.result as string).split(',')[1];
       try {
-        const result = await scanReceipt(base64);
-        setItems(result.items.map(i => ({ ...i, selected: true })));
+        await scanReceiptPhoto(base64);
       } catch {}
     };
     reader.readAsDataURL(file);
@@ -42,22 +43,21 @@ export default function ReceiptScannerPage() {
   };
 
   const toggleItem = (idx: number) => {
-    setItems(prev => prev.map((item, i) => i === idx ? { ...item, selected: !item.selected } : item));
+    setAccumulatedItems(prev => prev.map((item, i) => i === idx ? { ...item, selected: !item.selected } : item));
   };
 
   const handleAddToPantry = async () => {
     setAdding(true);
-    await addSelectedToPantry(items);
+    await addSelectedToPantry(accumulatedItems);
     setAdding(false);
-    setScanResult(null);
-    setItems([]);
+    resetScan();
   };
 
-  const selectedCount = items.filter(i => i.selected).length;
+  const selectedCount = accumulatedItems.filter(i => i.selected !== false).length;
+  const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency + ' ';
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-display font-bold flex items-center gap-2">
           <Receipt className="w-5 h-5 text-primary" /> Receipt Scanner
@@ -88,7 +88,8 @@ export default function ReceiptScannerPage() {
       {/* Scan Tab */}
       {tab === 'scan' && (
         <>
-          {!scanResult && !scanning && (
+          {/* Initial state — no scan active */}
+          {!scanActive && !scanning && (
             <Card className="border-dashed border-2 border-primary/30">
               <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -97,59 +98,66 @@ export default function ReceiptScannerPage() {
                 <div className="text-center">
                   <h3 className="font-display font-semibold">Scan a Receipt</h3>
                   <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-                    Take a photo or upload an image. AI will extract all items, prices, and store info.
+                    Take photos of your receipt. For long receipts, take multiple photos — we'll merge the items automatically.
                   </p>
                 </div>
-                <div className="flex gap-3">
-                  <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
-                    <Upload className="w-4 h-4" /> Upload Photo
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </div>
+                <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
+                  <Upload className="w-4 h-4" /> Upload First Photo
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </CardContent>
             </Card>
           )}
 
+          {/* Scanning indicator */}
           {scanning && (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+              <CardContent className="flex flex-col items-center justify-center py-12 gap-3">
                 <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                <p className="font-display font-semibold">Analyzing receipt...</p>
-                <p className="text-sm text-muted-foreground">AI is extracting items and prices</p>
+                <p className="font-display font-semibold">
+                  {photoCount === 0 ? 'Analyzing receipt...' : `Scanning photo ${photoCount + 1}...`}
+                </p>
+                <p className="text-sm text-muted-foreground">AI is extracting new items</p>
               </CardContent>
             </Card>
           )}
 
-          {scanResult && items.length > 0 && (
+          {/* Active scan — show accumulated results */}
+          {scanActive && !scanning && (
             <div className="space-y-3">
-              {/* Receipt summary */}
+              {/* Receipt summary + add more photos */}
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      {scanResult.store_name && (
+                      {storeName && (
                         <p className="font-display font-bold flex items-center gap-1.5">
-                          <Store className="w-4 h-4 text-primary" /> {scanResult.store_name}
+                          <Store className="w-4 h-4 text-primary" /> {storeName}
                         </p>
                       )}
-                      {scanResult.receipt_date && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Calendar className="w-3 h-3" /> {format(new Date(scanResult.receipt_date), 'MMM d, yyyy')}
-                        </p>
-                      )}
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {receiptDate && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Calendar className="w-3 h-3" /> {format(new Date(receiptDate), 'MMM d, yyyy')}
+                          </p>
+                        )}
+                        <Badge variant="outline" className="text-[10px] h-4">
+                          {photoCount} photo{photoCount > 1 ? 's' : ''}
+                        </Badge>
+                      </div>
                     </div>
-                    {scanResult.total_amount && (
+                    {totalAmount != null && (
                       <div className="text-right">
                         <p className="text-xs text-muted-foreground">Total</p>
                         <p className="text-lg font-bold text-primary">
-                          {scanResult.currency === 'USD' ? '$' : scanResult.currency === 'EUR' ? '€' : scanResult.currency === 'GBP' ? '£' : ''}{scanResult.total_amount.toFixed(2)}
+                          {currencySymbol}{totalAmount.toFixed(2)}
                         </p>
                       </div>
                     )}
@@ -157,55 +165,102 @@ export default function ReceiptScannerPage() {
                 </CardContent>
               </Card>
 
+              {/* Add more photos button */}
+              <Button
+                variant="outline"
+                className="w-full gap-2 border-dashed border-primary/30 text-primary"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImagePlus className="w-4 h-4" />
+                Add Another Photo (for long receipts)
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {/* Coupon codes found */}
+              {accumulatedCoupons.length > 0 && (
+                <Card className="border-primary/20 bg-accent/30">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Tag className="w-4 h-4 text-primary" />
+                      <p className="text-sm font-semibold">Coupon Codes Found!</p>
+                    </div>
+                    {accumulatedCoupons.map((coupon, idx) => (
+                      <div key={idx} className="flex items-center gap-2 py-1">
+                        <Badge variant="default" className="font-mono text-xs">{coupon.code}</Badge>
+                        {coupon.description && (
+                          <span className="text-xs text-muted-foreground">{coupon.description}</span>
+                        )}
+                      </div>
+                    ))}
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Will be auto-added to your Coupons{storeName ? ` for ${storeName}` : ''}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Items list */}
               <div className="flex items-center justify-between px-1">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Items Found ({items.length})
+                  Items Found ({accumulatedItems.length})
                 </h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={() => setItems(prev => prev.map(i => ({ ...i, selected: !prev.every(p => p.selected) })))}
+                  onClick={() => setAccumulatedItems(prev => prev.map(i => ({ ...i, selected: !prev.every(p => p.selected !== false) })))}
                 >
-                  {items.every(i => i.selected) ? 'Deselect All' : 'Select All'}
+                  {accumulatedItems.every(i => i.selected !== false) ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
 
-              {items.map((item, idx) => (
-                <Card key={idx} className={`border-border/50 shadow-none transition-opacity ${!item.selected ? 'opacity-50' : ''}`}>
-                  <CardContent className="p-3">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={item.selected}
-                        onCheckedChange={() => toggleItem(idx)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{item.name}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
-                          <Badge variant="outline" className="text-[10px] h-4">{item.category}</Badge>
+              {accumulatedItems.length === 0 ? (
+                <div className="flex flex-col items-center py-8 text-center text-muted-foreground">
+                  <p className="text-sm">No items extracted yet. Try another photo.</p>
+                </div>
+              ) : (
+                accumulatedItems.map((item, idx) => (
+                  <Card key={idx} className={`border-border/50 shadow-none transition-opacity ${item.selected === false ? 'opacity-50' : ''}`}>
+                    <CardContent className="p-3">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={item.selected !== false}
+                          onCheckedChange={() => toggleItem(idx)}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{item.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
+                            <Badge variant="outline" className="text-[10px] h-4">{item.category}</Badge>
+                          </div>
                         </div>
+                        {item.total_price != null && (
+                          <p className="text-sm font-semibold shrink-0">
+                            {currencySymbol}{item.total_price.toFixed(2)}
+                          </p>
+                        )}
                       </div>
-                      {item.total_price != null && (
-                        <p className="text-sm font-semibold shrink-0">
-                          ${item.total_price.toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
 
               {/* Action buttons */}
               <div className="flex gap-2 sticky bottom-20 md:bottom-4 bg-background/95 backdrop-blur-sm py-3 -mx-4 px-4">
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => { setScanResult(null); setItems([]); }}
+                  onClick={resetScan}
                 >
-                  <ArrowLeft className="w-4 h-4 mr-1" /> New Scan
+                  <ArrowLeft className="w-4 h-4 mr-1" /> Cancel
                 </Button>
                 <Button
                   className="flex-1 gap-2"
@@ -244,7 +299,7 @@ export default function ReceiptScannerPage() {
                     </div>
                     {scan.total_amount && (
                       <p className="font-bold text-sm">
-                        {scan.currency === 'USD' ? '$' : scan.currency === 'EUR' ? '€' : ''}{scan.total_amount.toFixed(2)}
+                        {scan.currency === 'USD' ? '$' : scan.currency === 'EUR' ? '€' : ''}{Number(scan.total_amount).toFixed(2)}
                       </p>
                     )}
                   </div>
@@ -265,7 +320,6 @@ export default function ReceiptScannerPage() {
             </div>
           ) : (
             <>
-              {/* Summary cards */}
               <div className="grid grid-cols-3 gap-2">
                 <Card className="border-border/50 shadow-none">
                   <CardContent className="p-3 text-center">
@@ -290,7 +344,6 @@ export default function ReceiptScannerPage() {
                 </Card>
               </div>
 
-              {/* Category breakdown */}
               {Object.keys(analytics.categorySpending).length > 0 && (
                 <Card className="border-border/50 shadow-none">
                   <CardHeader className="pb-2">
@@ -321,7 +374,6 @@ export default function ReceiptScannerPage() {
                 </Card>
               )}
 
-              {/* Store breakdown */}
               {Object.keys(analytics.storeSpending).length > 0 && (
                 <Card className="border-border/50 shadow-none">
                   <CardHeader className="pb-2">
@@ -342,7 +394,6 @@ export default function ReceiptScannerPage() {
                 </Card>
               )}
 
-              {/* Monthly trend */}
               {Object.keys(analytics.monthlySpending).length > 1 && (
                 <Card className="border-border/50 shadow-none">
                   <CardHeader className="pb-2">
