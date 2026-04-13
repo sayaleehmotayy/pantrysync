@@ -54,8 +54,10 @@ serve(async (req) => {
 CRITICAL PRIVACY & SECURITY RULES — FOLLOW THESE EXACTLY:
 - NEVER extract, return, or acknowledge any payment information (card numbers, last 4 digits, bank details, account numbers, payment method, authorization codes, transaction IDs, terminal IDs, merchant IDs)
 - NEVER extract personal information (customer name, phone number, email, loyalty card numbers, membership IDs, addresses)
+- NEVER extract employee information (employee card numbers, employee IDs, staff numbers, employee names, employee discount card numbers, staff discount references)
 - NEVER extract any financial data beyond individual item prices and the receipt total
 - IGNORE all text on the receipt that is not: store name, date, item names, item quantities, item prices, subtotal/total, currency, or coupon/promo codes
+- If you see employee discounts, staff discounts, or similar — completely ignore them. Do NOT return the discount amount, employee ID, or any reference to it.
 - If you see any sensitive data, DO NOT include it in your response under any circumstances
 
 EXTRACTION RULES:
@@ -184,13 +186,17 @@ MULTI-PHOTO DEDUPLICATION:
     };
 
     // SECURITY: Detect and reject if AI accidentally included card/bank data
-    const sensitivePatterns = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b|\b\d{4}\s?[*]{4,}\b|card|visa|mastercard|debit|credit|account\s*#/i;
+    const sensitivePatterns = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b|\b\d{4}\s?[*]{4,}\b|card|visa|mastercard|debit|credit|account\s*#|employee\s*(id|#|number|card|discount)|staff\s*(id|#|number|card|discount)|member(ship)?\s*(id|#|number)/i;
     if (sanitizedData.store_name && sensitivePatterns.test(sanitizedData.store_name)) {
       sanitizedData.store_name = null;
     }
-    // Also sanitize coupon codes — reject any that look like card numbers
+    // Sanitize coupon codes — reject any that look like card/employee numbers
     sanitizedData.coupon_codes = sanitizedData.coupon_codes.filter(
-      (c: any) => !sensitivePatterns.test(c.code)
+      (c: any) => !sensitivePatterns.test(c.code) && !sensitivePatterns.test(c.description || '')
+    );
+    // Sanitize item names — strip any that reference employee/staff discounts
+    sanitizedData.items = sanitizedData.items.filter(
+      (item: any) => !sensitivePatterns.test(item.name)
     );
 
     console.log("[SCAN-RECEIPT] Extracted items:", sanitizedData.items.length, "coupons:", sanitizedData.coupon_codes.length);
