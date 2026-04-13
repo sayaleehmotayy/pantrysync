@@ -59,8 +59,8 @@ const BOT_USER_ID = 'pantrysync-bot';
 export default function ChatPage() {
   const { user } = useAuth();
   const { household, members } = useHousehold();
-  const { addItem, items: shoppingItems } = useShoppingList();
-  const { items: inventoryItems } = useInventory();
+  const { addItem, data: shoppingItems } = useShoppingList();
+  const { data: inventoryItems } = useInventory();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [botReplies, setBotReplies] = useState<BotReply[]>([]);
   const [newMessage, setNewMessage] = useState('');
