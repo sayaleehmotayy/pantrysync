@@ -360,7 +360,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                 : <span className="text-primary"> ({fmt(remaining)} under budget)</span>
             )}
           </p>
-          <Button className="mt-4 gap-2" onClick={onExit}>
+          <Button className="mt-4 gap-2" onClick={() => { clearSession(); onExit(); }}>
             <ShoppingCart className="w-4 h-4" /> Finish Shopping
           </Button>
         </div>
