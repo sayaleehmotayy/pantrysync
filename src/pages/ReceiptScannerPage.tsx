@@ -1,16 +1,47 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useReceiptScanner, ReceiptItem } from '@/hooks/useReceiptScanner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Camera, Upload, Receipt, ShoppingBasket, BarChart3, Loader2, ArrowLeft, Store, Calendar, DollarSign, Plus, Tag, ImagePlus } from 'lucide-react';
+import { Camera, Upload, Receipt, ShoppingBasket, BarChart3, Loader2, ArrowLeft, Store, Calendar, DollarSign, Plus, Tag, ImagePlus, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { toast } from 'sonner';
 
 const CHART_COLORS = ['#2D6A4F', '#40916C', '#52B788', '#74C69D', '#95D5B2', '#B7E4C7', '#D8F3DC', '#1B4332', '#081C15', '#A7C957'];
 
 type Tab = 'scan' | 'history' | 'analytics';
+
+// Compress image to a reasonable size for AI processing
+function compressImage(file: File, maxWidth = 1600, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      let w = img.width;
+      let h = img.height;
+      if (w > maxWidth) {
+        h = (h * maxWidth) / w;
+        w = maxWidth;
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      const base64 = dataUrl.split(',')[1];
+      resolve(base64);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    img.src = url;
+  });
+}
 
 export default function ReceiptScannerPage() {
   const {
@@ -23,18 +54,20 @@ export default function ReceiptScannerPage() {
 
   const [tab, setTab] = useState<Tab>('scan');
   const [adding, setAdding] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addMoreRef = useRef<HTMLInputElement>(null);
 
-  const handleImageCapture = async (file: File) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = (reader.result as string).split(',')[1];
-      try {
-        await scanReceiptPhoto(base64);
-      } catch {}
-    };
-    reader.readAsDataURL(file);
-  };
+  const handleImageCapture = useCallback(async (file: File) => {
+    setLastError(null);
+    try {
+      const base64 = await compressImage(file);
+      await scanReceiptPhoto(base64);
+    } catch (e: any) {
+      const msg = e.message || 'Failed to scan receipt';
+      setLastError(msg);
+    }
+  }, [scanReceiptPhoto]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -88,7 +121,7 @@ export default function ReceiptScannerPage() {
       {/* Scan Tab */}
       {tab === 'scan' && (
         <>
-          {/* Initial state — no scan active */}
+          {/* Initial state — no scan active and not scanning */}
           {!scanActive && !scanning && (
             <Card className="border-dashed border-2 border-primary/30">
               <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
@@ -101,9 +134,27 @@ export default function ReceiptScannerPage() {
                     Take photos of your receipt. For long receipts, take multiple photos — we'll merge the items automatically.
                   </p>
                 </div>
-                <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
-                  <Upload className="w-4 h-4" /> Upload First Photo
-                </Button>
+
+                {/* Error message with retry */}
+                {lastError && (
+                  <div className="w-full max-w-xs bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-center">
+                    <p className="text-sm text-destructive font-medium">{lastError}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 gap-1.5"
+                      onClick={() => { setLastError(null); fileInputRef.current?.click(); }}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Try Again
+                    </Button>
+                  </div>
+                )}
+
+                {!lastError && (
+                  <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
+                    <Upload className="w-4 h-4" /> Upload Receipt Photo
+                  </Button>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -124,7 +175,7 @@ export default function ReceiptScannerPage() {
                 <p className="font-display font-semibold">
                   {photoCount === 0 ? 'Analyzing receipt...' : `Scanning photo ${photoCount + 1}...`}
                 </p>
-                <p className="text-sm text-muted-foreground">AI is extracting new items</p>
+                <p className="text-sm text-muted-foreground">AI is extracting items from your receipt</p>
               </CardContent>
             </Card>
           )}
@@ -132,7 +183,7 @@ export default function ReceiptScannerPage() {
           {/* Active scan — show accumulated results */}
           {scanActive && !scanning && (
             <div className="space-y-3">
-              {/* Receipt summary + add more photos */}
+              {/* Receipt summary */}
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -165,17 +216,32 @@ export default function ReceiptScannerPage() {
                 </CardContent>
               </Card>
 
+              {/* Error during additional photo */}
+              {lastError && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-center justify-between">
+                  <p className="text-sm text-destructive">{lastError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 shrink-0"
+                    onClick={() => { setLastError(null); addMoreRef.current?.click(); }}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Retry
+                  </Button>
+                </div>
+              )}
+
               {/* Add more photos button */}
               <Button
                 variant="outline"
                 className="w-full gap-2 border-dashed border-primary/30 text-primary"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => addMoreRef.current?.click()}
               >
                 <ImagePlus className="w-4 h-4" />
                 Add Another Photo (for long receipts)
               </Button>
               <input
-                ref={fileInputRef}
+                ref={addMoreRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
@@ -383,26 +449,6 @@ export default function ReceiptScannerPage() {
                     <div className="h-40">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={Object.entries(analytics.storeSpending).map(([name, value]) => ({ name, value }))}>
-                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                          <YAxis tick={{ fontSize: 10 }} />
-                          <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-                          <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {Object.keys(analytics.monthlySpending).length > 1 && (
-                <Card className="border-border/50 shadow-none">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-display">Monthly Spending</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3">
-                    <div className="h-40">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={Object.entries(analytics.monthlySpending).map(([name, value]) => ({ name, value }))}>
                           <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                           <YAxis tick={{ fontSize: 10 }} />
                           <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
