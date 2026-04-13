@@ -90,11 +90,13 @@ export default function AuthPage() {
         <Card className="border-border/50 shadow-lg">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg">
-              {verifyEmail ? 'Check Your Email' : isSignUp ? 'Create Account' : 'Welcome Back'}
+              {verifyEmail ? 'Check Your Email' : resetSent ? 'Check Your Email' : forgotPassword ? 'Forgot Password' : isSignUp ? 'Create Account' : 'Welcome Back'}
             </CardTitle>
             <CardDescription>
               {verifyEmail
                 ? 'Verify through email inbox'
+                : resetSent ? 'Password reset link sent'
+                : forgotPassword ? 'Enter your email to reset your password'
                 : isSignUp ? 'Sign up to get started' : 'Sign in to your account'}
             </CardDescription>
           </CardHeader>
@@ -112,6 +114,42 @@ export default function AuthPage() {
                   Back to Sign In
                 </Button>
               </div>
+            ) : resetSent ? (
+              <div className="space-y-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  We've sent a password reset link to <strong>{email}</strong>. Please check your inbox and follow the instructions.
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => { setResetSent(false); setForgotPassword(false); setError(''); }}
+                >
+                  Back to Sign In
+                </Button>
+              </div>
+            ) : forgotPassword ? (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                />
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Sending...' : 'Send Reset Link'}
+                </Button>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => { setForgotPassword(false); setError(''); }}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+              </form>
             ) : (
               <>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -154,7 +192,18 @@ export default function AuthPage() {
                     {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
                   </Button>
                 </form>
-                <div className="mt-4 text-center">
+                {!isSignUp && (
+                  <div className="mt-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => { setForgotPassword(true); setError(''); }}
+                      className="text-sm text-primary hover:underline transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                )}
+                <div className="mt-3 text-center">
                   <button
                     type="button"
                     onClick={() => { setIsSignUp(!isSignUp); setError(''); }}

@@ -21,6 +21,7 @@ import ReceiptScannerPage from "./pages/ReceiptScannerPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import WelcomePage from "./pages/WelcomePage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 
 const queryClient = new QueryClient();
