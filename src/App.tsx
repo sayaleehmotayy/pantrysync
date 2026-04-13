@@ -18,7 +18,6 @@ import SettingsPage from "./pages/SettingsPage";
 import AiPage from "./pages/AiPage";
 import CouponsPage from "./pages/CouponsPage";
 import ReceiptScannerPage from "./pages/ReceiptScannerPage";
-import ReceiptScannerPage from "./pages/ReceiptScannerPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import WelcomePage from "./pages/WelcomePage";
