@@ -29,26 +29,25 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash-lite",
+        max_tokens: 200,
         messages: [
           {
             role: "system",
-            content: `You are a smart shopping list parser for a household pantry app.
+            content: `Extract ONLY food/grocery item names from the message. Return just the item names, quantities and categories. Ignore all conversational words.
 
-Given a chat message, extract grocery/shopping items the user wants to add.
-Only extract items when the message clearly indicates adding to a shopping list (e.g. "add X to the list", "buy X", "we need X", "get X from the store", "add X to shopping list").
-If the message is just casual conversation with no shopping intent, return NO items.
+Examples:
+- "I was wondering if we need 6 more apples?" → name:"apples", quantity:6, unit:"pieces"
+- "buy 2 bottles of milk and bread" → two items: milk (2 bottles) and bread (1 pieces)  
+- "Do we have salt" → name:"salt", quantity:1, unit:"pieces"
+- "Hey how are you doing?" → NO items (no food mentioned with intent)
+- "Can someone pick up eggs and cheese from the store?" → eggs and cheese
 
-IMPORTANT RULES:
-1. **Extract the correct unit**: If the user says "500 milliliters" or "500ml", set quantity to 500 and unit to "ml". If they say "2 kg", set quantity to 2 and unit to "kg". If they say "3 bottles", set quantity to 3 and unit to "bottles". Default to "pieces" only if no unit is mentioned.
-2. **Smart serving estimation**: If the user says something like "enough ketchup to serve 40 people" or "enough rice for 10 people", estimate a realistic quantity and unit based on common serving sizes. For example:
-   - "enough ketchup for 40 people" → ~2 bottles (500ml each) → name: "ketchup", quantity: 2, unit: "bottles"
-   - "enough rice for 10 people" → ~2 kg → name: "rice", quantity: 2, unit: "kg"
-   - "enough milk for 20 people" → ~4 liters → name: "milk", quantity: 4, unit: "l"
-   Use practical, store-buyable quantities and common packaging sizes.
-3. **Keep item names clean and singular**: "chocolate ice cream" not "chocolate ice cream 500 milliliters". The quantity and unit should be separate fields.
-
-Use the provided tool to return structured data.`,
+RULES:
+- Extract food items even from questions like "do we need X?" or "should I get X?"
+- Keep names clean: just the food name, no extra words
+- Default quantity 1 and unit "pieces" if not specified
+- Return empty array ONLY if no food/grocery items are mentioned at all`,
           },
           { role: "user", content: message },
         ],
@@ -57,7 +56,7 @@ Use the provided tool to return structured data.`,
             type: "function",
             function: {
               name: "extract_shopping_items",
-              description: "Extract shopping items from a message with proper quantity, unit, and category",
+              description: "Extract food items from message",
               parameters: {
                 type: "object",
                 properties: {
@@ -66,11 +65,10 @@ Use the provided tool to return structured data.`,
                     items: {
                       type: "object",
                       properties: {
-                        name: { type: "string", description: "Clean product name e.g. apples, milk, bread (no quantities or units in the name)" },
-                        quantity: { type: "number", description: "Numeric quantity e.g. 500 for 500ml, 2 for 2 bottles, 1 if unspecified" },
+                        name: { type: "string", description: "Food item name only, e.g. apples, milk, bread" },
+                        quantity: { type: "number" },
                         unit: { 
                           type: "string", 
-                          description: "Unit of measurement",
                           enum: ["pieces", "g", "kg", "ml", "l", "cups", "tbsp", "tsp", "bottles", "packets"]
                         },
                         category: {
