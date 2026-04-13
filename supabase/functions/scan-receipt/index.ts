@@ -172,10 +172,11 @@ EXTRACTION RULES:
       .insert({
         household_id,
         scanned_by: userData.user.id,
-        store_name: receiptData.store_name || null,
-        receipt_date: receiptData.receipt_date || null,
-        total_amount: receiptData.total_amount || null,
-        currency: receiptData.currency || "USD",
+        store_name: sanitizedData.store_name,
+        receipt_date: sanitizedData.receipt_date,
+        total_amount: sanitizedData.total_amount,
+        currency: sanitizedData.currency,
+        // SECURITY: image_url is intentionally left null — we NEVER store receipt images
       })
       .select("id")
       .single();
@@ -185,16 +186,16 @@ EXTRACTION RULES:
       throw new Error("Failed to save receipt");
     }
 
-    // Save receipt items
-    if (receiptData.items?.length > 0) {
-      const itemsToInsert = receiptData.items.map((item: any) => ({
+    // Save receipt items (only safe, sanitized data)
+    if (sanitizedData.items.length > 0) {
+      const itemsToInsert = sanitizedData.items.map((item: any) => ({
         receipt_id: scan.id,
         name: item.name,
-        quantity: item.quantity || 1,
-        unit: item.unit || "pieces",
-        unit_price: item.unit_price || null,
-        total_price: item.total_price || null,
-        category: item.category || "Other",
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        category: item.category,
       }));
 
       const { error: itemsError } = await serviceClient
@@ -207,11 +208,11 @@ EXTRACTION RULES:
     return new Response(
       JSON.stringify({
         receipt_id: scan.id,
-        store_name: receiptData.store_name,
-        receipt_date: receiptData.receipt_date,
-        total_amount: receiptData.total_amount,
-        currency: receiptData.currency,
-        items: receiptData.items || [],
+        store_name: sanitizedData.store_name,
+        receipt_date: sanitizedData.receipt_date,
+        total_amount: sanitizedData.total_amount,
+        currency: sanitizedData.currency,
+        items: sanitizedData.items,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
