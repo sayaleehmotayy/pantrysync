@@ -32,9 +32,12 @@ function AppRoutes() {
   const location = useLocation();
   usePushNotifications();
 
-  // Allow /welcome to render without auth (verification landing)
+  // Allow /welcome and /reset-password to render without auth
   if (location.pathname === '/welcome') {
     return <WelcomePage />;
+  }
+  if (location.pathname === '/reset-password') {
+    return <ResetPasswordPage />;
   }
 
   if (authLoading || (user && hhLoading)) {
