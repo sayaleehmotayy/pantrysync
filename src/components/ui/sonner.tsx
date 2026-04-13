@@ -11,12 +11,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
       position="top-center"
-      expand={true}
+      expand={false}
       richColors
       closeButton
       duration={4000}
-      gap={8}
-      visibleToasts={3}
+      gap={0}
+      visibleToasts={5}
       // @ts-ignore — sonner supports swipeThreshold but types may lag
       swipeThreshold={50}
       toastOptions={{
