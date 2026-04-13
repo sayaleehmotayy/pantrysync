@@ -102,6 +102,7 @@ export default function ShoppingPage() {
           items={items}
           onMarkBought={handleShoppingModeBought}
           onExit={() => setShoppingMode(false)}
+          currency={receiptCurrency}
         />
       </div>
     );
