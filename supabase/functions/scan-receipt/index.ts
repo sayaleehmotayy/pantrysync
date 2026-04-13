@@ -132,7 +132,33 @@ EXTRACTION RULES:
     if (!toolCall) throw new Error("AI did not return structured data");
 
     const receiptData = JSON.parse(toolCall.function.arguments);
-    console.log("[SCAN-RECEIPT] Extracted:", JSON.stringify(receiptData).slice(0, 200));
+
+    // SECURITY: Sanitize AI output — strip anything that looks like sensitive data
+    // Remove any field that isn't in our expected schema
+    const sanitizedData = {
+      store_name: typeof receiptData.store_name === 'string' ? receiptData.store_name.substring(0, 100) : null,
+      receipt_date: typeof receiptData.receipt_date === 'string' ? receiptData.receipt_date.substring(0, 10) : null,
+      currency: typeof receiptData.currency === 'string' ? receiptData.currency.substring(0, 3) : 'USD',
+      total_amount: typeof receiptData.total_amount === 'number' ? receiptData.total_amount : null,
+      items: Array.isArray(receiptData.items) ? receiptData.items.map((item: any) => ({
+        name: typeof item.name === 'string' ? item.name.substring(0, 200) : 'Unknown Item',
+        quantity: typeof item.quantity === 'number' ? item.quantity : 1,
+        unit: typeof item.unit === 'string' ? item.unit.substring(0, 20) : 'pieces',
+        unit_price: typeof item.unit_price === 'number' ? item.unit_price : null,
+        total_price: typeof item.total_price === 'number' ? item.total_price : null,
+        category: typeof item.category === 'string' ? item.category.substring(0, 50) : 'Other',
+      })) : [],
+    };
+
+    // SECURITY: Detect and reject if AI accidentally included card/bank data in store name
+    const sensitivePatterns = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b|\b\d{4}\s?[*]{4,}\b|card|visa|mastercard|debit|credit|account\s*#/i;
+    if (sanitizedData.store_name && sensitivePatterns.test(sanitizedData.store_name)) {
+      sanitizedData.store_name = null; // Strip store name if it contains sensitive patterns
+    }
+
+    // SECURITY: The original image (image_base64) is NEVER stored — it exists only in memory
+    // during this function execution and is garbage collected after the response.
+    console.log("[SCAN-RECEIPT] Extracted items:", sanitizedData.items.length);
 
     // Save receipt scan to DB
     const serviceClient = createClient(
