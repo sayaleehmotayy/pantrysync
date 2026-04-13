@@ -343,6 +343,97 @@ export type Database = {
         }
         Relationships: []
       }
+      receipt_items: {
+        Row: {
+          added_to_pantry: boolean | null
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+          quantity: number | null
+          receipt_id: string
+          total_price: number | null
+          unit: string | null
+          unit_price: number | null
+        }
+        Insert: {
+          added_to_pantry?: boolean | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          quantity?: number | null
+          receipt_id: string
+          total_price?: number | null
+          unit?: string | null
+          unit_price?: number | null
+        }
+        Update: {
+          added_to_pantry?: boolean | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          quantity?: number | null
+          receipt_id?: string
+          total_price?: number | null
+          unit?: string | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipt_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipt_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receipt_scans: {
+        Row: {
+          created_at: string
+          currency: string | null
+          household_id: string
+          id: string
+          image_url: string | null
+          receipt_date: string | null
+          scanned_by: string
+          store_name: string | null
+          total_amount: number | null
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          household_id: string
+          id?: string
+          image_url?: string | null
+          receipt_date?: string | null
+          scanned_by: string
+          store_name?: string | null
+          total_amount?: number | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          household_id?: string
+          id?: string
+          image_url?: string | null
+          receipt_date?: string | null
+          scanned_by?: string
+          store_name?: string | null
+          total_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipt_scans_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_ingredients: {
         Row: {
           id: string
