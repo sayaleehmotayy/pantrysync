@@ -16,25 +16,62 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [verifyEmail, setVerifyEmail] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const result = isSignUp
-      ? await signUp(email, password, displayName)
-      : await signIn(email, password);
-
-    if (result.error) {
-      const msg = result.error.message;
-      if (msg.includes('security purposes') || msg.includes('after')) {
-        setError('Please check your email inbox to verify your account before signing in.');
+    if (isSignUp) {
+      const result = await signUp(email, password, displayName);
+      if (result.error) {
+        const msg = result.error.message;
+        if (msg.includes('security purposes') || msg.includes('after')) {
+          setError('Please check your email inbox to verify your account before signing in.');
+        } else {
+          setError(msg);
+        }
+      } else if (result.alreadyExists) {
+        setError('This email address is already in use. Please sign in instead, or use "Forgot password" to reset your password.');
       } else {
-        setError(msg);
+        setVerifyEmail(true);
       }
-    } else if (isSignUp) {
-      setVerifyEmail(true);
+    } else {
+      const result = await signIn(email, password);
+      if (result.error) {
+        const msg = result.error.message;
+        if (msg.includes('security purposes') || msg.includes('after')) {
+          setError('Please check your email inbox to verify your account before signing in.');
+        } else {
+          setError(msg);
+        }
+      }
+    }
+    setLoading(false);
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    const currentOrigin = window.location.origin;
+    const authOrigin = currentOrigin.includes('lovableproject.com') || currentOrigin.includes('id-preview--')
+      ? 'https://pantrysync.lovable.app'
+      : currentOrigin;
+
+    const { error } = await (await import('@/integrations/supabase/client')).supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${authOrigin}/reset-password`,
+    });
+    if (error) {
+      setError(error.message);
+    } else {
+      setResetSent(true);
     }
     setLoading(false);
   };
