@@ -19,7 +19,7 @@ interface AuthContextType {
   loading: boolean;
   subscription: SubscriptionState;
   checkSubscription: () => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null; alreadyExists?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -136,13 +136,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [user, checkSubscription]);
 
-  const signUp = async (email: string, password: string, displayName: string) => {
+  const signUp = async (email: string, password: string, displayName: string): Promise<{ error: Error | null; alreadyExists?: boolean }> => {
     const currentOrigin = window.location.origin;
     const authOrigin = currentOrigin.includes('lovableproject.com') || currentOrigin.includes('id-preview--')
       ? 'https://pantrysync.lovable.app'
       : currentOrigin;
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -150,6 +150,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailRedirectTo: `${authOrigin}/welcome`,
       },
     });
+
+    // Detect "fake" signup for existing user: Supabase returns a user with empty identities
+    if (!error && data?.user && data.user.identities && data.user.identities.length === 0) {
+      return { error: null, alreadyExists: true };
+    }
+
     return { error: error as Error | null };
   };
 
