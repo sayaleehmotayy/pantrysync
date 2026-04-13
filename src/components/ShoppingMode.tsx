@@ -7,11 +7,13 @@ import { Progress } from '@/components/ui/progress';
 import {
   ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2,
 } from 'lucide-react';
+import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
 
 interface ShoppingModeProps {
   items: ShoppingItem[];
   onMarkBought: (id: string, price: number) => void;
   onExit: () => void;
+  currency?: CurrencyInfo;
 }
 
 interface TrackedItem {
@@ -20,26 +22,21 @@ interface TrackedItem {
   quantity: number;
   unit: string;
   category: string;
-  price: number | null; // null = not yet priced
+  price: number | null;
 }
 
-export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingModeProps) {
+export default function ShoppingMode({ items, onMarkBought, onExit, currency }: ShoppingModeProps) {
+  const curr = currency || detectCurrencyFromLocale();
   const [budget, setBudget] = useState<number | null>(null);
   const [budgetInput, setBudgetInput] = useState('');
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [priceInput, setPriceInput] = useState('');
   const [trackedItems, setTrackedItems] = useState<TrackedItem[]>([]);
 
-  // Initialize tracked items from pending shopping items
   useEffect(() => {
     const pending = items.filter(i => i.status === 'pending' || i.status === 'not_found');
     setTrackedItems(pending.map(i => ({
-      id: i.id,
-      name: i.name,
-      quantity: i.quantity,
-      unit: i.unit,
-      category: i.category,
-      price: null,
+      id: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null,
     })));
   }, []);
 
@@ -54,7 +51,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
   const unpricedItems = trackedItems.filter(i => i.price === null);
   const pricedItems = trackedItems.filter(i => i.price !== null);
 
-  // Numpad handler
+  const fmt = (amount: number) => formatCurrency(amount, curr);
+
   const handleNumpad = useCallback((key: string) => {
     setPriceInput(prev => {
       if (key === 'clear') return '';
@@ -63,10 +61,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
         if (prev.includes('.')) return prev;
         return prev === '' ? '0.' : prev + '.';
       }
-      // Limit to 2 decimal places
       const parts = prev.split('.');
       if (parts.length === 2 && parts[1].length >= 2) return prev;
-      // Limit total length
       if (prev.length >= 8) return prev;
       return prev + key;
     });
@@ -108,14 +104,13 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
             <p className="text-sm text-muted-foreground mt-1">How much do you want to spend this trip?</p>
           </div>
 
-          {/* Budget amount display */}
           <div className="text-center">
             <span className="text-4xl font-bold font-display">
-              €{budgetInput || '0'}
+              {curr.symbol}{budgetInput || '0'}
             </span>
+            <span className="text-sm text-muted-foreground ml-2">{curr.code}</span>
           </div>
 
-          {/* Numpad for budget */}
           <div className="grid grid-cols-3 gap-2 w-full max-w-[280px]">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'].map(key => (
               <button
@@ -149,12 +144,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
             Start Shopping
           </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={() => setBudget(Infinity)}
-          >
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setBudget(Infinity)}>
             Skip — no budget
           </Button>
         </div>
@@ -182,14 +172,12 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
           <p className="text-xs text-muted-foreground">{item.quantity} {item.unit}</p>
         </div>
 
-        {/* Price display */}
         <div className="text-center py-4">
           <span className="text-5xl font-bold font-display tabular-nums">
-            €{priceInput || '0.00'}
+            {curr.symbol}{priceInput || '0.00'}
           </span>
         </div>
 
-        {/* Numpad */}
         <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'].map(key => (
             <button
@@ -209,7 +197,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
           onClick={confirmPrice}
         >
           <Check className="w-4 h-4" />
-          Confirm €{priceInput || '0.00'}
+          Confirm {curr.symbol}{priceInput || '0.00'}
         </Button>
       </div>
     );
@@ -230,7 +218,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
               <div>
                 <p className="text-xs text-muted-foreground">Spent</p>
                 <p className={`text-2xl font-bold font-display ${overBudget ? 'text-destructive' : 'text-foreground'}`}>
-                  €{totalSpent.toFixed(2)}
+                  {fmt(totalSpent)}
                 </p>
               </div>
               <div className="text-right">
@@ -238,11 +226,11 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
                 <p className={`text-2xl font-bold font-display ${overBudget ? 'text-destructive' : 'text-primary'}`}>
                   {overBudget ? (
                     <span className="flex items-center gap-1">
-                      <TrendingUp className="w-5 h-5" />€{Math.abs(remaining!).toFixed(2)}
+                      <TrendingUp className="w-5 h-5" />{fmt(Math.abs(remaining!))}
                     </span>
                   ) : (
                     <span className="flex items-center gap-1">
-                      <TrendingDown className="w-5 h-5" />€{remaining!.toFixed(2)}
+                      <TrendingDown className="w-5 h-5" />{fmt(remaining!)}
                     </span>
                   )}
                 </p>
@@ -251,7 +239,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
             <div className="space-y-1">
               <Progress value={progressPercent} className={`h-3 ${overBudget ? '[&>div]:bg-destructive' : ''}`} />
               <p className="text-[10px] text-muted-foreground text-center">
-                €{totalSpent.toFixed(2)} of €{budget.toFixed(2)} budget
+                {fmt(totalSpent)} of {fmt(budget)} budget
               </p>
             </div>
           </CardContent>
@@ -264,7 +252,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs text-muted-foreground">Total so far</p>
-              <p className="text-2xl font-bold font-display">€{totalSpent.toFixed(2)}</p>
+              <p className="text-2xl font-bold font-display">{fmt(totalSpent)}</p>
             </div>
             <Badge variant="outline" className="text-xs">
               {pricedItems.length}/{trackedItems.length} items
@@ -273,7 +261,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
         </Card>
       )}
 
-      {/* Unpriced items — tap to enter price */}
+      {/* Unpriced items */}
       {unpricedItems.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
@@ -316,7 +304,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <p className="font-bold text-sm">€{item.price!.toFixed(2)}</p>
+                  <p className="font-bold text-sm">{fmt(item.price!)}</p>
                   <button
                     onClick={() => undoPrice(item.id)}
                     className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
@@ -338,11 +326,11 @@ export default function ShoppingMode({ items, onMarkBought, onExit }: ShoppingMo
           </div>
           <p className="font-display font-semibold">All items priced!</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Total: €{totalSpent.toFixed(2)}
+            Total: {fmt(totalSpent)}
             {budget !== Infinity && remaining !== null && (
               overBudget
-                ? <span className="text-destructive"> (€{Math.abs(remaining).toFixed(2)} over budget)</span>
-                : <span className="text-primary"> (€{remaining.toFixed(2)} under budget)</span>
+                ? <span className="text-destructive"> ({fmt(Math.abs(remaining))} over budget)</span>
+                : <span className="text-primary"> ({fmt(remaining)} under budget)</span>
             )}
           </p>
           <Button className="mt-4 gap-2" onClick={onExit}>
