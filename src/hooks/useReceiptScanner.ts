@@ -15,13 +15,19 @@ export interface ReceiptItem {
   selected?: boolean;
 }
 
+export interface CouponCode {
+  code: string;
+  description: string | null;
+}
+
 export interface ScanResult {
-  receipt_id: string;
+  receipt_id?: string;
   store_name: string | null;
   receipt_date: string | null;
   total_amount: number | null;
   currency: string;
   items: ReceiptItem[];
+  coupon_codes: CouponCode[];
 }
 
 export function useReceiptScanner() {
@@ -29,30 +35,137 @@ export function useReceiptScanner() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [photoCount, setPhotoCount] = useState(0);
 
-  const scanReceipt = async (imageBase64: string) => {
+  // Accumulated state across multiple photos
+  const [accumulatedItems, setAccumulatedItems] = useState<ReceiptItem[]>([]);
+  const [accumulatedCoupons, setAccumulatedCoupons] = useState<CouponCode[]>([]);
+  const [storeName, setStoreName] = useState<string | null>(null);
+  const [receiptDate, setReceiptDate] = useState<string | null>(null);
+  const [totalAmount, setTotalAmount] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<string>('USD');
+  const [scanActive, setScanActive] = useState(false);
+
+  const scanReceiptPhoto = async (imageBase64: string) => {
     if (!household) throw new Error('No household');
     setScanning(true);
     try {
       const { data, error } = await supabase.functions.invoke('scan-receipt', {
-        body: { image_base64: imageBase64, household_id: household.id },
+        body: {
+          image_base64: imageBase64,
+          household_id: household.id,
+          existing_items: accumulatedItems.map(i => ({
+            name: i.name,
+            quantity: i.quantity,
+            unit: i.unit,
+            total_price: i.total_price,
+          })),
+        },
       });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      const result: ScanResult = {
-        ...data,
-        items: (data.items || []).map((item: any) => ({ ...item, selected: true })),
-      };
-      setScanResult(result);
-      return result;
+      // Merge new items (AI already deduplicates, but double-check client-side)
+      const existingNames = new Set(accumulatedItems.map(i => i.name.toLowerCase()));
+      const newItems = (data.items || [])
+        .filter((item: any) => !existingNames.has(item.name.toLowerCase()))
+        .map((item: any) => ({ ...item, selected: true }));
+
+      // Merge coupons (deduplicate by code)
+      const existingCodes = new Set(accumulatedCoupons.map(c => c.code.toLowerCase()));
+      const newCoupons = (data.coupon_codes || [])
+        .filter((c: any) => !existingCodes.has(c.code.toLowerCase()));
+
+      setAccumulatedItems(prev => [...prev, ...newItems]);
+      setAccumulatedCoupons(prev => [...prev, ...newCoupons]);
+
+      // Update metadata (take first non-null values, or update total)
+      if (data.store_name && !storeName) setStoreName(data.store_name);
+      if (data.receipt_date && !receiptDate) setReceiptDate(data.receipt_date);
+      if (data.total_amount) setTotalAmount(data.total_amount); // Always take latest total
+      if (data.currency) setCurrency(data.currency);
+
+      setPhotoCount(prev => prev + 1);
+      setScanActive(true);
+
+      const msg = newItems.length > 0
+        ? `Found ${newItems.length} new item${newItems.length > 1 ? 's' : ''}${newCoupons.length > 0 ? ` and ${newCoupons.length} coupon${newCoupons.length > 1 ? 's' : ''}` : ''}`
+        : 'No new items found in this section';
+      toast.success(msg);
+
+      return { newItems, newCoupons };
     } catch (e: any) {
       toast.error(e.message || 'Failed to scan receipt');
       throw e;
     } finally {
       setScanning(false);
     }
+  };
+
+  const finalizeScan = async () => {
+    if (!household || !user) return;
+
+    // Save receipt scan to DB
+    const { data: scan, error: scanError } = await supabase
+      .from('receipt_scans')
+      .insert({
+        household_id: household.id,
+        scanned_by: user.id,
+        store_name: storeName,
+        receipt_date: receiptDate,
+        total_amount: totalAmount,
+        currency,
+      })
+      .select('id')
+      .single();
+
+    if (scanError) throw scanError;
+
+    // Save receipt items
+    if (accumulatedItems.length > 0) {
+      await supabase.from('receipt_items').insert(
+        accumulatedItems.map(item => ({
+          receipt_id: scan!.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          category: item.category,
+        }))
+      );
+    }
+
+    // Auto-add coupons to discount_codes table
+    if (accumulatedCoupons.length > 0 && storeName) {
+      for (const coupon of accumulatedCoupons) {
+        // Check if this code already exists for this store in this household
+        const { data: existing } = await supabase
+          .from('discount_codes')
+          .select('id')
+          .eq('household_id', household.id)
+          .ilike('store_name', storeName)
+          .eq('code', coupon.code)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabase.from('discount_codes').insert({
+            household_id: household.id,
+            store_name: storeName,
+            code: coupon.code,
+            description: coupon.description || `Found on receipt from ${storeName}`,
+            added_by: user.id,
+          });
+        }
+      }
+      qc.invalidateQueries({ queryKey: ['discount-codes'] });
+      toast.success(`${accumulatedCoupons.length} coupon${accumulatedCoupons.length > 1 ? 's' : ''} added to Coupons for ${storeName}!`);
+    }
+
+    qc.invalidateQueries({ queryKey: ['receipt-scans'] });
+    qc.invalidateQueries({ queryKey: ['receipt-analytics'] });
+
+    return scan!.id;
   };
 
   const addSelectedToPantry = async (items: ReceiptItem[]) => {
@@ -63,8 +176,10 @@ export function useReceiptScanner() {
       return;
     }
 
+    // First finalize the scan to save to DB
+    await finalizeScan();
+
     for (const item of selected) {
-      // Check if item exists in pantry
       const { data: existing } = await supabase
         .from('inventory_items')
         .select('id, quantity')
@@ -88,27 +203,19 @@ export function useReceiptScanner() {
       }
     }
 
-    // Mark items as added in receipt_items
-    if (scanResult?.receipt_id) {
-      const { data: receiptItems } = await supabase
-        .from('receipt_items')
-        .select('id, name')
-        .eq('receipt_id', scanResult.receipt_id);
-
-      if (receiptItems) {
-        const selectedNames = new Set(selected.map(s => s.name.toLowerCase()));
-        const idsToUpdate = receiptItems
-          .filter(ri => selectedNames.has(ri.name.toLowerCase()))
-          .map(ri => ri.id);
-
-        if (idsToUpdate.length > 0) {
-          await supabase.from('receipt_items').update({ added_to_pantry: true }).in('id', idsToUpdate);
-        }
-      }
-    }
-
     qc.invalidateQueries({ queryKey: ['inventory'] });
     toast.success(`${selected.length} items added to pantry!`);
+  };
+
+  const resetScan = () => {
+    setAccumulatedItems([]);
+    setAccumulatedCoupons([]);
+    setStoreName(null);
+    setReceiptDate(null);
+    setTotalAmount(null);
+    setCurrency('USD');
+    setPhotoCount(0);
+    setScanActive(false);
   };
 
   // Fetch receipt history
@@ -145,7 +252,6 @@ export function useReceiptScanner() {
         .select('*, receipt_scans!inner(household_id)')
         .eq('receipt_scans.household_id', household.id);
 
-      // Category spending
       const categorySpending: Record<string, number> = {};
       const storeSpending: Record<string, number> = {};
       const monthlySpending: Record<string, number> = {};
@@ -160,7 +266,7 @@ export function useReceiptScanner() {
           storeSpending[scan.store_name] = (storeSpending[scan.store_name] || 0) + scan.total_amount;
         }
         if (scan.receipt_date && scan.total_amount) {
-          const month = scan.receipt_date.substring(0, 7); // YYYY-MM
+          const month = scan.receipt_date.substring(0, 7);
           monthlySpending[month] = (monthlySpending[month] || 0) + scan.total_amount;
         }
       }
@@ -183,10 +289,18 @@ export function useReceiptScanner() {
 
   return {
     scanning,
-    scanResult,
-    setScanResult,
-    scanReceipt,
+    scanActive,
+    photoCount,
+    accumulatedItems,
+    setAccumulatedItems,
+    accumulatedCoupons,
+    storeName,
+    receiptDate,
+    totalAmount,
+    currency,
+    scanReceiptPhoto,
     addSelectedToPantry,
+    resetScan,
     history: historyQuery.data || [],
     analytics: analyticsQuery.data,
     isLoadingHistory: historyQuery.isLoading,
