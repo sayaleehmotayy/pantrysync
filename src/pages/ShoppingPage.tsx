@@ -32,6 +32,7 @@ export default function ShoppingPage() {
   const [category, setCategory] = useState('Other');
   const [partialId, setPartialId] = useState<string | null>(null);
   const [partialQty, setPartialQty] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const pendingItems = useMemo(() => items.filter(i => i.status === 'pending' || i.status === 'not_found'), [items]);
   const completedItems = useMemo(() => items.filter(i => i.status === 'bought' || i.status === 'partial'), [items]);
@@ -50,6 +51,10 @@ export default function ShoppingPage() {
     }
     setPartialId(null);
     setPartialQty('');
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
   };
 
   const handleScanToPantry = (item: {
