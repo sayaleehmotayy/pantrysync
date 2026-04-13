@@ -30,6 +30,9 @@ serve(async (req) => {
     const { image_base64, household_id } = await req.json();
     if (!image_base64 || !household_id) throw new Error("Missing image_base64 or household_id");
 
+    // SECURITY: We never log, store, or transmit the receipt image beyond this function call.
+    // The base64 image is sent to AI for extraction only and immediately discarded after.
+    // We explicitly instruct AI to IGNORE all sensitive data (card numbers, bank details, etc).
     console.log("[SCAN-RECEIPT] Processing receipt for household:", household_id);
 
     // Call AI with vision to extract receipt data
@@ -44,18 +47,27 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a receipt scanning AI. Extract all items from the receipt image with extreme accuracy.
-You MUST use the extract_receipt_data tool to return the structured data. Be precise with prices and quantities.
-For categories, use: Fruits, Vegetables, Dairy, Grains, Snacks, Drinks, Meat, Seafood, Bakery, Frozen, Household, Personal Care, Spices, Other.
-For units, infer from context: pieces (default for most items), kg, g, l, ml, lb, oz.
-If a quantity isn't clear, default to 1.
-Extract the store name, date, and total from the receipt header/footer.
-Currency should be the 3-letter ISO code (USD, EUR, GBP, etc).`,
+            content: `You are a receipt scanning AI that extracts ONLY grocery/shopping item data. Be precise with prices and quantities.
+
+CRITICAL PRIVACY & SECURITY RULES — FOLLOW THESE EXACTLY:
+- NEVER extract, return, or acknowledge any payment information (card numbers, last 4 digits, bank details, account numbers, payment method, authorization codes, transaction IDs, terminal IDs, merchant IDs)
+- NEVER extract personal information (customer name, phone number, email, loyalty card numbers, membership IDs, addresses)
+- NEVER extract any financial data beyond individual item prices and the receipt total
+- IGNORE all text on the receipt that is not: store name, date, item names, item quantities, item prices, subtotal/total, or currency
+- If you see any sensitive data, DO NOT include it in your response under any circumstances
+
+EXTRACTION RULES:
+- For categories, use: Fruits, Vegetables, Dairy, Grains, Snacks, Drinks, Meat, Seafood, Bakery, Frozen, Household, Personal Care, Spices, Other
+- For units, infer from context: pieces (default for most items), kg, g, l, ml, lb, oz
+- If a quantity isn't clear, default to 1
+- Extract ONLY the store name (brand/company name only, no address), date, and total
+- Currency should be the 3-letter ISO code (USD, EUR, GBP, etc)
+- Clean up item names to be human-readable (e.g., "BNL BNNA" → "Banana")`,
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Extract all items, prices, store name, date, total, and currency from this receipt." },
+              { type: "text", text: "Extract ONLY the grocery/shopping items, their prices, store name, date, and total from this receipt. DO NOT extract any payment details, card numbers, personal info, or sensitive data." },
               { type: "image_url", image_url: { url: `data:image/jpeg;base64,${image_base64}` } },
             ],
           },
@@ -120,7 +132,33 @@ Currency should be the 3-letter ISO code (USD, EUR, GBP, etc).`,
     if (!toolCall) throw new Error("AI did not return structured data");
 
     const receiptData = JSON.parse(toolCall.function.arguments);
-    console.log("[SCAN-RECEIPT] Extracted:", JSON.stringify(receiptData).slice(0, 200));
+
+    // SECURITY: Sanitize AI output — strip anything that looks like sensitive data
+    // Remove any field that isn't in our expected schema
+    const sanitizedData = {
+      store_name: typeof receiptData.store_name === 'string' ? receiptData.store_name.substring(0, 100) : null,
+      receipt_date: typeof receiptData.receipt_date === 'string' ? receiptData.receipt_date.substring(0, 10) : null,
+      currency: typeof receiptData.currency === 'string' ? receiptData.currency.substring(0, 3) : 'USD',
+      total_amount: typeof receiptData.total_amount === 'number' ? receiptData.total_amount : null,
+      items: Array.isArray(receiptData.items) ? receiptData.items.map((item: any) => ({
+        name: typeof item.name === 'string' ? item.name.substring(0, 200) : 'Unknown Item',
+        quantity: typeof item.quantity === 'number' ? item.quantity : 1,
+        unit: typeof item.unit === 'string' ? item.unit.substring(0, 20) : 'pieces',
+        unit_price: typeof item.unit_price === 'number' ? item.unit_price : null,
+        total_price: typeof item.total_price === 'number' ? item.total_price : null,
+        category: typeof item.category === 'string' ? item.category.substring(0, 50) : 'Other',
+      })) : [],
+    };
+
+    // SECURITY: Detect and reject if AI accidentally included card/bank data in store name
+    const sensitivePatterns = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b|\b\d{4}\s?[*]{4,}\b|card|visa|mastercard|debit|credit|account\s*#/i;
+    if (sanitizedData.store_name && sensitivePatterns.test(sanitizedData.store_name)) {
+      sanitizedData.store_name = null; // Strip store name if it contains sensitive patterns
+    }
+
+    // SECURITY: The original image (image_base64) is NEVER stored — it exists only in memory
+    // during this function execution and is garbage collected after the response.
+    console.log("[SCAN-RECEIPT] Extracted items:", sanitizedData.items.length);
 
     // Save receipt scan to DB
     const serviceClient = createClient(
@@ -134,10 +172,11 @@ Currency should be the 3-letter ISO code (USD, EUR, GBP, etc).`,
       .insert({
         household_id,
         scanned_by: userData.user.id,
-        store_name: receiptData.store_name || null,
-        receipt_date: receiptData.receipt_date || null,
-        total_amount: receiptData.total_amount || null,
-        currency: receiptData.currency || "USD",
+        store_name: sanitizedData.store_name,
+        receipt_date: sanitizedData.receipt_date,
+        total_amount: sanitizedData.total_amount,
+        currency: sanitizedData.currency,
+        // SECURITY: image_url is intentionally left null — we NEVER store receipt images
       })
       .select("id")
       .single();
@@ -147,16 +186,16 @@ Currency should be the 3-letter ISO code (USD, EUR, GBP, etc).`,
       throw new Error("Failed to save receipt");
     }
 
-    // Save receipt items
-    if (receiptData.items?.length > 0) {
-      const itemsToInsert = receiptData.items.map((item: any) => ({
+    // Save receipt items (only safe, sanitized data)
+    if (sanitizedData.items.length > 0) {
+      const itemsToInsert = sanitizedData.items.map((item: any) => ({
         receipt_id: scan.id,
         name: item.name,
-        quantity: item.quantity || 1,
-        unit: item.unit || "pieces",
-        unit_price: item.unit_price || null,
-        total_price: item.total_price || null,
-        category: item.category || "Other",
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        category: item.category,
       }));
 
       const { error: itemsError } = await serviceClient
@@ -169,11 +208,11 @@ Currency should be the 3-letter ISO code (USD, EUR, GBP, etc).`,
     return new Response(
       JSON.stringify({
         receipt_id: scan.id,
-        store_name: receiptData.store_name,
-        receipt_date: receiptData.receipt_date,
-        total_amount: receiptData.total_amount,
-        currency: receiptData.currency,
-        items: receiptData.items || [],
+        store_name: sanitizedData.store_name,
+        receipt_date: sanitizedData.receipt_date,
+        total_amount: sanitizedData.total_amount,
+        currency: sanitizedData.currency,
+        items: sanitizedData.items,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
