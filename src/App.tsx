@@ -17,6 +17,7 @@ import ActivityPage from "./pages/ActivityPage";
 import SettingsPage from "./pages/SettingsPage";
 import AiPage from "./pages/AiPage";
 import CouponsPage from "./pages/CouponsPage";
+import ReceiptScannerPage from "./pages/ReceiptScannerPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import WelcomePage from "./pages/WelcomePage";
@@ -59,6 +60,7 @@ function AppRoutes() {
         <Route path="/chat" element={<ProGate feature="Group Chat"><ChatPage /></ProGate>} />
         <Route path="/ai" element={<ProGate feature="AI Assistant"><AiPage /></ProGate>} />
         <Route path="/coupons" element={<ProGate feature="Discount Code Scanner"><CouponsPage /></ProGate>} />
+        <Route path="/receipts" element={<ProGate feature="Receipt Scanner"><ReceiptScannerPage /></ProGate>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>

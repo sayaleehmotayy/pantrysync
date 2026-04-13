@@ -10,13 +10,14 @@ export const PRO_FEATURES = [
   { key: 'ai', label: 'AI Assistant', description: 'Smart pantry suggestions and meal planning' },
   { key: 'voice', label: 'Voice Commands', description: 'Hands-free pantry management' },
   { key: 'recipes', label: 'Recipe Suggestions', description: 'AI-powered recipes from your ingredients' },
+  { key: 'receipts', label: 'Receipt Scanner', description: 'AI-powered receipt scanning with spending insights' },
   { key: 'coupons', label: 'Discount Code Scanner', description: 'Scan and store discount codes' },
   { key: 'chat', label: 'Group Chat', description: 'Chat with household members' },
   { key: 'analytics', label: 'Advanced Analytics', description: 'Detailed usage insights and reports' },
   { key: 'support', label: 'Priority Support', description: 'Get help faster when you need it' },
 ] as const;
 
-export const PRO_GATED_ROUTES = ['/ai', '/recipes', '/coupons', '/chat'] as const;
+export const PRO_GATED_ROUTES = ['/ai', '/recipes', '/coupons', '/chat', '/receipts'] as const;
 
 export type TierKey = 'free' | 'duo' | 'family' | 'unlimited';
 
