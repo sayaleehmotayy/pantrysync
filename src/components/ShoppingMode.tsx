@@ -233,8 +233,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   // Main shopping mode view
   return (
     <div className="space-y-4 animate-fade-in">
-      <button onClick={onExit} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Exit Shopping Mode
+      <button onClick={() => { /* don't clear session — just go back to list view while keeping session alive */ onExit(); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="w-4 h-4" /> Back to list (session saved)
       </button>
 
       {/* Budget tracker */}
