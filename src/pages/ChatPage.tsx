@@ -205,7 +205,15 @@ export default function ChatPage() {
       } else {
         // No items detected, open manual dialog
         setAddToListMsg(msg);
-        setItemName(msg.content.slice(0, 50));
+        // Extract likely food words, strip conversational fluff
+        const cleaned = msg.content
+          .replace(/@\w+/g, '')
+          .replace(/\b(do|we|have|need|can|should|get|buy|add|please|some|more|the|a|an|i|was|wondering|if|from|store|shop|list)\b/gi, '')
+          .replace(/[?.!,]/g, '')
+          .trim()
+          .replace(/\s+/g, ' ')
+          .trim();
+        setItemName(cleaned.slice(0, 50) || msg.content.slice(0, 50));
       }
     } catch (error) {
       console.error('Failed to parse shopping items:', error);
