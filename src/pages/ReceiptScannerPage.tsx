@@ -33,6 +33,55 @@ function compressImage(dataUrl: string, maxWidth = 1600, quality = 0.8): Promise
   });
 }
 
+function ProcessingCard({ photoCount, scanStatus, onCheckHistory }: { photoCount: number; scanStatus: string; onCheckHistory: () => void }) {
+  const [startTime] = useState(Date.now());
+  const [elapsed, setElapsed] = useState(0);
+
+  // Estimate ~8s per photo for processing
+  const estimatedMs = photoCount * 8000;
+
+  useEffect(() => {
+    const timer = setInterval(() => setElapsed(Date.now() - startTime), 500);
+    return () => clearInterval(timer);
+  }, [startTime]);
+
+  // Progress: ramps quickly to ~90% then slows (never hits 100 until done)
+  const rawProgress = Math.min((elapsed / estimatedMs) * 100, 95);
+  // Ease-out curve so it slows as it approaches the end
+  const progress = Math.round(rawProgress < 80 ? rawProgress : 80 + (rawProgress - 80) * 0.5);
+
+  const remainingSec = Math.max(0, Math.round((estimatedMs - elapsed) / 1000));
+  const timeLabel = remainingSec > 60
+    ? `~${Math.ceil(remainingSec / 60)} min remaining`
+    : remainingSec > 0
+      ? `~${remainingSec}s remaining`
+      : 'Almost done...';
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="font-display font-semibold">Processing {photoCount} photo{photoCount > 1 ? 's' : ''}...</p>
+
+        <div className="w-full max-w-xs space-y-1.5 mt-1">
+          <Progress value={progress} className="h-2.5" />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{progress}%</span>
+            <span>{timeLabel}</span>
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground text-center max-w-xs mt-1">
+          This runs in the background — you can use other features or close the app.
+        </p>
+        <Button variant="outline" size="sm" className="mt-1" onClick={onCheckHistory}>
+          Check History
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ReceiptScannerPage() {
   const {
     scanStatus, photoCount, errorMessage,
