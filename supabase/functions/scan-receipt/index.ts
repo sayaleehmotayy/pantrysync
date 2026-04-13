@@ -51,12 +51,14 @@ EXTRACTION RULES:
 - Clean up item names to be human-readable (e.g., "BNL BNNA" → "Banana")
 
 COUPON/DISCOUNT CODE RULES:
-- Look for any promotional codes, coupon codes, discount codes, voucher codes, or promo references on the receipt
-- These may appear as: "PROMO:", "COUPON:", "CODE:", "VOUCHER:", "DISCOUNT CODE:", or similar labels
-- They may also appear as alphanumeric codes near discount line items
-- Extract the code text and any description of what the coupon is for
-- Do NOT confuse transaction IDs, receipt numbers, or barcodes with coupon codes
-- Only extract codes that are clearly promotional/discount codes
+- ONLY extract coupons that are ACTIONABLE for future purchases — meaning the customer can use a specific code, barcode, or QR code on their NEXT visit to save money
+- Examples of VALID coupons to extract: "Scan this barcode to get €5 off your next purchase over €25", "Use code SAVE10 for 10% off next order", "Present this voucher for a free coffee"
+- IGNORE generic promotional text like "better deals available", "save more with our app", "loyalty points earned", "you saved €X today" — these are NOT actionable coupons
+- IGNORE receipt-specific discounts already applied (e.g., "multi-buy discount -€2.00") — these are savings on the CURRENT receipt, not future coupons
+- IGNORE loyalty program references, points summaries, or membership tier info
+- Extract the code/barcode number AND describe the offer clearly (e.g., "€5 off next purchase over €25")
+- If the coupon has an expiry date mentioned, include it in the description
+- Do NOT confuse transaction IDs, receipt numbers, or internal reference codes with coupon codes
 
 MULTI-PHOTO DEDUPLICATION:
 - This may be one photo of a multi-photo scan of a long receipt
