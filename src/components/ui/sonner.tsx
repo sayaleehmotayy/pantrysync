@@ -17,7 +17,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       duration={4000}
       gap={8}
       visibleToasts={3}
-      swipeTreshold={50}
+      // @ts-ignore — sonner supports swipeThreshold but types may lag
+      swipeThreshold={50}
       toastOptions={{
         classNames: {
           toast:
