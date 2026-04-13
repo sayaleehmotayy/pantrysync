@@ -54,8 +54,10 @@ serve(async (req) => {
 CRITICAL PRIVACY & SECURITY RULES — FOLLOW THESE EXACTLY:
 - NEVER extract, return, or acknowledge any payment information (card numbers, last 4 digits, bank details, account numbers, payment method, authorization codes, transaction IDs, terminal IDs, merchant IDs)
 - NEVER extract personal information (customer name, phone number, email, loyalty card numbers, membership IDs, addresses)
+- NEVER extract employee information (employee card numbers, employee IDs, staff numbers, employee names, employee discount card numbers, staff discount references)
 - NEVER extract any financial data beyond individual item prices and the receipt total
 - IGNORE all text on the receipt that is not: store name, date, item names, item quantities, item prices, subtotal/total, currency, or coupon/promo codes
+- If you see employee discounts, staff discounts, or similar — completely ignore them. Do NOT return the discount amount, employee ID, or any reference to it.
 - If you see any sensitive data, DO NOT include it in your response under any circumstances
 
 EXTRACTION RULES:
