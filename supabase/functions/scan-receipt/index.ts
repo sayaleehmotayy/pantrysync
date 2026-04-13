@@ -186,13 +186,17 @@ MULTI-PHOTO DEDUPLICATION:
     };
 
     // SECURITY: Detect and reject if AI accidentally included card/bank data
-    const sensitivePatterns = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b|\b\d{4}\s?[*]{4,}\b|card|visa|mastercard|debit|credit|account\s*#/i;
+    const sensitivePatterns = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b|\b\d{4}\s?[*]{4,}\b|card|visa|mastercard|debit|credit|account\s*#|employee\s*(id|#|number|card|discount)|staff\s*(id|#|number|card|discount)|member(ship)?\s*(id|#|number)/i;
     if (sanitizedData.store_name && sensitivePatterns.test(sanitizedData.store_name)) {
       sanitizedData.store_name = null;
     }
-    // Also sanitize coupon codes — reject any that look like card numbers
+    // Sanitize coupon codes — reject any that look like card/employee numbers
     sanitizedData.coupon_codes = sanitizedData.coupon_codes.filter(
-      (c: any) => !sensitivePatterns.test(c.code)
+      (c: any) => !sensitivePatterns.test(c.code) && !sensitivePatterns.test(c.description || '')
+    );
+    // Sanitize item names — strip any that reference employee/staff discounts
+    sanitizedData.items = sanitizedData.items.filter(
+      (item: any) => !sensitivePatterns.test(item.name)
     );
 
     console.log("[SCAN-RECEIPT] Extracted items:", sanitizedData.items.length, "coupons:", sanitizedData.coupon_codes.length);
