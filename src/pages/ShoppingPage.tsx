@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ShoppingCart, Check, AlertTriangle, X, Trash2, Camera } from 'lucide-react';
+import { Plus, ShoppingCart, Check, AlertTriangle, X, Trash2, Camera, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
+import ShoppingMode from '@/components/ShoppingMode';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp'];
@@ -27,6 +28,7 @@ export default function ShoppingPage() {
   const { addItem: addPantryItem } = useInventory();
   const [addOpen, setAddOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [shoppingMode, setShoppingMode] = useState(false);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState('pieces');
@@ -66,6 +68,24 @@ export default function ShoppingPage() {
     toast.success(`${item.name} added to pantry via scan!`);
   };
 
+  const handleShoppingModeBought = (id: string, price: number) => {
+    // Mark as bought — the existing hook handles pantry transfer
+    updateItem.mutate({ id, status: 'bought', bought_quantity: items.find(i => i.id === id)?.quantity || 1 });
+  };
+
+  // Shopping Mode
+  if (shoppingMode) {
+    return (
+      <div className="animate-fade-in">
+        <ShoppingMode
+          items={items}
+          onMarkBought={handleShoppingModeBought}
+          onExit={() => setShoppingMode(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -104,6 +124,25 @@ export default function ShoppingPage() {
           </Dialog>
         </div>
       </div>
+
+      {/* Shopping Mode CTA */}
+      {pendingItems.length > 0 && (
+        <Card
+          className="border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10 cursor-pointer hover:border-primary/50 active:scale-[0.99] transition-all"
+          onClick={() => setShoppingMode(true)}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+              <Target className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-display font-semibold text-sm">Start Shopping</p>
+              <p className="text-xs text-muted-foreground">Set a budget and track prices as you shop</p>
+            </div>
+            <Badge variant="default" className="shrink-0">{pendingItems.length} items</Badge>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">Loading...</div>
