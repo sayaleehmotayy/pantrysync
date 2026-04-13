@@ -32,7 +32,9 @@ export default function ShoppingPage() {
   const { household } = useHousehold();
   const [addOpen, setAddOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [shoppingMode, setShoppingMode] = useState(false);
+  const [shoppingMode, setShoppingMode] = useState(() => {
+    try { return !!sessionStorage.getItem('pantrysync_shopping_session'); } catch { return false; }
+  });
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState('pieces');
