@@ -29,6 +29,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 export default function ShoppingPage() {
   const { data: items = [], isLoading, addItem, updateItem, deleteItem } = useShoppingList();
   const { addItem: addPantryItem } = useInventory();
+  const { household } = useHousehold();
   const [addOpen, setAddOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [shoppingMode, setShoppingMode] = useState(false);
@@ -39,6 +40,23 @@ export default function ShoppingPage() {
   const [partialId, setPartialId] = useState<string | null>(null);
   const [partialQty, setPartialQty] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [receiptCurrency, setReceiptCurrency] = useState<CurrencyInfo | undefined>();
+
+  // Fetch most recent receipt currency
+  useEffect(() => {
+    if (!household?.id) return;
+    supabase
+      .from('receipt_scans')
+      .select('currency')
+      .eq('household_id', household.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (data?.[0]?.currency) {
+          setReceiptCurrency(getCurrencyInfo(data[0].currency));
+        }
+      });
+  }, [household?.id]);
 
   const pendingItems = useMemo(() => items.filter(i => i.status === 'pending' || i.status === 'not_found'), [items]);
   const completedItems = useMemo(() => items.filter(i => i.status === 'bought' || i.status === 'partial'), [items]);
