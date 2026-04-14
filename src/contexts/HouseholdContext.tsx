@@ -52,33 +52,30 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
 
     setUserRole(membership.role);
 
-    const { data: hh } = await supabase
-      .from('households')
-      .select('*')
-      .eq('id', membership.household_id)
-      .single();
+    // Fetch household and members in parallel
+    const [hhRes] = await Promise.all([
+      supabase.from('households').select('*').eq('id', membership.household_id).single(),
+    ]);
 
-    if (hh) setHousehold(hh);
+    if (hhRes.data) setHousehold(hhRes.data);
     await fetchMembers(membership.household_id);
     setLoading(false);
   };
 
   const fetchMembers = async (householdId: string) => {
-    const { data } = await supabase
-      .from('household_members')
-      .select('id, user_id, role, joined_at')
-      .eq('household_id', householdId);
+    // Fetch members and profiles in parallel to avoid N+1
+    const [membersRes, profilesRes] = await Promise.all([
+      supabase.from('household_members').select('id, user_id, role, joined_at').eq('household_id', householdId),
+      supabase.from('profiles').select('user_id, display_name, avatar_url'),
+    ]);
 
-    if (data) {
-      const profileIds = data.map(m => m.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, display_name, avatar_url')
-        .in('user_id', profileIds);
-
-      const membersWithProfiles = data.map(m => ({
+    if (membersRes.data) {
+      const profileMap = new Map(
+        (profilesRes.data || []).map(p => [p.user_id, p])
+      );
+      const membersWithProfiles = membersRes.data.map(m => ({
         ...m,
-        profile: profiles?.find(p => p.user_id === m.user_id) || null,
+        profile: profileMap.get(m.user_id) || null,
       }));
       setMembers(membersWithProfiles as HouseholdMember[]);
     }
