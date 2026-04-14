@@ -235,9 +235,9 @@ export default function ReceiptScannerPage() {
     scanStatus, photoCount, errorMessage,
     items, setItems, coupons,
     storeName, receiptDate, totalAmount, currency,
-    submitPhotos, addSelectedToPantry, resetScan, deleteReceipt,
-    history, analytics, isLoadingHistory,
-  } = useReceiptScanner();
+    submitPhotos, addSelectedToPantry, resetScan, processingStartTime,
+  } = useReceiptScanContext();
+  const { deleteReceipt, history, analytics, isLoadingHistory } = useReceiptScanner();
 
   const [tab, setTab] = useState<Tab>('scan');
   const [captureStep, setCaptureStep] = useState<CaptureStep>('idle');
