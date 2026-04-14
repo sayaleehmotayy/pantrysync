@@ -140,8 +140,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
       );
       // If partial buy, add a new entry for the remaining quantity
       if (remainingQty > 0 && item) {
+        const remainingId = item.id.includes('_remaining') ? item.id : item.id + '_remaining';
         updated = [...updated, {
-          id: item.id + '_remaining',
+          id: remainingId,
+          dbId: item.dbId,
           name: item.name,
           quantity: remainingQty,
           unit: item.unit,
