@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity, MoreHorizontal, X, Sparkles, Tag, Receipt, DollarSign } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity, MoreHorizontal, X, Sparkles, Tag, Receipt, DollarSign, History } from 'lucide-react';
 import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
 ];
 
 const moreItems = [
+  { to: '/shopping-history', icon: History, label: 'History' },
   { to: '/spending', icon: DollarSign, label: 'Spending' },
   { to: '/receipts', icon: Receipt, label: 'Receipts' },
   { to: '/coupons', icon: Tag, label: 'Coupons' },
