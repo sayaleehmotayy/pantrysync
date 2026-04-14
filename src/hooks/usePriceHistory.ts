@@ -93,8 +93,8 @@ export function useSpendingSummary() {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      // Fetch both price_history and shopping_trips in parallel
-      const [priceRes, tripsRes] = await Promise.all([
+      // Fetch price_history, shopping_trips, and receipt_scans in parallel
+      const [priceRes, tripsRes, receiptsRes] = await Promise.all([
         supabase
           .from('price_history')
           .select('*')
@@ -107,42 +107,51 @@ export function useSpendingSummary() {
           .eq('household_id', household.id)
           .gte('finished_at', thirtyDaysAgo.toISOString())
           .order('finished_at', { ascending: true }),
+        supabase
+          .from('receipt_scans')
+          .select('*')
+          .eq('household_id', household.id)
+          .eq('status', 'completed')
+          .gte('created_at', thirtyDaysAgo.toISOString())
+          .order('created_at', { ascending: true }),
       ]);
 
       if (priceRes.error) throw priceRes.error;
       if (tripsRes.error) throw tripsRes.error;
+      if (receiptsRes.error) throw receiptsRes.error;
 
       const priceRecords = (priceRes.data || []) as PriceRecord[];
       const trips = (tripsRes.data || []) as Array<{
         id: string; store_name: string | null; total_spent: number; finished_at: string;
       }>;
+      const receipts = (receiptsRes.data || []) as Array<{
+        id: string; store_name: string | null; total_amount: number | null; created_at: string;
+      }>;
 
-      // Normalize both sources into a unified spending record list
+      // Normalize all sources into a unified spending record list
       type SpendEntry = { amount: number; store: string; date: Date; weekKey: string };
       const entries: SpendEntry[] = [];
 
-      priceRecords.forEach(r => {
-        const d = new Date(r.recorded_at);
+      const toWeekKey = (d: Date) => {
         const weekStart = new Date(d);
         weekStart.setDate(d.getDate() - d.getDay());
-        entries.push({
-          amount: Number(r.price),
-          store: r.store_name || 'Unknown',
-          date: d,
-          weekKey: weekStart.toISOString().slice(0, 10),
-        });
+        return weekStart.toISOString().slice(0, 10);
+      };
+
+      priceRecords.forEach(r => {
+        const d = new Date(r.recorded_at);
+        entries.push({ amount: Number(r.price), store: r.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
       });
 
       trips.forEach(t => {
         const d = new Date(t.finished_at);
-        const weekStart = new Date(d);
-        weekStart.setDate(d.getDate() - d.getDay());
-        entries.push({
-          amount: Number(t.total_spent),
-          store: t.store_name || 'Unknown',
-          date: d,
-          weekKey: weekStart.toISOString().slice(0, 10),
-        });
+        entries.push({ amount: Number(t.total_spent), store: t.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
+      });
+
+      receipts.forEach(r => {
+        if (!r.total_amount) return;
+        const d = new Date(r.created_at);
+        entries.push({ amount: Number(r.total_amount), store: r.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
       });
 
       const total30d = entries.reduce((sum, e) => sum + e.amount, 0);
