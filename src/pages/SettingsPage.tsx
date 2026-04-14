@@ -65,7 +65,7 @@ export default function SettingsPage() {
     if (!user) return;
     const { error } = await supabase
       .from('profiles')
-      .update({ preferred_currency: value } as any)
+      .update({ preferred_currency: value })
       .eq('user_id', user.id);
     if (error) {
       toast.error('Failed to update currency');
@@ -218,7 +218,7 @@ export default function SettingsPage() {
                     : ' Your entire household benefits from your subscription!'}
                 </p>
                 {!subscription.householdPro && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
                       <CreditCard className="w-3.5 h-3.5 mr-1" />
                       {portalLoading ? 'Loading...' : 'Manage Subscription'}
