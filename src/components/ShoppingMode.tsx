@@ -25,7 +25,8 @@ interface ShoppingModeProps {
 }
 
 interface TrackedItem {
-  id: string;
+  id: string;        // local tracking ID (may include _remaining suffix)
+  dbId: string;      // original database ID for API calls
   name: string;
   quantity: number;
   unit: string;
