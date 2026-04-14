@@ -113,7 +113,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     if (!item) return;
     setActiveItemId(id);
     setEntryStep('quantity');
-    setQuantityInput(String(item.quantity));
+    setQuantityInput('');
     setUnitPriceInput('');
     setUseSalePrice(false);
     setSaleTotalInput('');
