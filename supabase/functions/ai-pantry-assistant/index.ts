@@ -14,16 +14,30 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("Unauthorized");
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader! } },
+      global: { headers: { Authorization: authHeader } },
     });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
     const { feature, householdId } = await req.json();
+    if (!householdId || typeof householdId !== 'string') throw new Error("Missing householdId");
+
+    // Verify caller is a member of this household (RLS covers queries below,
+    // but explicit check prevents information leakage via error messages)
+    const { data: membership } = await supabase
+      .from('household_members')
+      .select('id')
+      .eq('household_id', householdId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!membership) throw new Error("Not a member of this household");
 
     // Fetch inventory for context
     const { data: inventory } = await supabase
