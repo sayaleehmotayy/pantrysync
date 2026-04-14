@@ -122,9 +122,27 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const confirmPurchase = useCallback(() => {
     if (!activeItemId || finalTotal <= 0) return;
 
-    setTrackedItems(prev => prev.map(i =>
-      i.id === activeItemId ? { ...i, price: finalTotal, quantityFound: qtyFound } : i
-    ));
+    const item = trackedItems.find(i => i.id === activeItemId);
+    const remainingQty = item ? item.quantity - qtyFound : 0;
+
+    setTrackedItems(prev => {
+      let updated = prev.map(i =>
+        i.id === activeItemId ? { ...i, price: finalTotal, quantityFound: qtyFound } : i
+      );
+      // If partial buy, add a new entry for the remaining quantity
+      if (remainingQty > 0 && item) {
+        updated = [...updated, {
+          id: item.id + '_remaining',
+          name: item.name,
+          quantity: remainingQty,
+          unit: item.unit,
+          category: item.category,
+          price: null,
+          quantityFound: null,
+        }];
+      }
+      return updated;
+    });
     onMarkBought(activeItemId, finalTotal, qtyFound);
     setActiveItemId(null);
     setEntryStep('quantity');
@@ -132,7 +150,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     setUnitPriceInput('');
     setUseSalePrice(false);
     setSaleTotalInput('');
-  }, [activeItemId, finalTotal, qtyFound, onMarkBought]);
+  }, [activeItemId, finalTotal, qtyFound, onMarkBought, trackedItems]);
 
   const undoPrice = useCallback((id: string) => {
     setTrackedItems(prev => prev.map(i =>
