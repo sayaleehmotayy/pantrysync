@@ -4,14 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
 import {
-  ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2,
+  ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag,
 } from 'lucide-react';
 import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
 
 interface ShoppingModeProps {
   items: ShoppingItem[];
-  onMarkBought: (id: string, price: number) => void;
+  onMarkBought: (id: string, price: number, quantityFound?: number) => void;
   onExit: () => void;
   currency?: CurrencyInfo;
 }
@@ -23,13 +24,15 @@ interface TrackedItem {
   unit: string;
   category: string;
   price: number | null;
+  quantityFound: number | null;
 }
+
+type EntryStep = 'quantity' | 'unitPrice' | 'confirm';
 
 export default function ShoppingMode({ items, onMarkBought, onExit, currency }: ShoppingModeProps) {
   const curr = currency || detectCurrencyFromLocale();
   const SESSION_KEY = 'pantrysync_shopping_session';
 
-  // Restore session from sessionStorage
   const savedSession = useMemo(() => {
     try {
       const raw = sessionStorage.getItem(SESSION_KEY);
@@ -41,21 +44,23 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const [budget, setBudget] = useState<number | null>(savedSession?.budget ?? null);
   const [budgetInput, setBudgetInput] = useState('');
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
-  const [priceInput, setPriceInput] = useState('');
+  const [entryStep, setEntryStep] = useState<EntryStep>('quantity');
+  const [quantityInput, setQuantityInput] = useState('');
+  const [unitPriceInput, setUnitPriceInput] = useState('');
+  const [useSalePrice, setUseSalePrice] = useState(false);
+  const [saleTotalInput, setSaleTotalInput] = useState('');
   const [trackedItems, setTrackedItems] = useState<TrackedItem[]>(savedSession?.trackedItems ?? []);
   const initialized = useRef(!!savedSession);
 
-  // Initialize tracked items from pending shopping items (only if no saved session)
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
     const pending = items.filter(i => i.status === 'pending' || i.status === 'not_found');
     setTrackedItems(pending.map(i => ({
-      id: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null,
+      id: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null, quantityFound: null,
     })));
   }, []);
 
-  // Persist session to sessionStorage on every change
   useEffect(() => {
     if (budget === null && trackedItems.length === 0) return;
     try {
@@ -80,11 +85,19 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
 
   const fmt = (amount: number) => formatCurrency(amount, curr);
 
-  const handleNumpad = useCallback((key: string) => {
-    setPriceInput(prev => {
+  const activeItem = activeItemId ? trackedItems.find(i => i.id === activeItemId) : null;
+
+  const qtyFound = quantityInput ? parseInt(quantityInput) : (activeItem?.quantity ?? 0);
+  const unitPrice = unitPriceInput ? parseFloat(unitPriceInput) : 0;
+  const calculatedTotal = qtyFound * unitPrice;
+  const finalTotal = useSalePrice && saleTotalInput ? parseFloat(saleTotalInput) : calculatedTotal;
+
+  const handleNumpad = useCallback((key: string, setter: React.Dispatch<React.SetStateAction<string>>, allowDecimal = true) => {
+    setter(prev => {
       if (key === 'clear') return '';
       if (key === 'back') return prev.slice(0, -1);
       if (key === '.') {
+        if (!allowDecimal) return prev;
         if (prev.includes('.')) return prev;
         return prev === '' ? '0.' : prev + '.';
       }
@@ -95,22 +108,35 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     });
   }, []);
 
-  const confirmPrice = useCallback(() => {
-    if (!activeItemId || !priceInput) return;
-    const price = parseFloat(priceInput);
-    if (isNaN(price) || price < 0) return;
+  const openItem = useCallback((id: string) => {
+    const item = trackedItems.find(i => i.id === id);
+    if (!item) return;
+    setActiveItemId(id);
+    setEntryStep('quantity');
+    setQuantityInput(String(item.quantity));
+    setUnitPriceInput('');
+    setUseSalePrice(false);
+    setSaleTotalInput('');
+  }, [trackedItems]);
+
+  const confirmPurchase = useCallback(() => {
+    if (!activeItemId || finalTotal <= 0) return;
 
     setTrackedItems(prev => prev.map(i =>
-      i.id === activeItemId ? { ...i, price } : i
+      i.id === activeItemId ? { ...i, price: finalTotal, quantityFound: qtyFound } : i
     ));
-    onMarkBought(activeItemId, price);
+    onMarkBought(activeItemId, finalTotal, qtyFound);
     setActiveItemId(null);
-    setPriceInput('');
-  }, [activeItemId, priceInput, onMarkBought]);
+    setEntryStep('quantity');
+    setQuantityInput('');
+    setUnitPriceInput('');
+    setUseSalePrice(false);
+    setSaleTotalInput('');
+  }, [activeItemId, finalTotal, qtyFound, onMarkBought]);
 
   const undoPrice = useCallback((id: string) => {
     setTrackedItems(prev => prev.map(i =>
-      i.id === id ? { ...i, price: null } : i
+      i.id === id ? { ...i, price: null, quantityFound: null } : i
     ));
   }, []);
 
@@ -179,53 +205,204 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     );
   }
 
-  // Active item — numpad for price entry
-  if (activeItemId) {
-    const item = trackedItems.find(i => i.id === activeItemId);
-    if (!item) return null;
-
+  // Active item — multi-step entry
+  if (activeItemId && activeItem) {
     return (
       <div className="space-y-4 animate-fade-in">
         <button
-          onClick={() => { setActiveItemId(null); setPriceInput(''); }}
+          onClick={() => { setActiveItemId(null); setEntryStep('quantity'); }}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
 
         <div className="text-center space-y-1">
-          <p className="text-sm text-muted-foreground">How much for</p>
-          <h2 className="font-display font-bold text-lg">{item.name}</h2>
-          <p className="text-xs text-muted-foreground">{item.quantity} {item.unit}</p>
+          <h2 className="font-display font-bold text-lg">{activeItem.name}</h2>
+          <p className="text-xs text-muted-foreground">Shopping list: {activeItem.quantity} {activeItem.unit}</p>
         </div>
 
-        <div className="text-center py-4">
-          <span className="text-5xl font-bold font-display tabular-nums">
-            {curr.symbol}{priceInput || '0.00'}
-          </span>
-        </div>
+        {/* Step 1: Quantity found */}
+        {entryStep === 'quantity' && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-2">How many did you find?</p>
+              <span className="text-5xl font-bold font-display tabular-nums">
+                {quantityInput || '0'}
+              </span>
+              <p className="text-xs text-muted-foreground mt-1">{activeItem.unit}</p>
+            </div>
 
-        <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'].map(key => (
-            <button
-              key={key}
-              onClick={() => handleNumpad(key === 'back' ? 'back' : key)}
-              className="h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all font-semibold text-xl flex items-center justify-center"
+            <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'].map(key => (
+                <button
+                  key={key}
+                  onClick={() => handleNumpad(key, setQuantityInput, false)}
+                  className="h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all font-semibold text-xl flex items-center justify-center"
+                >
+                  {key === 'back' ? <Delete className="w-5 h-5" /> : key === 'clear' ? 'C' : key}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              className="w-full max-w-[280px] mx-auto flex gap-2"
+              size="lg"
+              disabled={!quantityInput || parseInt(quantityInput) <= 0}
+              onClick={() => setEntryStep('unitPrice')}
             >
-              {key === 'back' ? <Delete className="w-5 h-5" /> : key}
-            </button>
-          ))}
-        </div>
+              Next — Enter Price
+            </Button>
+          </div>
+        )}
 
-        <Button
-          className="w-full max-w-[280px] mx-auto flex gap-2"
-          size="lg"
-          disabled={!priceInput || parseFloat(priceInput) <= 0}
-          onClick={confirmPrice}
-        >
-          <Check className="w-4 h-4" />
-          Confirm {curr.symbol}{priceInput || '0.00'}
-        </Button>
+        {/* Step 2: Unit price */}
+        {entryStep === 'unitPrice' && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-2">
+                Price per 1 {activeItem.unit.replace(/s$/, '')}?
+              </p>
+              <span className="text-5xl font-bold font-display tabular-nums">
+                {curr.symbol}{unitPriceInput || '0.00'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'].map(key => (
+                <button
+                  key={key}
+                  onClick={() => handleNumpad(key, setUnitPriceInput)}
+                  className="h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all font-semibold text-xl flex items-center justify-center"
+                >
+                  {key === 'back' ? <Delete className="w-5 h-5" /> : key}
+                </button>
+              ))}
+            </div>
+
+            {unitPrice > 0 && (
+              <div className="text-center text-sm text-muted-foreground">
+                {qtyFound} × {fmt(unitPrice)} = <span className="font-bold text-foreground">{fmt(calculatedTotal)}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 max-w-[280px] mx-auto">
+              <Button
+                variant="outline"
+                size="lg"
+                className="flex-1"
+                onClick={() => setEntryStep('quantity')}
+              >
+                Back
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                size="lg"
+                disabled={!unitPriceInput || unitPrice <= 0}
+                onClick={() => setEntryStep('confirm')}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Confirm (with sale override option) */}
+        {entryStep === 'confirm' && (
+          <div className="space-y-4">
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Quantity found</span>
+                  <span className="font-medium">{qtyFound} {activeItem.unit}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Price per {activeItem.unit.replace(/s$/, '')}</span>
+                  <span className="font-medium">{fmt(unitPrice)}</span>
+                </div>
+                <div className="border-t border-border pt-2 flex justify-between">
+                  <span className="font-medium">Calculated total</span>
+                  <span className={`font-bold ${useSalePrice ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                    {fmt(calculatedTotal)}
+                  </span>
+                </div>
+
+                {useSalePrice && (
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-primary flex items-center gap-1">
+                      <Tag className="w-3.5 h-3.5" /> Sale price
+                    </span>
+                    <span className="font-bold text-primary text-lg">{fmt(finalTotal)}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Sale/deal toggle */}
+            <div className="max-w-[320px] mx-auto">
+              {!useSalePrice ? (
+                <button
+                  onClick={() => setUseSalePrice(true)}
+                  className="w-full flex items-center justify-center gap-2 text-sm text-primary hover:underline py-2"
+                >
+                  <Tag className="w-4 h-4" /> There's a sale/deal? Enter total instead
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-primary shrink-0" />
+                    <p className="text-sm text-muted-foreground">
+                      Sale total for {qtyFound} {activeItem.unit}:
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0"
+                      placeholder={`e.g. ${fmt(calculatedTotal * 0.8).replace(curr.symbol, '')}`}
+                      value={saleTotalInput}
+                      onChange={(e) => setSaleTotalInput(e.target.value)}
+                      className="text-center text-lg font-bold"
+                    />
+                  </div>
+                  <button
+                    onClick={() => { setUseSalePrice(false); setSaleTotalInput(''); }}
+                    className="text-xs text-muted-foreground hover:underline"
+                  >
+                    Cancel — use calculated price
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {budget !== Infinity && remaining !== null && (
+              <div className="text-center text-xs text-muted-foreground">
+                Budget after: {fmt(remaining - finalTotal)}
+              </div>
+            )}
+
+            <div className="flex gap-2 max-w-[280px] mx-auto">
+              <Button
+                variant="outline"
+                size="lg"
+                className="flex-1"
+                onClick={() => setEntryStep('unitPrice')}
+              >
+                Back
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                size="lg"
+                disabled={finalTotal <= 0}
+                onClick={confirmPurchase}
+              >
+                <Check className="w-4 h-4" />
+                Confirm {fmt(finalTotal)}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -233,7 +410,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   // Main shopping mode view
   return (
     <div className="space-y-4 animate-fade-in">
-      <button onClick={() => { /* don't clear session — just go back to list view while keeping session alive */ onExit(); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <button onClick={() => { onExit(); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to list (session saved)
       </button>
 
@@ -273,7 +450,6 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         </Card>
       )}
 
-      {/* No budget — simple total */}
       {budget === Infinity && totalSpent > 0 && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 flex items-center justify-between">
@@ -288,7 +464,6 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         </Card>
       )}
 
-      {/* Unpriced items */}
       {unpricedItems.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
@@ -298,21 +473,20 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             <Card
               key={item.id}
               className="border-border/50 shadow-none cursor-pointer hover:border-primary/30 active:scale-[0.99] transition-all"
-              onClick={() => { setActiveItemId(item.id); setPriceInput(''); }}
+              onClick={() => openItem(item.id)}
             >
               <CardContent className="p-3 flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{item.name}</p>
                   <p className="text-xs text-muted-foreground">{item.quantity} {item.unit} · {item.category}</p>
                 </div>
-                <Badge variant="secondary" className="text-xs shrink-0">Tap to price</Badge>
+                <Badge variant="secondary" className="text-xs shrink-0">Tap to buy</Badge>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {/* Priced items */}
       {pricedItems.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
@@ -327,7 +501,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.quantity} {item.unit}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.quantityFound ?? item.quantity} {item.unit}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -345,7 +521,6 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         </div>
       )}
 
-      {/* All done */}
       {unpricedItems.length === 0 && trackedItems.length > 0 && (
         <div className="text-center py-6">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">

@@ -6,7 +6,7 @@ import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
   { to: '/pantry', icon: Package, label: 'Pantry' },
-  { to: '/shopping', icon: ShoppingCart, label: 'Shop' },
+  { to: '/shopping', icon: ShoppingCart, label: 'Shopping List' },
   { to: '/recipes', icon: ChefHat, label: 'Recipes' },
   { to: '/chat', icon: MessageCircle, label: 'Chat' },
 ];
