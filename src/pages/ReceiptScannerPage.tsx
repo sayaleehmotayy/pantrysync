@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useReceiptScanner, ReceiptItem } from '@/hooks/useReceiptScanner';
+import { useReceiptScanContext, ReceiptItem } from '@/contexts/ReceiptScanContext';
+import { useReceiptScanner } from '@/hooks/useReceiptScanner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,9 +47,8 @@ function getCurrencySymbol(c: string) {
 
 // --- Sub-components ---
 
-function ProcessingCard({ photoCount, onCheckHistory }: { photoCount: number; onCheckHistory: () => void }) {
-  const [startTime] = useState(Date.now());
-  const [elapsed, setElapsed] = useState(0);
+function ProcessingCard({ photoCount, startTime, onCheckHistory }: { photoCount: number; startTime: number; onCheckHistory: () => void }) {
+  const [elapsed, setElapsed] = useState(Date.now() - startTime);
   const estimatedMs = Math.max(photoCount * 8000, 8000);
 
   useEffect(() => {
