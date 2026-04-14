@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera, ScanBarcode } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, format, isBefore, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
+import BarcodeScanner from '@/components/BarcodeScanner';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Frozen', 'Sauces', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'bottles', 'packets'];
@@ -90,6 +91,7 @@ export default function PantryPage() {
   const [filterCat, setFilterCat] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -144,6 +146,9 @@ export default function PantryPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-display font-bold">Pantry</h1>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setBarcodeOpen(true)}>
+            <ScanBarcode className="w-4 h-4 mr-1" /> Barcode
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setScannerOpen(true)}>
             <Camera className="w-4 h-4 mr-1" /> Scan
           </Button>
@@ -292,6 +297,12 @@ export default function PantryPage() {
       <ProductScanner
         open={scannerOpen}
         onOpenChange={setScannerOpen}
+        onAddToPantry={handleScanToPantry}
+      />
+
+      <BarcodeScanner
+        open={barcodeOpen}
+        onOpenChange={setBarcodeOpen}
         onAddToPantry={handleScanToPantry}
       />
     </div>
