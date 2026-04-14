@@ -10,6 +10,13 @@ import {
 } from 'lucide-react';
 import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
 
+// Countable units where per-unit pricing makes sense
+const COUNTABLE_UNITS = new Set(['pieces', 'packets', 'bags', 'bottles', 'cans', 'boxes', 'cartons', 'packs', 'jars', 'tubs']);
+
+function isCountableUnit(unit: string): boolean {
+  return COUNTABLE_UNITS.has(unit.toLowerCase());
+}
+
 interface ShoppingModeProps {
   items: ShoppingItem[];
   onMarkBought: (id: string, price: number, quantityFound?: number) => void;
@@ -86,10 +93,11 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const fmt = (amount: number) => formatCurrency(amount, curr);
 
   const activeItem = activeItemId ? trackedItems.find(i => i.id === activeItemId) : null;
+  const countable = activeItem ? isCountableUnit(activeItem.unit) : true;
 
-  const qtyFound = quantityInput ? parseInt(quantityInput) : (activeItem?.quantity ?? 0);
+  const qtyFound = quantityInput ? parseFloat(quantityInput) : 0;
   const unitPrice = unitPriceInput ? parseFloat(unitPriceInput) : 0;
-  const calculatedTotal = qtyFound * unitPrice;
+  const calculatedTotal = countable ? qtyFound * unitPrice : unitPrice; // bulk: price IS the total
   const finalTotal = useSalePrice && saleTotalInput ? parseFloat(saleTotalInput) : calculatedTotal;
 
   const handleNumpad = useCallback((key: string, setter: React.Dispatch<React.SetStateAction<string>>, allowDecimal = true) => {
@@ -243,7 +251,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         {entryStep === 'quantity' && (
           <div className="space-y-4">
             <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">How many did you find?</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {countable ? 'How many did you find?' : `How much ${activeItem.unit} did you find?`}
+              </p>
               <span className="text-5xl font-bold font-display tabular-nums">
                 {quantityInput || '0'}
               </span>
@@ -251,10 +261,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             </div>
 
             <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'].map(key => (
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', countable ? 'clear' : '.', '0', 'back'].map(key => (
                 <button
                   key={key}
-                  onClick={() => handleNumpad(key, setQuantityInput, false)}
+                  onClick={() => handleNumpad(key === 'clear' ? 'clear' : key, setQuantityInput, !countable)}
                   className="h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all font-semibold text-xl flex items-center justify-center"
                 >
                   {key === 'back' ? <Delete className="w-5 h-5" /> : key === 'clear' ? 'C' : key}
@@ -265,7 +275,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             <Button
               className="w-full max-w-[280px] mx-auto flex gap-2"
               size="lg"
-              disabled={!quantityInput || parseInt(quantityInput) <= 0}
+              disabled={!quantityInput || parseFloat(quantityInput) <= 0}
               onClick={() => setEntryStep('unitPrice')}
             >
               Next — Enter Price
@@ -278,7 +288,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
           <div className="space-y-4">
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">
-                Price per 1 {activeItem.unit.replace(/s$/, '')}?
+                {countable
+                  ? `Price per 1 ${activeItem.unit.replace(/s$/, '')}?`
+                  : `Total price for ${qtyFound} ${activeItem.unit}?`}
               </p>
               <span className="text-5xl font-bold font-display tabular-nums">
                 {curr.symbol}{unitPriceInput || '0.00'}
@@ -297,7 +309,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
               ))}
             </div>
 
-            {unitPrice > 0 && (
+            {countable && unitPrice > 0 && (
               <div className="text-center text-sm text-muted-foreground">
                 {qtyFound} × {fmt(unitPrice)} = <span className="font-bold text-foreground">{fmt(calculatedTotal)}</span>
               </div>
@@ -333,12 +345,14 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                   <span className="text-muted-foreground">Quantity found</span>
                   <span className="font-medium">{qtyFound} {activeItem.unit}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Price per {activeItem.unit.replace(/s$/, '')}</span>
-                  <span className="font-medium">{fmt(unitPrice)}</span>
-                </div>
+                {countable ? (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Price per {activeItem.unit.replace(/s$/, '')}</span>
+                    <span className="font-medium">{fmt(unitPrice)}</span>
+                  </div>
+                ) : null}
                 <div className="border-t border-border pt-2 flex justify-between">
-                  <span className="font-medium">Calculated total</span>
+                  <span className="font-medium">{countable ? 'Calculated total' : 'Total price'}</span>
                   <span className={`font-bold ${useSalePrice ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                     {fmt(calculatedTotal)}
                   </span>
