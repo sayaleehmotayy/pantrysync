@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera, ScanBarcode } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, format, isBefore, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
+import BarcodeScanner from '@/components/BarcodeScanner';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Frozen', 'Sauces', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'bottles', 'packets'];
