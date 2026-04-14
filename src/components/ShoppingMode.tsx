@@ -65,7 +65,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     initialized.current = true;
     const pending = items.filter(i => i.status === 'pending' || i.status === 'not_found');
     setTrackedItems(pending.map(i => ({
-      id: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null, quantityFound: null,
+      id: i.id, dbId: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null, quantityFound: null,
     })));
   }, []);
 
