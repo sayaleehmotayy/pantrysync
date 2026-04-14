@@ -154,7 +154,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
       }
       return updated;
     });
-    onMarkBought(activeItemId, finalTotal, qtyFound);
+    const dbId = item?.dbId ?? activeItemId;
+    onMarkBought(dbId, finalTotal, qtyFound);
     setActiveItemId(null);
     setEntryStep('quantity');
     setQuantityInput('');
