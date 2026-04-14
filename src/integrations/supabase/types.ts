@@ -171,10 +171,47 @@ export type Database = {
         }
         Relationships: []
       }
+      household_invites: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          household_id: string
+          id: string
+          invite_code: string
+          is_active: boolean
+          max_uses: number | null
+          used_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          household_id: string
+          id?: string
+          invite_code: string
+          is_active?: boolean
+          max_uses?: number | null
+          used_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          household_id?: string
+          id?: string
+          invite_code?: string
+          is_active?: boolean
+          max_uses?: number | null
+          used_count?: number
+        }
+        Relationships: []
+      }
       household_members: {
         Row: {
           household_id: string
           id: string
+          invite_code_used: string | null
           joined_at: string
           role: string
           user_id: string
@@ -182,6 +219,7 @@ export type Database = {
         Insert: {
           household_id: string
           id?: string
+          invite_code_used?: string | null
           joined_at?: string
           role?: string
           user_id: string
@@ -189,6 +227,7 @@ export type Database = {
         Update: {
           household_id?: string
           id?: string
+          invite_code_used?: string | null
           joined_at?: string
           role?: string
           user_id?: string
@@ -671,6 +710,10 @@ export type Database = {
       is_household_member: {
         Args: { _household_id: string; _user_id: string }
         Returns: boolean
+      }
+      join_household_with_invite: {
+        Args: { p_invite_code: string }
+        Returns: undefined
       }
       lookup_household_by_invite_code: {
         Args: { _invite_code: string }
