@@ -10,6 +10,13 @@ import {
 } from 'lucide-react';
 import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
 
+// Countable units where per-unit pricing makes sense
+const COUNTABLE_UNITS = new Set(['pieces', 'packets', 'bags', 'bottles', 'cans', 'boxes', 'cartons', 'packs', 'jars', 'tubs']);
+
+function isCountableUnit(unit: string): boolean {
+  return COUNTABLE_UNITS.has(unit.toLowerCase());
+}
+
 interface ShoppingModeProps {
   items: ShoppingItem[];
   onMarkBought: (id: string, price: number, quantityFound?: number) => void;
