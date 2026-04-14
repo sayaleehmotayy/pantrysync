@@ -477,7 +477,7 @@ export default function ChatPage() {
                     <button
                       onClick={() => quickAddFromMessage(msg)}
                       disabled={!!aiParsing}
-                      className="text-[10px] text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-0.5 disabled:opacity-50"
+                      className="text-[10px] text-muted-foreground hover:text-foreground transition-all duration-200 flex items-center gap-0.5 disabled:opacity-50"
                     >
                       {isParsing ? (
                         <><Sparkles className="w-3 h-3 animate-spin" /> Adding...</>
