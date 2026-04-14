@@ -37,19 +37,29 @@ function getProductId(subscription: Stripe.Subscription): string | null {
   return typeof product === "string" ? product : product?.id ?? null;
 }
 
+function getPriceId(subscription: Stripe.Subscription): string | null {
+  return subscription.items.data[0]?.price?.id ?? null;
+}
+
 function getSubscriptionEnd(subscription: Stripe.Subscription): string | null {
-  const rawEnd = (subscription as Stripe.Subscription & {
-    current_period_end?: unknown;
-    trial_end?: unknown;
-    ended_at?: unknown;
-  }).current_period_end
-    ?? (subscription as Stripe.Subscription & { trial_end?: unknown }).trial_end
-    ?? (subscription as Stripe.Subscription & { ended_at?: unknown }).ended_at;
+  const rawEnd = (subscription as any).current_period_end
+    ?? (subscription as any).trial_end
+    ?? (subscription as any).ended_at;
 
   return toIsoDate(rawEnd);
 }
 
-async function checkStripeSubscription(stripe: Stripe, email: string) {
+interface SubscriptionResult {
+  subscribed: boolean;
+  product_id: string | null;
+  subscription_end: string | null;
+  trial: boolean;
+  // Full Stripe objects for cache seeding
+  _subscription?: Stripe.Subscription;
+  _customerId?: string;
+}
+
+async function checkStripeSubscription(stripe: Stripe, email: string): Promise<SubscriptionResult | null> {
   const customers = await stripe.customers.list({ email, limit: 1 });
   if (customers.data.length === 0) return null;
 
@@ -78,7 +88,47 @@ async function checkStripeSubscription(stripe: Stripe, email: string) {
     product_id: productId,
     subscription_end: subscriptionEnd,
     trial: subscription.status === "trialing",
+    _subscription: subscription,
+    _customerId: customerId,
   };
+}
+
+// Seed subscription_cache so the join_household_with_invite RPC has data
+async function seedSubscriptionCache(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  sub: Stripe.Subscription,
+  customerId: string,
+) {
+  const productId = getProductId(sub);
+  const priceId = getPriceId(sub);
+  const currentPeriodEnd = toIsoDate((sub as any).current_period_end);
+  const trialEnd = toIsoDate((sub as any).trial_end);
+  const cancelAtPeriodEnd = (sub as any).cancel_at_period_end ?? false;
+
+  const { error } = await supabaseAdmin
+    .from("subscription_cache")
+    .upsert(
+      {
+        user_id: userId,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: sub.id,
+        status: sub.status,
+        product_id: productId,
+        price_id: priceId,
+        current_period_end: currentPeriodEnd,
+        trial_end: trialEnd,
+        cancel_at_period_end: cancelAtPeriodEnd,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+
+  if (error) {
+    logStep("Failed to seed subscription_cache", { error: error.message });
+  } else {
+    logStep("subscription_cache seeded successfully", { userId, productId });
+  }
 }
 
 serve(async (req) => {
@@ -124,8 +174,25 @@ serve(async (req) => {
     // 1. Check if THIS user has a subscription
     const ownSub = await checkStripeSubscription(stripe, user.email);
     if (ownSub) {
-      logStep("User has own subscription", ownSub);
-      return new Response(JSON.stringify(ownSub), {
+      logStep("User has own subscription", {
+        subscribed: ownSub.subscribed,
+        product_id: ownSub.product_id,
+        subscription_end: ownSub.subscription_end,
+        trial: ownSub.trial,
+      });
+
+      // Seed the cache so the join RPC has data for member limits
+      if (ownSub._subscription && ownSub._customerId) {
+        // Fire and forget — don't block the response
+        seedSubscriptionCache(supabaseClient, user.id, ownSub._subscription, ownSub._customerId);
+      }
+
+      return new Response(JSON.stringify({
+        subscribed: ownSub.subscribed,
+        product_id: ownSub.product_id,
+        subscription_end: ownSub.subscription_end,
+        trial: ownSub.trial,
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
@@ -156,9 +223,21 @@ serve(async (req) => {
             logStep("Checking household member subscription", { memberEmail });
             const memberSub = await checkStripeSubscription(stripe, memberEmail);
             if (memberSub) {
-              logStep("Household member has subscription — granting access", memberSub);
+              logStep("Household member has subscription — granting access", {
+                subscribed: memberSub.subscribed,
+                product_id: memberSub.product_id,
+              });
+
+              // Seed cache for the subscribing member too
+              if (memberSub._subscription && memberSub._customerId) {
+                seedSubscriptionCache(supabaseClient, member.user_id, memberSub._subscription, memberSub._customerId);
+              }
+
               return new Response(JSON.stringify({
-                ...memberSub,
+                subscribed: memberSub.subscribed,
+                product_id: memberSub.product_id,
+                subscription_end: memberSub.subscription_end,
+                trial: memberSub.trial,
                 household_pro: true,
               }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
