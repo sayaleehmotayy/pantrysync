@@ -618,6 +618,51 @@ export type Database = {
           },
         ]
       }
+      subscription_cache: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string
+          current_period_end: string | null
+          id: string
+          price_id: string | null
+          product_id: string | null
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string | null
+          trial_end: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          price_id?: string | null
+          product_id?: string | null
+          status?: string
+          stripe_customer_id: string
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          price_id?: string | null
+          product_id?: string | null
+          status?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
