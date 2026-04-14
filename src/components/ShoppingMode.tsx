@@ -93,10 +93,11 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const fmt = (amount: number) => formatCurrency(amount, curr);
 
   const activeItem = activeItemId ? trackedItems.find(i => i.id === activeItemId) : null;
+  const countable = activeItem ? isCountableUnit(activeItem.unit) : true;
 
-  const qtyFound = quantityInput ? parseInt(quantityInput) : (activeItem?.quantity ?? 0);
+  const qtyFound = quantityInput ? parseFloat(quantityInput) : 0;
   const unitPrice = unitPriceInput ? parseFloat(unitPriceInput) : 0;
-  const calculatedTotal = qtyFound * unitPrice;
+  const calculatedTotal = countable ? qtyFound * unitPrice : unitPrice; // bulk: price IS the total
   const finalTotal = useSalePrice && saleTotalInput ? parseFloat(saleTotalInput) : calculatedTotal;
 
   const handleNumpad = useCallback((key: string, setter: React.Dispatch<React.SetStateAction<string>>, allowDecimal = true) => {
