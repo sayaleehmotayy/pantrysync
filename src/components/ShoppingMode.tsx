@@ -251,7 +251,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         {entryStep === 'quantity' && (
           <div className="space-y-4">
             <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">How many did you find?</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {countable ? 'How many did you find?' : `How much ${activeItem.unit} did you find?`}
+              </p>
               <span className="text-5xl font-bold font-display tabular-nums">
                 {quantityInput || '0'}
               </span>
@@ -259,10 +261,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             </div>
 
             <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'].map(key => (
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', countable ? 'clear' : '.', '0', 'back'].map(key => (
                 <button
                   key={key}
-                  onClick={() => handleNumpad(key, setQuantityInput, false)}
+                  onClick={() => handleNumpad(key === 'clear' ? 'clear' : key, setQuantityInput, !countable)}
                   className="h-14 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-all font-semibold text-xl flex items-center justify-center"
                 >
                   {key === 'back' ? <Delete className="w-5 h-5" /> : key === 'clear' ? 'C' : key}
@@ -273,7 +275,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             <Button
               className="w-full max-w-[280px] mx-auto flex gap-2"
               size="lg"
-              disabled={!quantityInput || parseInt(quantityInput) <= 0}
+              disabled={!quantityInput || parseFloat(quantityInput) <= 0}
               onClick={() => setEntryStep('unitPrice')}
             >
               Next — Enter Price
