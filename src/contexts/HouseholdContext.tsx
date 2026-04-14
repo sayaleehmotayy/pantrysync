@@ -32,7 +32,7 @@ interface HouseholdContextType {
 const HouseholdContext = createContext<HouseholdContextType | undefined>(undefined);
 
 export function HouseholdProvider({ children }: { children: React.ReactNode }) {
-  const { user, subscription } = useAuth();
+  const { user } = useAuth();
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [loading, setLoading] = useState(true);
