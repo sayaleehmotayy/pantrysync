@@ -91,9 +91,16 @@ export default function ShoppingPage() {
     toast.success(`${item.name} added to pantry via scan!`);
   };
 
-  const handleShoppingModeBought = (id: string, price: number) => {
-    // Mark as bought — the existing hook handles pantry transfer
-    updateItem.mutate({ id, status: 'bought', bought_quantity: items.find(i => i.id === id)?.quantity || 1 });
+  const handleShoppingModeBought = (id: string, price: number, quantityFound?: number) => {
+    const item = items.find(i => i.id === id);
+    const qty = quantityFound ?? item?.quantity ?? 1;
+    if (qty < (item?.quantity ?? 1)) {
+      // Partial buy — only bought some
+      updateItem.mutate({ id, status: 'partial', bought_quantity: qty });
+    } else {
+      // Full buy
+      updateItem.mutate({ id, status: 'bought', bought_quantity: qty });
+    }
   };
 
   // Shopping Mode
