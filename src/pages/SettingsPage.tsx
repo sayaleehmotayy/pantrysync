@@ -6,8 +6,34 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check } from 'lucide-react';
+import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe } from 'lucide-react';
 import { TIERS, TRIAL_DAYS, getTierByProductId, getMemberLimit, type TierKey } from '@/config/subscription';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const CURRENCIES = [
+  { code: 'USD', label: 'US Dollar ($)' },
+  { code: 'EUR', label: 'Euro (€)' },
+  { code: 'GBP', label: 'British Pound (£)' },
+  { code: 'CAD', label: 'Canadian Dollar (CA$)' },
+  { code: 'AUD', label: 'Australian Dollar (A$)' },
+  { code: 'CHF', label: 'Swiss Franc (CHF)' },
+  { code: 'SEK', label: 'Swedish Krona (kr)' },
+  { code: 'NOK', label: 'Norwegian Krone (kr)' },
+  { code: 'DKK', label: 'Danish Krone (kr)' },
+  { code: 'PLN', label: 'Polish Złoty (zł)' },
+  { code: 'CZK', label: 'Czech Koruna (Kč)' },
+  { code: 'JPY', label: 'Japanese Yen (¥)' },
+  { code: 'INR', label: 'Indian Rupee (₹)' },
+  { code: 'BRL', label: 'Brazilian Real (R$)' },
+  { code: 'MXN', label: 'Mexican Peso (MX$)' },
+  { code: 'ZAR', label: 'South African Rand (R)' },
+  { code: 'NZD', label: 'New Zealand Dollar (NZ$)' },
+  { code: 'SGD', label: 'Singapore Dollar (S$)' },
+  { code: 'HKD', label: 'Hong Kong Dollar (HK$)' },
+  { code: 'KRW', label: 'South Korean Won (₩)' },
+  { code: 'TRY', label: 'Turkish Lira (₺)' },
+  { code: 'AED', label: 'UAE Dirham (د.إ)' },
+];
 
 export default function SettingsPage() {
   const { household, members, userRole, leaveHousehold } = useHousehold();
@@ -16,9 +42,37 @@ export default function SettingsPage() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<Exclude<TierKey, 'free'>>('duo');
+  const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
 
   const currentTier = getTierByProductId(subscription.productId);
   const memberLimit = getMemberLimit(currentTier);
+
+  // Load user's preferred currency
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('profiles')
+      .select('preferred_currency')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.preferred_currency) setPreferredCurrency(data.preferred_currency);
+      });
+  }, [user]);
+
+  const handleCurrencyChange = async (value: string) => {
+    setPreferredCurrency(value);
+    if (!user) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ preferred_currency: value } as any)
+      .eq('user_id', user.id);
+    if (error) {
+      toast.error('Failed to update currency');
+    } else {
+      toast.success(`Currency set to ${value}`);
+    }
+  };
 
   const copyInviteCode = () => {
     navigator.clipboard.writeText(household.invite_code);
@@ -102,6 +156,28 @@ export default function SettingsPage() {
   return (
     <div className="space-y-4 animate-fade-in">
       <h1 className="text-xl font-display font-bold">Settings</h1>
+
+      {/* Currency Preference */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-display flex items-center gap-2">
+            <Globe className="w-4 h-4 text-primary" /> Currency
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-2">Choose your preferred currency for receipts and spending.</p>
+          <Select value={preferredCurrency} onValueChange={handleCurrencyChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select currency" />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCIES.map(c => (
+                <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
       {/* Subscription Card */}
       <Card className={`overflow-hidden ${subscription.subscribed ? 'border-primary/30 bg-primary/5' : 'border-border/50'}`}>

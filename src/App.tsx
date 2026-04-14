@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { HouseholdProvider, useHousehold } from "@/contexts/HouseholdContext";
 import { ProGate } from "@/components/ProGate";
+import { ReceiptScanProvider } from "@/contexts/ReceiptScanContext";
 import AuthPage from "./pages/AuthPage";
 import HouseholdSetup from "./pages/HouseholdSetup";
 import DashboardPage from "./pages/DashboardPage";
@@ -78,7 +79,9 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <HouseholdProvider>
-            <AppRoutes />
+            <ReceiptScanProvider>
+              <AppRoutes />
+            </ReceiptScanProvider>
           </HouseholdProvider>
         </AuthProvider>
       </BrowserRouter>

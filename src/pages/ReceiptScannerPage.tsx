@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useReceiptScanner, ReceiptItem } from '@/hooks/useReceiptScanner';
+import { useReceiptScanContext, ReceiptItem } from '@/contexts/ReceiptScanContext';
+import { useReceiptScanner } from '@/hooks/useReceiptScanner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,9 +47,8 @@ function getCurrencySymbol(c: string) {
 
 // --- Sub-components ---
 
-function ProcessingCard({ photoCount, onCheckHistory }: { photoCount: number; onCheckHistory: () => void }) {
-  const [startTime] = useState(Date.now());
-  const [elapsed, setElapsed] = useState(0);
+function ProcessingCard({ photoCount, startTime, onCheckHistory }: { photoCount: number; startTime: number; onCheckHistory: () => void }) {
+  const [elapsed, setElapsed] = useState(Date.now() - startTime);
   const estimatedMs = Math.max(photoCount * 8000, 8000);
 
   useEffect(() => {
@@ -81,13 +81,14 @@ function ProcessingCard({ photoCount, onCheckHistory }: { photoCount: number; on
 
 function HistoryProcessingBar({ scan }: { scan: any }) {
   const [elapsed, setElapsed] = useState(0);
-  const startRef = useRef(Date.now());
+  // Use scan created_at as start time so it persists across navigations
+  const startTime = new Date(scan.created_at).getTime();
   const est = Math.max((scan.photo_count || 1) * 8000, 8000);
 
   useEffect(() => {
-    const t = setInterval(() => setElapsed(Date.now() - startRef.current), 500);
+    const t = setInterval(() => setElapsed(Date.now() - startTime), 500);
     return () => clearInterval(t);
-  }, []);
+  }, [startTime]);
 
   const raw = Math.min((elapsed / est) * 100, 95);
   const progress = Math.round(raw < 80 ? raw : 80 + (raw - 80) * 0.5);
@@ -235,9 +236,9 @@ export default function ReceiptScannerPage() {
     scanStatus, photoCount, errorMessage,
     items, setItems, coupons,
     storeName, receiptDate, totalAmount, currency,
-    submitPhotos, addSelectedToPantry, resetScan, deleteReceipt,
-    history, analytics, isLoadingHistory,
-  } = useReceiptScanner();
+    submitPhotos, addSelectedToPantry, resetScan, processingStartTime,
+  } = useReceiptScanContext();
+  const { deleteReceipt, history, analytics, isLoadingHistory } = useReceiptScanner();
 
   const [tab, setTab] = useState<Tab>('scan');
   const [captureStep, setCaptureStep] = useState<CaptureStep>('idle');
@@ -504,7 +505,7 @@ export default function ReceiptScannerPage() {
 
           {/* PROCESSING */}
           {isProcessing && captureStep !== 'capture' && (
-            <ProcessingCard photoCount={photoCount} onCheckHistory={() => setTab('history')} />
+            <ProcessingCard photoCount={photoCount} startTime={processingStartTime || Date.now()} onCheckHistory={() => setTab('history')} />
           )}
 
           {/* CAPTURE */}
