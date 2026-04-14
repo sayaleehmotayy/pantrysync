@@ -19,6 +19,7 @@ import ActivityPage from "./pages/ActivityPage";
 import SettingsPage from "./pages/SettingsPage";
 import AiPage from "./pages/AiPage";
 import CouponsPage from "./pages/CouponsPage";
+import SpendingPage from "./pages/SpendingPage";
 import ReceiptScannerPage from "./pages/ReceiptScannerPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
@@ -62,6 +63,7 @@ function AppRoutes() {
         <Route path="/expiry" element={<ExpiryPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/spending" element={<SpendingPage />} />
         <Route path="/recipes" element={<ProGate feature="Recipe Suggestions"><RecipesPage /></ProGate>} />
         <Route path="/chat" element={<ProGate feature="Group Chat"><ChatPage /></ProGate>} />
         <Route path="/ai" element={<ProGate feature="AI Assistant"><AiPage /></ProGate>} />
