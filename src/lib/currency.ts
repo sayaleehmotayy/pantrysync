@@ -74,3 +74,15 @@ export function formatCurrency(amount: number, currency: CurrencyInfo): string {
     return `${currency.symbol}${amount.toFixed(2)}`;
   }
 }
+
+/** React hook for easy currency formatting using user's profile preference */
+export function useCurrency() {
+  const defaultCurrency = detectCurrencyFromLocale();
+  
+  const formatPrice = (amount: number, currencyCode?: string) => {
+    const info = currencyCode ? getCurrencyInfo(currencyCode) : defaultCurrency;
+    return formatCurrency(amount, info);
+  };
+
+  return { formatPrice, currency: defaultCurrency };
+}
