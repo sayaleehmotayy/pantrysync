@@ -345,12 +345,14 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                   <span className="text-muted-foreground">Quantity found</span>
                   <span className="font-medium">{qtyFound} {activeItem.unit}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Price per {activeItem.unit.replace(/s$/, '')}</span>
-                  <span className="font-medium">{fmt(unitPrice)}</span>
-                </div>
+                {countable ? (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Price per {activeItem.unit.replace(/s$/, '')}</span>
+                    <span className="font-medium">{fmt(unitPrice)}</span>
+                  </div>
+                ) : null}
                 <div className="border-t border-border pt-2 flex justify-between">
-                  <span className="font-medium">Calculated total</span>
+                  <span className="font-medium">{countable ? 'Calculated total' : 'Total price'}</span>
                   <span className={`font-bold ${useSalePrice ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                     {fmt(calculatedTotal)}
                   </span>
