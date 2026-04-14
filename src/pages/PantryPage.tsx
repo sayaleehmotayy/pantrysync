@@ -146,6 +146,9 @@ export default function PantryPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-display font-bold">Pantry</h1>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setBarcodeOpen(true)}>
+            <ScanBarcode className="w-4 h-4 mr-1" /> Barcode
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setScannerOpen(true)}>
             <Camera className="w-4 h-4 mr-1" /> Scan
           </Button>
