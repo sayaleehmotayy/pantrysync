@@ -25,7 +25,8 @@ interface ShoppingModeProps {
 }
 
 interface TrackedItem {
-  id: string;
+  id: string;        // local tracking ID (may include _remaining suffix)
+  dbId: string;      // original database ID for API calls
   name: string;
   quantity: number;
   unit: string;
@@ -64,7 +65,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     initialized.current = true;
     const pending = items.filter(i => i.status === 'pending' || i.status === 'not_found');
     setTrackedItems(pending.map(i => ({
-      id: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null, quantityFound: null,
+      id: i.id, dbId: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null, quantityFound: null,
     })));
   }, []);
 
@@ -139,8 +140,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
       );
       // If partial buy, add a new entry for the remaining quantity
       if (remainingQty > 0 && item) {
+        const remainingId = item.id.includes('_remaining') ? item.id : item.id + '_remaining';
         updated = [...updated, {
-          id: item.id + '_remaining',
+          id: remainingId,
+          dbId: item.dbId,
           name: item.name,
           quantity: remainingQty,
           unit: item.unit,
@@ -151,7 +154,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
       }
       return updated;
     });
-    onMarkBought(activeItemId, finalTotal, qtyFound);
+    const dbId = item?.dbId ?? activeItemId;
+    onMarkBought(dbId, finalTotal, qtyFound);
     setActiveItemId(null);
     setEntryStep('quantity');
     setQuantityInput('');
