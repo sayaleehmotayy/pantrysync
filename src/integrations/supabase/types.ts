@@ -238,6 +238,8 @@ export type Database = {
           expiry_date: string | null
           household_id: string
           id: string
+          last_price: number | null
+          last_store: string | null
           min_threshold: number | null
           name: string
           quantity: number
@@ -252,6 +254,8 @@ export type Database = {
           expiry_date?: string | null
           household_id: string
           id?: string
+          last_price?: number | null
+          last_store?: string | null
           min_threshold?: number | null
           name: string
           quantity?: number
@@ -266,6 +270,8 @@ export type Database = {
           expiry_date?: string | null
           household_id?: string
           id?: string
+          last_price?: number | null
+          last_store?: string | null
           min_threshold?: number | null
           name?: string
           quantity?: number
@@ -313,6 +319,39 @@ export type Database = {
           read?: boolean
           sender_id?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      price_history: {
+        Row: {
+          currency: string
+          household_id: string
+          id: string
+          inventory_item_id: string
+          price: number
+          recorded_at: string
+          recorded_by: string | null
+          store_name: string | null
+        }
+        Insert: {
+          currency?: string
+          household_id: string
+          id?: string
+          inventory_item_id: string
+          price: number
+          recorded_at?: string
+          recorded_by?: string | null
+          store_name?: string | null
+        }
+        Update: {
+          currency?: string
+          household_id?: string
+          id?: string
+          inventory_item_id?: string
+          price?: number
+          recorded_at?: string
+          recorded_by?: string | null
+          store_name?: string | null
         }
         Relationships: []
       }
