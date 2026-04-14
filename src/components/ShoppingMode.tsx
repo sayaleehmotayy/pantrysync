@@ -227,6 +227,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
       }
 
       qc.invalidateQueries({ queryKey: ['shopping-trips'] });
+      qc.invalidateQueries({ queryKey: ['spending_summary'] });
       clearSession();
       toast.success(`Shopping trip saved! ${pricedItems.length} items added to pantry.`);
       onExit();

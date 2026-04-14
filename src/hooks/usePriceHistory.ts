@@ -86,33 +86,74 @@ export function useSpendingSummary() {
   return useQuery({
     queryKey: ['spending_summary', household?.id],
     queryFn: async () => {
-      if (!household) return { total30d: 0, total7d: 0, byStore: [], byMonth: [] };
+      if (!household) return { total30d: 0, total7d: 0, byStore: [], byWeek: [] };
 
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const { data, error } = await supabase
-        .from('price_history')
-        .select('*')
-        .eq('household_id', household.id)
-        .gte('recorded_at', thirtyDaysAgo.toISOString())
-        .order('recorded_at', { ascending: true });
+      // Fetch both price_history and shopping_trips in parallel
+      const [priceRes, tripsRes] = await Promise.all([
+        supabase
+          .from('price_history')
+          .select('*')
+          .eq('household_id', household.id)
+          .gte('recorded_at', thirtyDaysAgo.toISOString())
+          .order('recorded_at', { ascending: true }),
+        supabase
+          .from('shopping_trips')
+          .select('*')
+          .eq('household_id', household.id)
+          .gte('finished_at', thirtyDaysAgo.toISOString())
+          .order('finished_at', { ascending: true }),
+      ]);
 
-      if (error) throw error;
-      const records = (data || []) as PriceRecord[];
+      if (priceRes.error) throw priceRes.error;
+      if (tripsRes.error) throw tripsRes.error;
 
-      const total30d = records.reduce((sum, r) => sum + Number(r.price), 0);
-      const total7d = records
-        .filter(r => new Date(r.recorded_at) >= sevenDaysAgo)
-        .reduce((sum, r) => sum + Number(r.price), 0);
+      const priceRecords = (priceRes.data || []) as PriceRecord[];
+      const trips = (tripsRes.data || []) as Array<{
+        id: string; store_name: string | null; total_spent: number; finished_at: string;
+      }>;
+
+      // Normalize both sources into a unified spending record list
+      type SpendEntry = { amount: number; store: string; date: Date; weekKey: string };
+      const entries: SpendEntry[] = [];
+
+      priceRecords.forEach(r => {
+        const d = new Date(r.recorded_at);
+        const weekStart = new Date(d);
+        weekStart.setDate(d.getDate() - d.getDay());
+        entries.push({
+          amount: Number(r.price),
+          store: r.store_name || 'Unknown',
+          date: d,
+          weekKey: weekStart.toISOString().slice(0, 10),
+        });
+      });
+
+      trips.forEach(t => {
+        const d = new Date(t.finished_at);
+        const weekStart = new Date(d);
+        weekStart.setDate(d.getDate() - d.getDay());
+        entries.push({
+          amount: Number(t.total_spent),
+          store: t.store_name || 'Unknown',
+          date: d,
+          weekKey: weekStart.toISOString().slice(0, 10),
+        });
+      });
+
+      const total30d = entries.reduce((sum, e) => sum + e.amount, 0);
+      const total7d = entries
+        .filter(e => e.date >= sevenDaysAgo)
+        .reduce((sum, e) => sum + e.amount, 0);
 
       // Group by store
       const storeMap = new Map<string, number>();
-      records.forEach(r => {
-        const store = r.store_name || 'Unknown';
-        storeMap.set(store, (storeMap.get(store) || 0) + Number(r.price));
+      entries.forEach(e => {
+        storeMap.set(e.store, (storeMap.get(e.store) || 0) + e.amount);
       });
       const byStore = Array.from(storeMap.entries())
         .map(([name, total]) => ({ name, total }))
@@ -120,12 +161,8 @@ export function useSpendingSummary() {
 
       // Group by week
       const weekMap = new Map<string, number>();
-      records.forEach(r => {
-        const d = new Date(r.recorded_at);
-        const weekStart = new Date(d);
-        weekStart.setDate(d.getDate() - d.getDay());
-        const key = weekStart.toISOString().slice(0, 10);
-        weekMap.set(key, (weekMap.get(key) || 0) + Number(r.price));
+      entries.forEach(e => {
+        weekMap.set(e.weekKey, (weekMap.get(e.weekKey) || 0) + e.amount);
       });
       const byWeek = Array.from(weekMap.entries())
         .map(([week, total]) => ({ week, total }))
