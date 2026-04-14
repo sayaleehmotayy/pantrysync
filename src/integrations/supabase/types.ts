@@ -657,6 +657,100 @@ export type Database = {
           },
         ]
       }
+      shopping_trip_items: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          item_name: string
+          quantity_bought: number
+          total_price: number
+          trip_id: string
+          unit: string
+          unit_price: number | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          item_name: string
+          quantity_bought?: number
+          total_price?: number
+          trip_id: string
+          unit?: string
+          unit_price?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          item_name?: string
+          quantity_bought?: number
+          total_price?: number
+          trip_id?: string
+          unit?: string
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_trip_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopping_trips: {
+        Row: {
+          budget: number | null
+          created_at: string
+          currency: string
+          finished_at: string
+          household_id: string
+          id: string
+          items_count: number
+          started_at: string
+          store_name: string | null
+          total_spent: number
+          user_id: string
+        }
+        Insert: {
+          budget?: number | null
+          created_at?: string
+          currency?: string
+          finished_at?: string
+          household_id: string
+          id?: string
+          items_count?: number
+          started_at?: string
+          store_name?: string | null
+          total_spent?: number
+          user_id: string
+        }
+        Update: {
+          budget?: number | null
+          created_at?: string
+          currency?: string
+          finished_at?: string
+          household_id?: string
+          id?: string
+          items_count?: number
+          started_at?: string
+          store_name?: string | null
+          total_spent?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_trips_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_cache: {
         Row: {
           cancel_at_period_end: boolean | null

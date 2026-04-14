@@ -21,6 +21,7 @@ import AiPage from "./pages/AiPage";
 import CouponsPage from "./pages/CouponsPage";
 import SpendingPage from "./pages/SpendingPage";
 import ReceiptScannerPage from "./pages/ReceiptScannerPage";
+import ShoppingHistoryPage from "./pages/ShoppingHistoryPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import WelcomePage from "./pages/WelcomePage";
@@ -64,6 +65,7 @@ function AppRoutes() {
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/spending" element={<SpendingPage />} />
+        <Route path="/shopping-history" element={<ShoppingHistoryPage />} />
         <Route path="/recipes" element={<ProGate feature="Recipe Suggestions"><RecipesPage /></ProGate>} />
         <Route path="/chat" element={<ProGate feature="Group Chat"><ChatPage /></ProGate>} />
         <Route path="/ai" element={<ProGate feature="AI Assistant"><AiPage /></ProGate>} />

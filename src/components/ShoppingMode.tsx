@@ -1,14 +1,19 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { ShoppingItem } from '@/hooks/useShoppingList';
+import { useHousehold } from '@/contexts/HouseholdContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import {
-  ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag,
+  ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag, Store,
 } from 'lucide-react';
 import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Countable units where per-unit pricing makes sense
 const COUNTABLE_UNITS = new Set(['pieces', 'packets', 'bags', 'bottles', 'cans', 'boxes', 'cartons', 'packs', 'jars', 'tubs']);
@@ -40,17 +45,23 @@ type EntryStep = 'quantity' | 'unitPrice' | 'confirm';
 export default function ShoppingMode({ items, onMarkBought, onExit, currency }: ShoppingModeProps) {
   const curr = currency || detectCurrencyFromLocale();
   const SESSION_KEY = 'pantrysync_shopping_session';
+  const { household } = useHousehold();
+  const { user } = useAuth();
+  const qc = useQueryClient();
 
   const savedSession = useMemo(() => {
     try {
       const raw = sessionStorage.getItem(SESSION_KEY);
-      if (raw) return JSON.parse(raw) as { budget: number | null; trackedItems: TrackedItem[] };
+      if (raw) return JSON.parse(raw) as { budget: number | null; storeName: string; trackedItems: TrackedItem[]; startedAt: string };
     } catch {}
     return null;
   }, []);
 
   const [budget, setBudget] = useState<number | null>(savedSession?.budget ?? null);
   const [budgetInput, setBudgetInput] = useState('');
+  const [storeName, setStoreName] = useState(savedSession?.storeName ?? '');
+  const [storeInput, setStoreInput] = useState('');
+  const [startedAt] = useState(savedSession?.startedAt ?? new Date().toISOString());
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [entryStep, setEntryStep] = useState<EntryStep>('quantity');
   const [quantityInput, setQuantityInput] = useState('');
@@ -58,6 +69,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const [useSalePrice, setUseSalePrice] = useState(false);
   const [saleTotalInput, setSaleTotalInput] = useState('');
   const [trackedItems, setTrackedItems] = useState<TrackedItem[]>(savedSession?.trackedItems ?? []);
+  const [isFinishing, setIsFinishing] = useState(false);
   const initialized = useRef(!!savedSession);
 
   useEffect(() => {
@@ -72,9 +84,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   useEffect(() => {
     if (budget === null && trackedItems.length === 0) return;
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ budget, trackedItems }));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ budget, storeName, trackedItems, startedAt }));
     } catch {}
-  }, [budget, trackedItems]);
+  }, [budget, storeName, trackedItems, startedAt]);
 
   const clearSession = useCallback(() => {
     try { sessionStorage.removeItem(SESSION_KEY); } catch {}
@@ -170,7 +182,63 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     ));
   }, []);
 
-  // Budget setup screen
+  const finishShopping = useCallback(async () => {
+    if (!household || !user) return;
+    setIsFinishing(true);
+    try {
+      // Save trip to DB
+      const tripData = {
+        household_id: household.id,
+        user_id: user.id,
+        store_name: storeName || null,
+        budget: budget === Infinity ? null : budget,
+        total_spent: totalSpent,
+        currency: curr.code,
+        items_count: pricedItems.length,
+        started_at: startedAt,
+        finished_at: new Date().toISOString(),
+      };
+
+      const { data: trip, error: tripError } = await supabase
+        .from('shopping_trips')
+        .insert(tripData)
+        .select('id')
+        .single();
+
+      if (tripError) throw tripError;
+
+      // Save trip items
+      if (pricedItems.length > 0 && trip) {
+        const tripItems = pricedItems.map(item => ({
+          trip_id: trip.id,
+          item_name: item.name,
+          quantity_bought: item.quantityFound ?? item.quantity,
+          unit: item.unit,
+          category: item.category,
+          unit_price: item.price && item.quantityFound ? (isCountableUnit(item.unit) ? item.price / item.quantityFound : null) : null,
+          total_price: item.price ?? 0,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('shopping_trip_items')
+          .insert(tripItems);
+
+        if (itemsError) throw itemsError;
+      }
+
+      qc.invalidateQueries({ queryKey: ['shopping-trips'] });
+      clearSession();
+      toast.success(`Shopping trip saved! ${pricedItems.length} items added to pantry.`);
+      onExit();
+    } catch (err: any) {
+      console.error('Error finishing shopping:', err);
+      toast.error('Failed to save shopping trip');
+    } finally {
+      setIsFinishing(false);
+    }
+  }, [household, user, storeName, budget, totalSpent, curr, pricedItems, startedAt, clearSession, onExit, qc]);
+
+  // Budget + store setup screen
   if (budget === null) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -183,11 +251,25 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             <Target className="w-8 h-8 text-primary" />
           </div>
           <div className="text-center">
-            <h2 className="font-display font-bold text-lg">Set Your Budget</h2>
-            <p className="text-sm text-muted-foreground mt-1">How much do you want to spend this trip?</p>
+            <h2 className="font-display font-bold text-lg">Set Up Your Trip</h2>
+            <p className="text-sm text-muted-foreground mt-1">Where are you shopping and what's your budget?</p>
           </div>
 
-          <div className="text-center">
+          {/* Store name input */}
+          <div className="w-full max-w-[280px] space-y-1">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Store className="w-3.5 h-3.5" /> Store name (optional)
+            </label>
+            <Input
+              placeholder="e.g. Walmart, Costco..."
+              value={storeInput}
+              onChange={e => setStoreInput(e.target.value)}
+              className="text-center"
+            />
+          </div>
+
+          <div className="text-center mt-2">
+            <p className="text-xs text-muted-foreground mb-2">Budget</p>
             <span className="text-4xl font-bold font-display">
               {curr.symbol}{budgetInput || '0'}
             </span>
@@ -221,13 +303,13 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             className="w-full max-w-[280px] gap-2"
             size="lg"
             disabled={!budgetInput || parseFloat(budgetInput) <= 0}
-            onClick={() => setBudget(parseFloat(budgetInput))}
+            onClick={() => { setBudget(parseFloat(budgetInput)); setStoreName(storeInput); }}
           >
             <ShoppingCart className="w-4 h-4" />
             Start Shopping
           </Button>
 
-          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setBudget(Infinity)}>
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => { setBudget(Infinity); setStoreName(storeInput); }}>
             Skip — no budget
           </Button>
         </div>
@@ -450,6 +532,13 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         <ArrowLeft className="w-4 h-4" /> Back to list (session saved)
       </button>
 
+      {/* Store name badge */}
+      {storeName && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+          <Store className="w-3.5 h-3.5" /> Shopping at <span className="font-medium text-foreground">{storeName}</span>
+        </div>
+      )}
+
       {/* Budget tracker */}
       {budget !== Infinity && (
         <Card className={`${overBudget ? 'border-destructive/50 bg-destructive/5' : 'border-primary/30 bg-primary/5'}`}>
@@ -557,22 +646,45 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         </div>
       )}
 
-      {unpricedItems.length === 0 && trackedItems.length > 0 && (
-        <div className="text-center py-6">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <Check className="w-6 h-6 text-primary" />
-          </div>
-          <p className="font-display font-semibold">All items priced!</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Total: {fmt(totalSpent)}
+      {/* Finish Shopping button — always visible when there are priced items */}
+      {pricedItems.length > 0 && (
+        <Card className="border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Total ({pricedItems.length} items)</span>
+              <span className="font-bold text-lg">{fmt(totalSpent)}</span>
+            </div>
             {budget !== Infinity && remaining !== null && (
-              overBudget
-                ? <span className="text-destructive"> ({fmt(Math.abs(remaining))} over budget)</span>
-                : <span className="text-primary"> ({fmt(remaining)} under budget)</span>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{overBudget ? 'Over budget' : 'Under budget'}</span>
+                <span className={overBudget ? 'text-destructive font-medium' : 'text-primary font-medium'}>
+                  {fmt(Math.abs(remaining))}
+                </span>
+              </div>
             )}
-          </p>
-          <Button className="mt-4 gap-2" onClick={() => { clearSession(); onExit(); }}>
-            <ShoppingCart className="w-4 h-4" /> Finish Shopping
+            {unpricedItems.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {unpricedItems.length} items still unpriced — they won't be added to pantry
+              </p>
+            )}
+            <Button
+              className="w-full gap-2"
+              size="lg"
+              disabled={isFinishing}
+              onClick={finishShopping}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              {isFinishing ? 'Saving...' : 'Finish Shopping'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {unpricedItems.length === 0 && pricedItems.length === 0 && trackedItems.length === 0 && (
+        <div className="text-center py-6">
+          <p className="text-muted-foreground text-sm">No items to shop for</p>
+          <Button className="mt-4" variant="outline" onClick={() => { clearSession(); onExit(); }}>
+            Go back
           </Button>
         </div>
       )}
