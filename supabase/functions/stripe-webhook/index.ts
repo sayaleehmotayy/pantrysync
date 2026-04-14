@@ -47,6 +47,7 @@ serve(async (req) => {
     "customer.subscription.updated",
     "customer.subscription.deleted",
     "customer.subscription.trial_will_end",
+    "invoice.payment_failed",
   ];
 
   if (!relevantEvents.includes(event.type)) {
@@ -54,10 +55,29 @@ serve(async (req) => {
     return new Response(JSON.stringify({ received: true }), { status: 200 });
   }
 
-  const subscription = event.data.object as Stripe.Subscription;
-  const customerId = typeof subscription.customer === "string"
-    ? subscription.customer
-    : subscription.customer.id;
+  // For invoice.payment_failed, extract the subscription from the invoice
+  let subscription: Stripe.Subscription;
+  let customerId: string;
+
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subId = typeof invoice.subscription === "string"
+      ? invoice.subscription
+      : invoice.subscription?.id;
+    if (!subId) {
+      logStep("Invoice has no subscription, skipping");
+      return new Response(JSON.stringify({ received: true }), { status: 200 });
+    }
+    subscription = await stripe.subscriptions.retrieve(subId);
+    customerId = typeof invoice.customer === "string"
+      ? invoice.customer
+      : invoice.customer?.id ?? "";
+  } else {
+    subscription = event.data.object as Stripe.Subscription;
+    customerId = typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer.id;
+  }
 
   // Look up the customer email from Stripe
   const customer = await stripe.customers.retrieve(customerId);
@@ -72,20 +92,37 @@ serve(async (req) => {
     return new Response(JSON.stringify({ received: true }), { status: 200 });
   }
 
-  // Find Supabase user by email
-  const { data: usersData, error: userErr } = await supabase.auth.admin.listUsers();
-  if (userErr) {
-    logStep("Failed to list users", { error: userErr.message });
-    return new Response("Internal error", { status: 500 });
+  // Find Supabase user by email — use paginated search instead of listing all users
+  let userId: string | null = null;
+  let page = 1;
+  const perPage = 50;
+
+  // Try to find user efficiently by iterating pages
+  while (true) {
+    const { data: usersData, error: userErr } = await supabase.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+    if (userErr) {
+      logStep("Failed to list users", { error: userErr.message, page });
+      return new Response("Internal error", { status: 500 });
+    }
+
+    const found = usersData.users.find((u) => u.email === email);
+    if (found) {
+      userId = found.id;
+      break;
+    }
+
+    // If we got fewer results than perPage, we've exhausted all users
+    if (usersData.users.length < perPage) break;
+    page++;
   }
 
-  const user = usersData.users.find((u) => u.email === email);
-  if (!user) {
+  if (!userId) {
     logStep("No Supabase user found for email", { email });
     return new Response(JSON.stringify({ received: true }), { status: 200 });
   }
-
-  const userId = user.id;
 
   // Extract subscription details
   const item = subscription.items?.data?.[0];
@@ -103,8 +140,9 @@ serve(async (req) => {
 
   const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end ?? false;
 
-  // Map Stripe status
-  let status = subscription.status; // active, trialing, canceled, past_due, unpaid, incomplete, etc.
+  // Map Stripe status — pass through directly
+  // Stripe sends: active, trialing, canceled, past_due, unpaid, incomplete, incomplete_expired, paused
+  const status = subscription.status;
 
   logStep("Upserting subscription_cache", {
     userId,
@@ -114,6 +152,7 @@ serve(async (req) => {
     priceId,
     currentPeriodEnd,
     cancelAtPeriodEnd,
+    trialEnd,
   });
 
   // Upsert into subscription_cache (using service role — bypasses RLS)
