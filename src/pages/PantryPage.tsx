@@ -299,6 +299,12 @@ export default function PantryPage() {
         onOpenChange={setScannerOpen}
         onAddToPantry={handleScanToPantry}
       />
+
+      <BarcodeScanner
+        open={barcodeOpen}
+        onOpenChange={setBarcodeOpen}
+        onAddToPantry={handleScanToPantry}
+      />
     </div>
   );
 }
