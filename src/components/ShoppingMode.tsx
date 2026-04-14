@@ -288,7 +288,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
           <div className="space-y-4">
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">
-                Price per 1 {activeItem.unit.replace(/s$/, '')}?
+                {countable
+                  ? `Price per 1 ${activeItem.unit.replace(/s$/, '')}?`
+                  : `Total price for ${qtyFound} ${activeItem.unit}?`}
               </p>
               <span className="text-5xl font-bold font-display tabular-nums">
                 {curr.symbol}{unitPriceInput || '0.00'}
@@ -307,7 +309,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
               ))}
             </div>
 
-            {unitPrice > 0 && (
+            {countable && unitPrice > 0 && (
               <div className="text-center text-sm text-muted-foreground">
                 {qtyFound} × {fmt(unitPrice)} = <span className="font-bold text-foreground">{fmt(calculatedTotal)}</span>
               </div>
