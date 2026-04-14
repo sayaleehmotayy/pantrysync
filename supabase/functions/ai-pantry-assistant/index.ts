@@ -38,6 +38,14 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!membership) throw new Error("Not a member of this household");
+
+    // Fetch inventory for context
+    const { data: inventory } = await supabase
+      .from("inventory_items")
+      .select("name, quantity, unit, category, expiry_date, storage_location")
+      .eq("household_id", householdId);
+
+    // Fetch recent shopping history
     const { data: shopping } = await supabase
       .from("shopping_list_items")
       .select("name, quantity, unit, category, status, created_at")
