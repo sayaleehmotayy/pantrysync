@@ -39,6 +39,7 @@ const CURRENCIES = [
 export default function SettingsPage() {
   const { household, members, userRole, leaveHousehold } = useHousehold();
   const { signOut, user, subscription, checkSubscription } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
