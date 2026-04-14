@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe } from 'lucide-react';
+import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe, Moon, Sun, Monitor } from 'lucide-react';
 import { TIERS, TRIAL_DAYS, getTierByProductId, getMemberLimit, type TierKey } from '@/config/subscription';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTheme } from 'next-themes';
 
 const CURRENCIES = [
   { code: 'USD', label: 'US Dollar ($)' },
@@ -38,6 +39,7 @@ const CURRENCIES = [
 export default function SettingsPage() {
   const { household, members, userRole, leaveHousehold } = useHousehold();
   const { signOut, user, subscription, checkSubscription } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
@@ -176,6 +178,40 @@ export default function SettingsPage() {
               ))}
             </SelectContent>
           </Select>
+        </CardContent>
+      </Card>
+
+      {/* Theme */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-display flex items-center gap-2">
+            {theme === 'dark' ? <Moon className="w-4 h-4 text-primary" /> : <Sun className="w-4 h-4 text-primary" />} Appearance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-3">Choose your preferred theme.</p>
+          <div className="flex gap-2">
+            {([
+              { value: 'light', label: 'Light', icon: Sun },
+              { value: 'dark', label: 'Dark', icon: Moon },
+              { value: 'system', label: 'System', icon: Monitor },
+            ] as const).map(opt => {
+              const Icon = opt.icon;
+              const active = theme === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setTheme(opt.value)}
+                  className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-xs font-medium transition-all ${
+                    active ? 'border-primary bg-primary/5 text-primary' : 'border-border/50 text-muted-foreground hover:border-border'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 

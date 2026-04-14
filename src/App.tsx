@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { HouseholdProvider, useHousehold } from "@/contexts/HouseholdContext";
 import { ProGate } from "@/components/ProGate";
@@ -73,20 +74,22 @@ function AppRoutes() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Sonner position="top-center" />
-      <BrowserRouter>
-        <AuthProvider>
-          <HouseholdProvider>
-            <ReceiptScanProvider>
-              <AppRoutes />
-            </ReceiptScanProvider>
-          </HouseholdProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Sonner position="top-center" />
+        <BrowserRouter>
+          <AuthProvider>
+            <HouseholdProvider>
+              <ReceiptScanProvider>
+                <AppRoutes />
+              </ReceiptScanProvider>
+            </HouseholdProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
