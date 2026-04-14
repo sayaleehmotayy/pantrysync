@@ -143,18 +143,18 @@ export default function PantryPage() {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-display font-bold">Pantry</h1>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setBarcodeOpen(true)}>
-            <ScanBarcode className="w-4 h-4 mr-1" /> Barcode
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl font-display font-bold flex-shrink-0">Pantry</h1>
+        <div className="flex gap-1.5">
+          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setBarcodeOpen(true)} title="Scan barcode">
+            <ScanBarcode className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setScannerOpen(true)}>
-            <Camera className="w-4 h-4 mr-1" /> Scan
+          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setScannerOpen(true)} title="Scan product">
+            <Camera className="w-4 h-4" />
           </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add Item</Button>
+              <Button size="sm" className="h-8"><Plus className="w-4 h-4 mr-1" /> Add</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Add Pantry Item</DialogTitle></DialogHeader>
