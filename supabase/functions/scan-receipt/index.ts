@@ -279,28 +279,44 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const supabaseClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? "");
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    const { data: userData, error: userError } = await adminClient.auth.getUser(token);
     if (userError || !userData.user) throw new Error("Not authenticated");
+
+    const userId = userData.user.id;
 
     const { images, household_id } = await req.json();
     if (!Array.isArray(images) || images.length === 0 || !household_id) {
       throw new Error("Missing images array or household_id");
     }
 
+    // CRITICAL: Verify the caller is actually a member of this household
+    const { data: membership, error: memberError } = await adminClient
+      .from('household_members')
+      .select('id')
+      .eq('household_id', household_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (memberError || !membership) {
+      console.error("[SCAN-RECEIPT] Unauthorized household access attempt", { userId, household_id });
+      return new Response(
+        JSON.stringify({ error: "You are not a member of this household" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
+      );
+    }
+
     console.log(`[SCAN-RECEIPT] Received ${images.length} photos for household ${household_id}`);
 
-    // Create receipt_scan record with 'pending' status
-    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const { data: scan, error: scanError } = await adminClient
       .from('receipt_scans')
       .insert({
         household_id,
-        scanned_by: userData.user.id,
+        scanned_by: userId,
         status: 'pending',
         photo_count: images.length,
       })
@@ -311,7 +327,7 @@ serve(async (req) => {
 
     // Dispatch background processing
     EdgeRuntime.waitUntil(
-      processInBackground(scan.id, images, household_id, userData.user.id, LOVABLE_API_KEY)
+      processInBackground(scan.id, images, household_id, userId, LOVABLE_API_KEY)
     );
 
     // Return immediately with receipt ID for polling
