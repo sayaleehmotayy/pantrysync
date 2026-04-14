@@ -81,13 +81,14 @@ function ProcessingCard({ photoCount, startTime, onCheckHistory }: { photoCount:
 
 function HistoryProcessingBar({ scan }: { scan: any }) {
   const [elapsed, setElapsed] = useState(0);
-  const startRef = useRef(Date.now());
+  // Use scan created_at as start time so it persists across navigations
+  const startTime = new Date(scan.created_at).getTime();
   const est = Math.max((scan.photo_count || 1) * 8000, 8000);
 
   useEffect(() => {
-    const t = setInterval(() => setElapsed(Date.now() - startRef.current), 500);
+    const t = setInterval(() => setElapsed(Date.now() - startTime), 500);
     return () => clearInterval(t);
-  }, []);
+  }, [startTime]);
 
   const raw = Math.min((elapsed / est) * 100, 95);
   const progress = Math.round(raw < 80 ? raw : 80 + (raw - 80) * 0.5);
