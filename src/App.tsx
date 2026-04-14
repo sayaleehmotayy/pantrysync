@@ -78,7 +78,9 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <HouseholdProvider>
-            <AppRoutes />
+            <ReceiptScanProvider>
+              <AppRoutes />
+            </ReceiptScanProvider>
           </HouseholdProvider>
         </AuthProvider>
       </BrowserRouter>
