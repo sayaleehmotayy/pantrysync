@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { getTierByProductId, getMemberLimit } from '@/config/subscription';
+
 
 interface Household {
   id: string;
