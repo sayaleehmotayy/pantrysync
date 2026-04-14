@@ -504,7 +504,7 @@ export default function ReceiptScannerPage() {
 
           {/* PROCESSING */}
           {isProcessing && captureStep !== 'capture' && (
-            <ProcessingCard photoCount={photoCount} onCheckHistory={() => setTab('history')} />
+            <ProcessingCard photoCount={photoCount} startTime={processingStartTime || Date.now()} onCheckHistory={() => setTab('history')} />
           )}
 
           {/* CAPTURE */}
