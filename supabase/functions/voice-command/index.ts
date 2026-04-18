@@ -42,21 +42,67 @@ CRITICAL RULES:
 10. When a user says "I ate/had/consumed/drank X", check if X exists in the pantry. If so, use the existing unit and reduce by the appropriate amount. If the item has quantity in pieces, reduce by 1. If in kg/g/l/ml, reduce by a reasonable single serving.
 11. **CRITICAL UNIT CONVERSION**: When the user says a quantity in a unit DIFFERENT from the unit stored in inventory, you MUST convert it to the inventory's stored unit before deducting. The "quantity" and "unit" fields you return MUST match the inventory item's existing unit.
 
-   Common conversions (use sensible food-density defaults):
-   - 1 cup uncooked rice / grains / flour ≈ 0.2 kg (200 g)
-   - 1 cup sugar ≈ 0.2 kg
-   - 1 cup oats ≈ 0.09 kg (90 g)
-   - 1 cup liquid (milk, water, oil) ≈ 0.24 l (240 ml)
-   - 1 tbsp ≈ 15 ml or 15 g
-   - 1 tsp ≈ 5 ml or 5 g
-   - 1 glass ≈ 0.25 l (250 ml)
-   - 1 bottle of water ≈ 0.5 l
-   - 1 slice of bread ≈ 0.03 kg (30 g)
-   - 1 g = 0.001 kg ; 1 ml = 0.001 l ; 1 kg = 1000 g ; 1 l = 1000 ml
+   Common conversions (use sensible food-density / portion defaults):
 
-   Example: Inventory has "Basmati Rice (54 kg, pantry)". User says "I ate 2 cups of basmati rice".
-   → 2 cups uncooked rice ≈ 0.4 kg → return: { type: "update_quantity", name: "Basmati Rice", quantity: 0.4, unit: "kg", storage_location: "pantry", category: "Grains" }
-   NEVER return quantity:2, unit:"cups" when inventory stores it in kg — always convert first.
+   GRAINS / DRY GOODS (per 1 cup, uncooked):
+   - rice / basmati / jasmine / quinoa ≈ 0.2 kg (200 g)
+   - flour (all-purpose / wheat) ≈ 0.125 kg (125 g)
+   - sugar ≈ 0.2 kg ; brown sugar ≈ 0.22 kg
+   - oats / rolled oats ≈ 0.09 kg (90 g)
+   - lentils / dal / beans (dry) ≈ 0.2 kg
+   - pasta (dry) ≈ 0.1 kg (100 g)
+   - cereal / cornflakes ≈ 0.03 kg (30 g)
+
+   LIQUIDS:
+   - 1 cup ≈ 0.24 l (240 ml) ; 1 glass ≈ 0.25 l ; 1 mug ≈ 0.3 l
+   - 1 tbsp ≈ 15 ml ; 1 tsp ≈ 5 ml
+   - 1 standard water bottle ≈ 0.5 l ; 1 large ≈ 1 l or 1.5 l
+   - 1 can of soda ≈ 0.33 l
+
+   MEAT / POULTRY / FISH (typical raw piece weight):
+   - 1 chicken leg (drumstick) ≈ 0.12 kg (120 g)
+   - 1 chicken thigh ≈ 0.15 kg (150 g)
+   - 1 whole chicken leg quarter (drumstick + thigh) ≈ 0.3 kg
+   - 1 chicken breast ≈ 0.2 kg (200 g)
+   - 1 chicken wing ≈ 0.05 kg (50 g)
+   - 1 whole chicken ≈ 1.5 kg
+   - 1 fish fillet ≈ 0.15 kg ; 1 whole fish ≈ 0.5 kg
+   - 1 steak ≈ 0.25 kg ; 1 lamb chop ≈ 0.1 kg
+   - 1 sausage ≈ 0.07 kg ; 1 strip of bacon ≈ 0.015 kg
+
+   BREAD / BAKED:
+   - 1 slice of bread ≈ 0.03 kg (30 g) ; 1 loaf ≈ 0.5 kg
+   - 1 roll / bun ≈ 0.06 kg ; 1 tortilla / chapati ≈ 0.04 kg
+
+   DAIRY / EGGS:
+   - 1 egg ≈ 0.05 kg (50 g)
+   - 1 slice cheese ≈ 0.02 kg ; 1 stick butter ≈ 0.113 kg
+   - 1 cup yogurt ≈ 0.245 kg
+
+   PRODUCE (per 1 piece):
+   - 1 apple/orange/onion/tomato (medium) ≈ 0.15 kg
+   - 1 banana ≈ 0.12 kg ; 1 potato (medium) ≈ 0.2 kg
+   - 1 carrot ≈ 0.06 kg ; 1 clove garlic ≈ 0.005 kg ; 1 lemon ≈ 0.06 kg
+
+   FRACTIONS OF A CONTAINER — when user says "half / quarter / a third of the [bottle/jar/box/pack/bag]":
+   - Compute the deduction as fraction × current_inventory_quantity for that item, in the inventory's existing unit.
+   - Example: ketchup is "Ketchup (1 bottles, fridge)" with no weight info → return quantity:0.5 unit:"bottles".
+   - Example: ketchup is "Ketchup (0.5 l, fridge)" → "half the bottle" → quantity:0.25 unit:"l".
+   - Example: rice is "Basmati Rice (54 kg, pantry)" → "half a bag" only applies if user says half a bag — otherwise treat plain consumption normally.
+
+   UNIT IDENTITIES: 1 g = 0.001 kg ; 1 ml = 0.001 l ; 1 kg = 1000 g ; 1 l = 1000 ml.
+
+   WORKED EXAMPLES:
+   - Inventory: "Basmati Rice (54 kg, pantry)". User: "I ate 2 cups of basmati rice".
+     → 2 × 0.2 = 0.4 kg → { type:"update_quantity", name:"Basmati Rice", quantity:0.4, unit:"kg", storage_location:"pantry", category:"Grains" }
+   - Inventory: "Chicken (3 kg, fridge)". User: "I ate two chicken leg pieces".
+     → 2 × 0.12 = 0.24 kg → { type:"update_quantity", name:"Chicken", quantity:0.24, unit:"kg", storage_location:"fridge", category:"Meat" }
+   - Inventory: "Ketchup (1 bottles, fridge)". User: "I used half the ketchup bottle".
+     → 0.5 × 1 = 0.5 → { type:"update_quantity", name:"Ketchup", quantity:0.5, unit:"bottles", storage_location:"fridge", category:"Sauces" }
+   - Inventory: "Milk (2 l, fridge)". User: "I drank a glass of milk".
+     → 1 × 0.25 = 0.25 l → { type:"update_quantity", name:"Milk", quantity:0.25, unit:"l", storage_location:"fridge", category:"Dairy" }
+
+   NEVER return a unit that differs from the matched inventory item's unit — always convert first using the tables above. If you genuinely have no conversion data, estimate conservatively rather than mismatching units.
 
 Action types:
 - "remove_inventory": Remove item entirely (ate all, finished, threw away)
