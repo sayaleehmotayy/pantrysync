@@ -226,8 +226,63 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         if (itemsError) throw itemsError;
       }
 
+      // Commit purchases to pantry + clean up shopping list.
+      // Aggregate by dbId so partial + remaining rows resolve correctly.
+      const boughtByDbId = new Map<string, { name: string; unit: string; category: string; qtyBought: number; originalQty: number }>();
+      for (const item of pricedItems) {
+        const qty = item.quantityFound ?? item.quantity;
+        if (qty <= 0) continue;
+        const existing = boughtByDbId.get(item.dbId);
+        if (existing) {
+          existing.qtyBought += qty;
+        } else {
+          const originalQty = trackedItems
+            .filter(t => t.dbId === item.dbId)
+            .reduce((s, t) => s + t.quantity, 0);
+          boughtByDbId.set(item.dbId, {
+            name: item.name, unit: item.unit, category: item.category,
+            qtyBought: qty, originalQty,
+          });
+        }
+      }
+
+      for (const [dbId, info] of boughtByDbId) {
+        const { data: existing } = await supabase
+          .from('inventory_items')
+          .select('id, quantity')
+          .eq('household_id', household.id)
+          .ilike('name', info.name)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from('inventory_items')
+            .update({ quantity: Number(existing.quantity) + info.qtyBought })
+            .eq('id', existing.id);
+        } else {
+          await supabase.from('inventory_items').insert({
+            household_id: household.id,
+            name: info.name,
+            quantity: info.qtyBought,
+            unit: info.unit,
+            category: info.category,
+            added_by: user.id,
+          });
+        }
+
+        const remaining = info.originalQty - info.qtyBought;
+        if (remaining <= 0) {
+          await supabase.from('shopping_list_items').delete().eq('id', dbId);
+        } else {
+          await supabase.from('shopping_list_items')
+            .update({ quantity: remaining, status: 'pending', bought_quantity: 0 })
+            .eq('id', dbId);
+        }
+      }
+
       qc.invalidateQueries({ queryKey: ['shopping-trips'] });
       qc.invalidateQueries({ queryKey: ['spending_summary'] });
+      qc.invalidateQueries({ queryKey: ['shopping'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
       clearSession();
       toast.success(`Shopping trip saved! ${pricedItems.length} items added to pantry.`);
       onExit();
@@ -237,7 +292,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     } finally {
       setIsFinishing(false);
     }
-  }, [household, user, storeName, budget, totalSpent, curr, pricedItems, startedAt, clearSession, onExit, qc]);
+  }, [household, user, storeName, budget, totalSpent, curr, pricedItems, trackedItems, startedAt, clearSession, onExit, qc]);
 
   // Budget + store setup screen
   if (budget === null) {

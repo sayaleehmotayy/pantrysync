@@ -91,16 +91,9 @@ export default function ShoppingPage() {
     toast.success(`${item.name} added to pantry via scan!`);
   };
 
-  const handleShoppingModeBought = (id: string, price: number, quantityFound?: number) => {
-    const item = items.find(i => i.id === id);
-    const qty = quantityFound ?? item?.quantity ?? 1;
-    if (qty < (item?.quantity ?? 1)) {
-      // Partial buy — only bought some
-      updateItem.mutate({ id, status: 'partial', bought_quantity: qty });
-    } else {
-      // Full buy
-      updateItem.mutate({ id, status: 'bought', bought_quantity: qty });
-    }
+  const handleShoppingModeBought = (_id: string, _price: number, _quantityFound?: number) => {
+    // No-op during the trip. ShoppingMode tracks purchases locally and
+    // commits them to pantry + shopping list on "Finish Shopping".
   };
 
   // Shopping Mode
