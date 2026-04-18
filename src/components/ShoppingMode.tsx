@@ -762,6 +762,28 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
           </Button>
         </div>
       )}
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End shopping trip?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pricedItems.length > 0
+                ? `You have ${pricedItems.length} item(s) in your cart. Ending now will discard them — they won't be saved or added to your pantry.`
+                : 'This will end your current shopping session.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Shopping</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={cancelTrip}
+            >
+              End Trip
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
