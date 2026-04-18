@@ -77,12 +77,15 @@ export function formatCurrency(amount: number, currency: CurrencyInfo): string {
 
 /** React hook for easy currency formatting using user's profile preference */
 export function useCurrency() {
-  const defaultCurrency = detectCurrencyFromLocale();
-  
+  // Lazy import to avoid circular deps; useUserCurrency depends on AuthContext.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { useUserCurrency } = require('@/hooks/useUserCurrency');
+  const userCurrency: CurrencyInfo = useUserCurrency();
+
   const formatPrice = (amount: number, currencyCode?: string) => {
-    const info = currencyCode ? getCurrencyInfo(currencyCode) : defaultCurrency;
+    const info = currencyCode ? getCurrencyInfo(currencyCode) : userCurrency;
     return formatCurrency(amount, info);
   };
 
-  return { formatPrice, currency: defaultCurrency };
+  return { formatPrice, currency: userCurrency };
 }
