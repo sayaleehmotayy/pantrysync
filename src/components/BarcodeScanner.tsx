@@ -23,6 +23,13 @@ interface BarcodeScannerProps {
     storage_location?: string;
     min_threshold?: number;
   }) => void;
+  onAddToShoppingList?: (item: {
+    name: string;
+    quantity: number;
+    unit: string;
+    category: string;
+  }) => void;
+  defaultDestination?: 'pantry' | 'shopping';
 }
 
 interface ProductResult {
@@ -38,12 +45,14 @@ interface ProductResult {
   nutritional_info: string | null;
 }
 
-export default function BarcodeScanner({ open, onOpenChange, onAddToPantry }: BarcodeScannerProps) {
+export default function BarcodeScanner({ open, onOpenChange, onAddToPantry, onAddToShoppingList, defaultDestination = 'shopping' }: BarcodeScannerProps) {
   const [step, setStep] = useState<'scan' | 'manual' | 'looking' | 'review' | 'not_found'>('scan');
   const [product, setProduct] = useState<ProductResult | null>(null);
   const [editedProduct, setEditedProduct] = useState<ProductResult & { expiry_date: string }>({} as any);
   const [manualBarcode, setManualBarcode] = useState('');
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [destination, setDestination] = useState<'pantry' | 'shopping'>(defaultDestination);
+  const [source, setSource] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -74,8 +83,10 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry }: Ba
       if (data?.found && data.product) {
         setProduct(data.product);
         setEditedProduct({ ...data.product, expiry_date: '' });
+        setSource(data.source || 'database');
+        setDestination(defaultDestination);
         setStep('review');
-        toast.success('Product found!');
+        toast.success(data.source === 'ai' ? 'Product identified via web search!' : 'Product found!');
       } else {
         setStep('not_found');
       }
@@ -143,15 +154,24 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry }: Ba
 
   const handleConfirmAdd = () => {
     if (!editedProduct) return;
-    onAddToPantry({
-      name: editedProduct.name,
-      quantity: editedProduct.quantity,
-      unit: editedProduct.unit,
-      category: editedProduct.category,
-      expiry_date: editedProduct.expiry_date || null,
-      storage_location: editedProduct.storage_location,
-      min_threshold: 0,
-    });
+    if (destination === 'shopping' && onAddToShoppingList) {
+      onAddToShoppingList({
+        name: editedProduct.name,
+        quantity: editedProduct.quantity,
+        unit: editedProduct.unit,
+        category: editedProduct.category,
+      });
+    } else {
+      onAddToPantry({
+        name: editedProduct.name,
+        quantity: editedProduct.quantity,
+        unit: editedProduct.unit,
+        category: editedProduct.category,
+        expiry_date: editedProduct.expiry_date || null,
+        storage_location: editedProduct.storage_location,
+        min_threshold: 0,
+      });
+    }
     handleClose();
   };
 
@@ -301,6 +321,11 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry }: Ba
               <DialogTitle className="flex items-center gap-2">
                 <Check className="w-5 h-5 text-primary" /> Product Found
               </DialogTitle>
+              <p className="text-xs text-muted-foreground">
+                {source === 'ai'
+                  ? 'Identified via web search — please review the details.'
+                  : 'Where would you like to add it?'}
+              </p>
             </DialogHeader>
 
             <div className="p-4 pt-2 space-y-3">
@@ -312,6 +337,31 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry }: Ba
                     alt={product.name}
                     className="w-24 h-24 object-contain rounded-lg border border-border"
                   />
+                </div>
+              )}
+
+              {/* Destination toggle */}
+              {onAddToShoppingList && (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Add to</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={destination === 'shopping' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setDestination('shopping')}
+                    >
+                      Shopping List
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={destination === 'pantry' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setDestination('pantry')}
+                    >
+                      Pantry
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -351,23 +401,27 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry }: Ba
                     <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground mb-1 block">Storage</label>
-                  <Select value={editedProduct.storage_location} onValueChange={v => setEditedProduct({ ...editedProduct, storage_location: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{LOCATIONS.map(l => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+                {destination === 'pantry' && (
+                  <div className="flex-1">
+                    <label className="text-xs text-muted-foreground mb-1 block">Storage</label>
+                    <Select value={editedProduct.storage_location} onValueChange={v => setEditedProduct({ ...editedProduct, storage_location: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{LOCATIONS.map(l => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Expiry Date</label>
-                <Input
-                  type="date"
-                  value={editedProduct.expiry_date || ''}
-                  onChange={e => setEditedProduct({ ...editedProduct, expiry_date: e.target.value })}
-                />
-              </div>
+              {destination === 'pantry' && (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Expiry Date</label>
+                  <Input
+                    type="date"
+                    value={editedProduct.expiry_date || ''}
+                    onChange={e => setEditedProduct({ ...editedProduct, expiry_date: e.target.value })}
+                  />
+                </div>
+              )}
 
               {/* Extra info */}
               {(product?.brand || product?.barcode || product?.ingredients || product?.nutritional_info) && (
@@ -393,7 +447,7 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry }: Ba
                   <RotateCcw className="w-4 h-4 mr-1" /> Scan another
                 </Button>
                 <Button className="flex-1" onClick={handleConfirmAdd}>
-                  <Check className="w-4 h-4 mr-1" /> Add to Pantry
+                  <Check className="w-4 h-4 mr-1" /> Add to {destination === 'shopping' ? 'Shopping List' : 'Pantry'}
                 </Button>
               </div>
             </div>
