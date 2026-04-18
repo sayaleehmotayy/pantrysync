@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, format, isBefore, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
+import { formatQty } from '@/lib/utils';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Frozen', 'Sauces', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'bottles', 'packets'];
@@ -240,7 +241,7 @@ export default function PantryPage() {
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                        <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
+                        <span className="text-xs text-muted-foreground">{formatQty(item.quantity)} {item.unit}</span>
                         <span className="text-xs text-muted-foreground">·</span>
                         <span className="text-xs text-muted-foreground capitalize">{item.storage_location}</span>
                         {item.expiry_date && (
@@ -330,7 +331,7 @@ export default function PantryPage() {
             className="space-y-4"
           >
             <p className="text-sm text-muted-foreground">
-              Currently {restockTarget?.quantity} {restockTarget?.unit} in {restockTarget?.storage_location}. How much do you want to restock?
+              Currently {formatQty(restockTarget?.quantity)} {restockTarget?.unit} in {restockTarget?.storage_location}. How much do you want to restock?
             </p>
             <div className="flex gap-3">
               <Input
@@ -366,7 +367,7 @@ export default function PantryPage() {
               Are you sure you want to remove{' '}
               <span className="font-semibold text-foreground">{deleteTarget?.name}</span>
               {deleteTarget && (
-                <> ({deleteTarget.quantity} {deleteTarget.unit})</>
+                <> ({formatQty(deleteTarget.quantity)} {deleteTarget.unit})</>
               )}{' '}
               from your pantry? This can't be undone.
             </AlertDialogDescription>

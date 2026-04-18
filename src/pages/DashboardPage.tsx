@@ -18,6 +18,7 @@ import {
   ChevronRight, Plus, ChefHat, MessageCircle, Check, Trash2, Sparkles
 } from 'lucide-react';
 import { formatDistanceToNow, isBefore, addDays } from 'date-fns';
+import { formatQty } from '@/lib/utils';
 
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp'];
 
@@ -196,7 +197,7 @@ export default function DashboardPage() {
                     <div className="w-1.5 h-1.5 rounded-full bg-warning" />
                     <span>{item.name}</span>
                   </div>
-                  <span className="text-warning font-semibold text-xs">{item.quantity} {item.unit}</span>
+                  <span className="text-warning font-semibold text-xs">{formatQty(item.quantity)} {item.unit}</span>
                 </div>
               ))}
             </div>
@@ -269,7 +270,7 @@ export default function DashboardPage() {
                       </button>
                     </div>
                     <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      <span className="text-xs text-muted-foreground mr-1">{item.quantity} {item.unit}</span>
+                      <span className="text-xs text-muted-foreground mr-1">{formatQty(item.quantity)} {item.unit}</span>
                       <Button
                         variant="ghost"
                         size="icon"

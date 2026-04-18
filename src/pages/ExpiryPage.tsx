@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { format, differenceInDays, isBefore, addDays } from 'date-fns';
+import { formatQty } from '@/lib/utils';
 
 type ExpiryStatus = 'expired' | 'expiring' | 'safe';
 
@@ -78,7 +79,7 @@ export default function ExpiryPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {item.quantity} {item.unit} · {item.storage_location}
+                          {formatQty(item.quantity)} {item.unit} · {item.storage_location}
                         </p>
                       </div>
                       <div className="text-right ml-2">
