@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
 import ShoppingMode from '@/components/ShoppingMode';
 import { getCurrencyInfo, type CurrencyInfo } from '@/lib/currency';
+import { guessCategory } from '@/lib/categorize';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp'];
