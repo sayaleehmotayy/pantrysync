@@ -125,6 +125,7 @@ export default function SettingsPage() {
     if (error) {
       toast.error('Failed to update currency');
     } else {
+      qc.invalidateQueries({ queryKey: ['user-preferred-currency'] });
       toast.success(`Currency set to ${value}`);
     }
   };
