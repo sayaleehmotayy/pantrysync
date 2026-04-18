@@ -161,8 +161,14 @@ export default function PantryPage() {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-display font-bold flex-shrink-0">Pantry</h1>
         <div className="flex gap-1.5">
-          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setBarcodeOpen(true)} title="Scan barcode">
-            <ScanBarcode className="w-4 h-4" />
+          <Button
+            size="icon"
+            variant={simplified ? 'default' : 'outline'}
+            className="h-8 w-8"
+            onClick={() => setSimplified(s => !s)}
+            title={simplified ? 'Show full names' : 'Simplify names'}
+          >
+            <Sparkles className="w-4 h-4" />
           </Button>
           <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setScannerOpen(true)} title="Scan product">
             <Camera className="w-4 h-4" />
