@@ -7,7 +7,7 @@ export interface CurrencyInfo {
 }
 
 const CURRENCY_MAP: Record<string, CurrencyInfo> = {
-  EUR: { code: 'EUR', symbol: '€', locale: 'de-DE' },
+  EUR: { code: 'EUR', symbol: '€', locale: 'en-IE' },
   USD: { code: 'USD', symbol: '$', locale: 'en-US' },
   GBP: { code: 'GBP', symbol: '£', locale: 'en-GB' },
   CAD: { code: 'CAD', symbol: 'CA$', locale: 'en-CA' },
