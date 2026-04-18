@@ -75,7 +75,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const initialized = useRef(!!savedSession);
 
   const cancelTrip = useCallback(() => {
-    clearSession();
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
     toast.success('Shopping session ended');
     onExit();
   }, [onExit]);
