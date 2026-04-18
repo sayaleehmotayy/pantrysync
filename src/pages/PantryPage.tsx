@@ -91,7 +91,7 @@ export default function PantryPage() {
   const [filterCat, setFilterCat] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [simplified, setSimplified] = useState(false);
+  
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
