@@ -214,6 +214,21 @@ export default function CouponsPage() {
 
   const selectStoreForCode = (name: string) => { setStoreName(name); addRecentStore(name); setCodeDialogOpen(true); };
   const selectStoreForPhoto = (name: string) => { setPhotoStoreName(name); addRecentStore(name); setPhotoDialogOpen(true); };
+  const openCouponForCheckout = async (item: DiscountCode) => {
+    setOpeningBarcodeId(item.id);
+    try {
+      let imageUrl = signedUrls[item.id];
+      if (!imageUrl && item.receipt_image_url) {
+        imageUrl = await getSignedUrl(item.receipt_image_url);
+        if (imageUrl) {
+          setSignedUrls(prev => ({ ...prev, [item.id]: imageUrl }));
+        }
+      }
+      setBarcodeFor(item);
+    } finally {
+      setOpeningBarcodeId(null);
+    }
+  };
 
   const handleCodeSubmit = async () => {
     if (!household || !user) return;
