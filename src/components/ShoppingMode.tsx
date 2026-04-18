@@ -853,7 +853,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {item.quantityFound ?? item.quantity} {item.unit}
+                      {item.quantityFound ?? item.quantity} {item.boughtUnit || item.unit}
+                      {item.packSize ? ` × ${item.packSize} ${item.packSizeUnit}` : ''}
                     </p>
                   </div>
                 </div>
