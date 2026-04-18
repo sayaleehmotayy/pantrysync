@@ -31,11 +31,19 @@ interface VoiceAction {
   _originalGrams?: number | null;
 }
 
+type UndoSnapshot =
+  | { kind: 'inventory_update'; id: string; previousQuantity: number; name: string }
+  | { kind: 'inventory_delete'; row: any; name: string }
+  | { kind: 'inventory_insert'; id: string; name: string }
+  | { kind: 'shopping_insert'; id: string; name: string }
+  | { kind: 'shopping_delete'; row: any; name: string };
+
 export default function VoiceCommandBar() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [pendingActions, setPendingActions] = useState<VoiceAction[] | null>(null);
+  const [mediumActions, setMediumActions] = useState<VoiceAction[] | null>(null);
   const recognitionRef = useRef<any>(null);
   const { household } = useHousehold();
   const { user } = useAuth();
