@@ -471,7 +471,7 @@ export default function ChatPage() {
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className="max-w-[80%] group">
                   {!isMe && (
-                    <p className="text-[10px] text-muted-foreground mb-0.5 px-1">{msg.sender_name}</p>
+                    <p className="text-[10px] text-muted-foreground mb-0.5 px-1">{resolveSenderName(msg.user_id)}</p>
                   )}
                   <div className={`rounded-2xl px-3 py-2 text-sm transition-all duration-200 ${isMe ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm'}`}>
                     {renderMessageContent(msg.content)}
