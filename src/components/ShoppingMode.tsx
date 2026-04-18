@@ -685,7 +685,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                   <div className="flex items-center gap-2">
                     <Tag className="w-4 h-4 text-primary shrink-0" />
                     <p className="text-sm text-muted-foreground">
-                      Sale total for {qtyFound} {activeItem.unit}:
+                      Sale total for {qtyFound} {effectiveUnit}:
                     </p>
                   </div>
                   <div className="flex gap-2">
