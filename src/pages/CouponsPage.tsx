@@ -402,7 +402,7 @@ export default function CouponsPage() {
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
                     {item.receipt_image_url && signedUrls[item.id] && (
-                      <button onClick={() => setPreviewImage(signedUrls[item.id])} className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted">
+                      <button onClick={() => setBarcodeFor(item)} className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted" title="Show at checkout">
                         <img src={signedUrls[item.id]} alt="Coupon" className="w-full h-full object-cover" />
                       </button>
                     )}
@@ -433,7 +433,11 @@ export default function CouponsPage() {
                             <Copy className="w-3 h-3 text-muted-foreground" />
                           </button>
                         )}
-                        {item.code === 'RECEIPT' && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Camera className="w-3 h-3" /> Photo</span>}
+                        {item.code === 'RECEIPT' && (
+                          <button onClick={() => setBarcodeFor(item)} className="text-[10px] text-primary font-semibold flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20">
+                            <Camera className="w-3 h-3" /> Show photo
+                          </button>
+                        )}
                       </div>
                       {item.description && <p className="text-xs text-muted-foreground mt-1 truncate">{item.description}</p>}
                       {(item.min_spend || item.conditions) && (
@@ -668,6 +672,7 @@ export default function CouponsPage() {
         code={barcodeFor?.code || ''}
         storeName={barcodeFor?.store_name}
         title={barcodeFor?.title || barcodeFor?.discount_text}
+        fallbackImageUrl={barcodeFor ? signedUrls[barcodeFor.id] : null}
       />
     </div>
   );
