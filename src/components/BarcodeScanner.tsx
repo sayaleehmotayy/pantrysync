@@ -83,8 +83,10 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry, onAd
       if (data?.found && data.product) {
         setProduct(data.product);
         setEditedProduct({ ...data.product, expiry_date: '' });
+        setSource(data.source || 'database');
+        setDestination(defaultDestination);
         setStep('review');
-        toast.success('Product found!');
+        toast.success(data.source === 'ai' ? 'Product identified via web search!' : 'Product found!');
       } else {
         setStep('not_found');
       }
