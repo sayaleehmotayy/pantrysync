@@ -526,42 +526,50 @@ export default function VoiceCommandBar() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-            {pendingActions?.map((a, idx) => (
-              <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-2 bg-muted/30">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium text-sm">{a.name}</p>
-                  <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-warning/15 text-warning font-semibold">
-                    needs review
-                  </span>
-                </div>
-                {a.original_pieces && a.food_key && (
-                  <p className="text-xs text-muted-foreground">
-                    {a.original_pieces} × {a.original_size ?? 'medium'} {a.food_key.replace(/_/g, ' ')}
-                    {a.grams != null && ` ≈ ${a.grams} g`}
-                  </p>
-                )}
-                {a.reason && <p className="text-[11px] text-muted-foreground italic">{a.reason}</p>}
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Quantity</label>
-                    <Input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={a.quantity}
-                      onChange={e => {
-                        const v = Number(e.target.value);
-                        setPendingActions(prev => prev?.map((p, i) => i === idx ? { ...p, quantity: v } : p) ?? null);
-                      }}
-                    />
+            {pendingActions?.map((a, idx) => {
+              const sourceLabel =
+                a.source === 'ai' ? { text: 'AI estimate', cls: 'bg-accent/15 text-accent' }
+                : a.source === 'learned' ? { text: 'learned', cls: 'bg-primary/15 text-primary' }
+                : a.source === 'config' ? { text: 'default', cls: 'bg-muted text-muted-foreground' }
+                : { text: 'needs review', cls: 'bg-warning/15 text-warning' };
+              return (
+                <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-2 bg-muted/30">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-sm">{a.name}</p>
+                    <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold ${sourceLabel.cls}`}>
+                      {sourceLabel.text}
+                    </span>
                   </div>
-                  <div className="w-20">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Unit</label>
-                    <Input value={a.unit} disabled />
+                  {a.original_pieces && a.food_key && (
+                    <p className="text-xs text-muted-foreground">
+                      {a.original_pieces} × {a.original_size ?? 'medium'} {a.food_key.replace(/_/g, ' ')}
+                      {a.grams != null && ` ≈ ${a.grams} g`}
+                    </p>
+                  )}
+                  {a.ai_reasoning && <p className="text-[11px] text-muted-foreground">💡 {a.ai_reasoning}</p>}
+                  {a.reason && <p className="text-[11px] text-muted-foreground italic">{a.reason}</p>}
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Quantity</label>
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={a.quantity}
+                        onChange={e => {
+                          const v = Number(e.target.value);
+                          setPendingActions(prev => prev?.map((p, i) => i === idx ? { ...p, quantity: v } : p) ?? null);
+                        }}
+                      />
+                    </div>
+                    <div className="w-20">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Unit</label>
+                      <Input value={a.unit} disabled />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPendingActions(null)}>Cancel</Button>
@@ -569,6 +577,12 @@ export default function VoiceCommandBar() {
               onClick={async () => {
                 const toRun = pendingActions ?? [];
                 setPendingActions(null);
+                // Persist learned corrections for any action where the user edited the quantity.
+                for (const a of toRun) {
+                  if (a._originalQuantity != null && a.quantity !== a._originalQuantity) {
+                    await learnCorrection(a);
+                  }
+                }
                 await executeActions(toRun);
               }}
             >
