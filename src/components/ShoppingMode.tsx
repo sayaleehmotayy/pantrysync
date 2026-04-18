@@ -265,7 +265,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             name: info.name,
             quantity: info.qtyBought,
             unit: info.unit,
-            category: info.category,
+            category: info.category && info.category !== 'Other' ? info.category : guessCategory(info.name, 'Other'),
             added_by: user.id,
           });
         }
