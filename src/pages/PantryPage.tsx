@@ -241,7 +241,7 @@ export default function PantryPage() {
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                        <span className="text-xs text-muted-foreground">{item.quantity} {item.unit}</span>
+                        <span className="text-xs text-muted-foreground">{formatQty(item.quantity)} {item.unit}</span>
                         <span className="text-xs text-muted-foreground">·</span>
                         <span className="text-xs text-muted-foreground capitalize">{item.storage_location}</span>
                         {item.expiry_date && (
