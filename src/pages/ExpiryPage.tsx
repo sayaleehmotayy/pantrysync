@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { format, differenceInDays, isBefore, addDays } from 'date-fns';
+import { formatQty } from '@/lib/utils';
 
 type ExpiryStatus = 'expired' | 'expiring' | 'safe';
 
