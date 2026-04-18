@@ -433,7 +433,11 @@ export default function CouponsPage() {
                             <Copy className="w-3 h-3 text-muted-foreground" />
                           </button>
                         )}
-                        {item.code === 'RECEIPT' && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Camera className="w-3 h-3" /> Photo</span>}
+                        {item.code === 'RECEIPT' && (
+                          <button onClick={() => setBarcodeFor(item)} className="text-[10px] text-primary font-semibold flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20">
+                            <Camera className="w-3 h-3" /> Show photo
+                          </button>
+                        )}
                       </div>
                       {item.description && <p className="text-xs text-muted-foreground mt-1 truncate">{item.description}</p>}
                       {(item.min_spend || item.conditions) && (
