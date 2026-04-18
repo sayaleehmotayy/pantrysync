@@ -44,9 +44,31 @@ export default function DashboardPage() {
   const [partialUnit, setPartialUnit] = useState('pieces');
   const [deleteTarget, setDeleteTarget] = useState<ShoppingItem | null>(null);
 
-  const recentlyBought = shopping
-    .filter(i => i.status === 'bought')
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const { data: recentlyBought = [] } = useQuery({
+    queryKey: ['recently-bought', household?.id],
+    queryFn: async () => {
+      if (!household) return [];
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: trips, error: tripsErr } = await supabase
+        .from('shopping_trips')
+        .select('id, finished_at')
+        .eq('household_id', household.id)
+        .gte('finished_at', since);
+      if (tripsErr) throw tripsErr;
+      if (!trips || trips.length === 0) return [];
+      const tripMap = new Map(trips.map(t => [t.id, t.finished_at]));
+      const { data: items, error } = await supabase
+        .from('shopping_trip_items')
+        .select('*')
+        .in('trip_id', trips.map(t => t.id));
+      if (error) throw error;
+      return (items || [])
+        .map(i => ({ ...i, finished_at: tripMap.get(i.trip_id) as string }))
+        .sort((a, b) => new Date(b.finished_at).getTime() - new Date(a.finished_at).getTime());
+    },
+    enabled: !!household,
+    refetchInterval: 60000,
+  });
 
   const lowStock = inventory.filter(i => i.min_threshold > 0 && i.quantity <= i.min_threshold);
   const expiringSoon = inventory.filter(i => getExpiryStatus(i.expiry_date) === 'expiring');
