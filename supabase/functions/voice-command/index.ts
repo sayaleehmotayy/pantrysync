@@ -91,26 +91,36 @@ function computeDeduction(args: {
   inventoryItem: InventoryItem | null;
   category?: string;
   learnedOverrides?: LearnedOverride[];
-}): { quantity: number; unit: string; grams: number | null; confidence: "high" | "low"; reason: string; source: "config" | "learned" | "ai" | "raw" | "fraction" } {
+}): { quantity: number; unit: string; grams: number | null; confidence: "high" | "medium" | "low"; reason: string; source: "config" | "learned" | "ai" | "raw" | "fraction" } {
   const inv = args.inventoryItem;
   const invUnit = inv?.unit ?? args.rawUnit ?? "pieces";
   const overrides = args.learnedOverrides ?? [];
 
-  const toInvUnit = (grams: number, source: "config" | "learned" | "ai", reason: string, confidence: "high" | "low") => {
-    if (invUnit === "kg") return { quantity: +(grams / 1000).toFixed(3), unit: "kg", grams, confidence, reason, source };
-    if (invUnit === "g")  return { quantity: Math.round(grams), unit: "g", grams, confidence, reason, source };
-    if (invUnit === "pieces" && args.pieces) return { quantity: args.pieces, unit: "pieces", grams, confidence, reason, source };
-    return { quantity: args.pieces ?? +(grams / 1000).toFixed(3), unit: invUnit, grams, confidence: "low" as const, reason: `${reason} (unit mismatch ${invUnit})`, source };
+  // Convert a gram value into the inventory's unit. NEVER coerce grams into "pieces"
+  // (that produced bugs like "0.012 pieces"). If inv is piece-based but we computed grams,
+  // we either keep pieces (when we have a piece count) or downgrade confidence.
+  const toInvUnit = (grams: number, source: "config" | "learned" | "ai", reason: string, baseConfidence: "high" | "medium" | "low") => {
+    if (invUnit === "kg") return { quantity: +(grams / 1000).toFixed(3), unit: "kg", grams, confidence: baseConfidence, reason, source };
+    if (invUnit === "g")  return { quantity: Math.round(grams), unit: "g", grams, confidence: baseConfidence, reason, source };
+    if (invUnit === "pieces" && args.pieces && args.pieces > 0) {
+      return { quantity: args.pieces, unit: "pieces", grams, confidence: baseConfidence, reason, source };
+    }
+    // Inventory unit is something like bottles/packs/cans — we cannot safely deduct grams.
+    // If we have a piece count, use that; otherwise flag as low confidence.
+    if (args.pieces && args.pieces > 0) {
+      return { quantity: args.pieces, unit: invUnit, grams, confidence: "low" as const, reason: `${reason} (assuming ${args.pieces} ${invUnit})`, source };
+    }
+    return { quantity: +(grams / 1000).toFixed(3), unit: "kg", grams, confidence: "low" as const, reason: `${reason} (unit mismatch with ${invUnit})`, source };
   };
 
-  // CASE 1A: piece-based food → check LEARNED overrides FIRST
+  // CASE 1A: piece-based food → check LEARNED overrides FIRST (always HIGH)
   if (args.foodKey && args.pieces && args.pieces > 0) {
     const learned = overrides.find(o => o.food_key === args.foodKey && o.unit === "piece");
     if (learned) {
       const grams = args.pieces * learned.grams_per_unit;
       return toInvUnit(grams, "learned", `${args.pieces} × ${learned.grams_per_unit}g (learned, ${learned.sample_count} samples)`, "high");
     }
-    // CASE 1B: piece-based food via canonical config
+    // CASE 1B: piece-based food via canonical config → HIGH if realistic, LOW if not
     const entry = FOOD_WEIGHTS.find(e => e.key === args.foodKey) ?? findFoodEntry(args.foodKey);
     if (entry) {
       const size = args.size ?? "medium";
@@ -120,40 +130,45 @@ function computeDeduction(args: {
     }
   }
 
-  // CASE 2: cup of a known dry good
+  // CASE 2: cup / tbsp / tsp / glass of a known dry good → HIGH
+  // (cup_amount already encodes the conversion: 1 tbsp = 1/16 cup, 1 tsp = 1/48 cup)
   if (args.cupAmount && args.cupAmount > 0 && args.cupOfWhat) {
     const what = args.cupOfWhat.toLowerCase();
     const dryGrams = Object.keys(CUP_WEIGHTS_G).find(k => what.includes(k));
     if (dryGrams) {
       const grams = args.cupAmount * CUP_WEIGHTS_G[dryGrams];
-      if (invUnit === "kg") return { quantity: +(grams / 1000).toFixed(3), unit: "kg", grams, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_WEIGHTS_G[dryGrams]}g`, source: "config" };
-      if (invUnit === "g")  return { quantity: grams, unit: "g", grams, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_WEIGHTS_G[dryGrams]}g`, source: "config" };
+      const realistic = grams >= 1 && grams <= 5000;
+      return toInvUnit(grams, "config", `${args.cupAmount} cup × ${CUP_WEIGHTS_G[dryGrams]}g/cup ${dryGrams}`, realistic ? "high" : "low");
     }
+    // Liquid default
     const ml = args.cupAmount * CUP_ML;
     if (invUnit === "l")  return { quantity: +(ml / 1000).toFixed(3), unit: "l", grams: null, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_ML}ml`, source: "config" };
     if (invUnit === "ml") return { quantity: ml, unit: "ml", grams: null, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_ML}ml`, source: "config" };
   }
 
-  // CASE 3: fraction of a container
+  // CASE 3: fraction of a container → HIGH (math is exact against current stock)
   if (args.fractionOfContainer && args.fractionOfContainer > 0 && inv) {
     const qty = +(args.fractionOfContainer * inv.quantity).toFixed(3);
     return { quantity: qty, unit: inv.unit, grams: null, confidence: "high", reason: `${args.fractionOfContainer} × current ${inv.quantity} ${inv.unit}`, source: "fraction" };
   }
 
-  // CASE 4: AI ESTIMATE (no config match) — always low confidence, needs confirm
+  // CASE 4: AI ESTIMATE → MEDIUM by default, LOW if AI itself was unsure or unrealistic
   if (args.aiEstimateGrams && args.aiEstimateGrams > 0) {
-    const conf: "high" | "low" = "low"; // AI estimates ALWAYS need confirmation
-    return toInvUnit(args.aiEstimateGrams, "ai", `AI estimate ≈ ${args.aiEstimateGrams}g (${args.aiConfidence ?? "medium"} confidence)`, conf);
+    const realistic = args.aiEstimateGrams >= 1 && args.aiEstimateGrams <= 5000;
+    const conf: "medium" | "low" = (!realistic || args.aiConfidence === "low") ? "low" : "medium";
+    return toInvUnit(args.aiEstimateGrams, "ai", `AI estimate ≈ ${args.aiEstimateGrams}g`, conf);
   }
   if (args.aiEstimateMl && args.aiEstimateMl > 0) {
-    if (invUnit === "l")  return { quantity: +(args.aiEstimateMl / 1000).toFixed(3), unit: "l", grams: null, confidence: "low", reason: `AI estimate ≈ ${args.aiEstimateMl}ml`, source: "ai" };
-    if (invUnit === "ml") return { quantity: args.aiEstimateMl, unit: "ml", grams: null, confidence: "low", reason: `AI estimate ≈ ${args.aiEstimateMl}ml`, source: "ai" };
+    const conf: "medium" | "low" = args.aiConfidence === "low" ? "low" : "medium";
+    if (invUnit === "l")  return { quantity: +(args.aiEstimateMl / 1000).toFixed(3), unit: "l", grams: null, confidence: conf, reason: `AI estimate ≈ ${args.aiEstimateMl}ml`, source: "ai" };
+    if (invUnit === "ml") return { quantity: args.aiEstimateMl, unit: "ml", grams: null, confidence: conf, reason: `AI estimate ≈ ${args.aiEstimateMl}ml`, source: "ai" };
   }
 
-  // FALLBACK: raw qty/unit
+  // FALLBACK: raw qty/unit → HIGH if units already match inventory, MEDIUM otherwise
   const qty = args.rawQuantity ?? 1;
   const unit = args.rawUnit ?? invUnit;
-  return { quantity: qty, unit, grams: null, confidence: unit === invUnit ? "high" : "low", reason: "raw extraction", source: "raw" };
+  const conf: "high" | "medium" = unit === invUnit ? "high" : "medium";
+  return { quantity: qty, unit, grams: null, confidence: conf, reason: "raw extraction", source: "raw" };
 }
 
 serve(async (req) => {
