@@ -46,12 +46,121 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+type CropRect = { x: number; y: number; width: number; height: number };
+
+function detectBarcodeBandFromPixels(img: HTMLImageElement): CropRect | null {
+  const analysisWidth = Math.max(220, Math.min(420, img.naturalWidth));
+  const scale = analysisWidth / img.naturalWidth;
+  const analysisHeight = Math.max(220, Math.round(img.naturalHeight * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = analysisWidth;
+  canvas.height = analysisHeight;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+
+  ctx.drawImage(img, 0, 0, analysisWidth, analysisHeight);
+  const { data } = ctx.getImageData(0, 0, analysisWidth, analysisHeight);
+  const grayscale = new Float32Array(analysisWidth * analysisHeight);
+
+  for (let y = 0; y < analysisHeight; y += 1) {
+    for (let x = 0; x < analysisWidth; x += 1) {
+      const idx = (y * analysisWidth + x) * 4;
+      grayscale[y * analysisWidth + x] = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+    }
+  }
+
+  const rowScores = new Float32Array(analysisHeight);
+  for (let y = 0; y < analysisHeight; y += 1) {
+    let edgeSum = 0;
+    for (let x = 1; x < analysisWidth; x += 1) {
+      const idx = y * analysisWidth + x;
+      edgeSum += Math.abs(grayscale[idx] - grayscale[idx - 1]);
+    }
+    rowScores[y] = edgeSum / analysisWidth;
+  }
+
+  const smoothedRows = new Float32Array(analysisHeight);
+  for (let y = 0; y < analysisHeight; y += 1) {
+    let total = 0;
+    let count = 0;
+    for (let offset = -5; offset <= 5; offset += 1) {
+      const yy = y + offset;
+      if (yy >= 0 && yy < analysisHeight) {
+        total += rowScores[yy];
+        count += 1;
+      }
+    }
+    smoothedRows[y] = total / Math.max(count, 1);
+  }
+
+  const bandHeights = [
+    Math.max(20, Math.round(analysisHeight * 0.12)),
+    Math.max(28, Math.round(analysisHeight * 0.17)),
+    Math.max(36, Math.round(analysisHeight * 0.22)),
+  ];
+
+  let best: { y: number; height: number; score: number } | null = null;
+  const scanStart = Math.floor(analysisHeight * 0.62);
+  const scanEnd = Math.floor(analysisHeight * 0.96);
+
+  for (const bandHeight of bandHeights) {
+    for (let y = scanStart; y <= scanEnd - bandHeight; y += 2) {
+      let total = 0;
+      for (let yy = y; yy < y + bandHeight; yy += 1) total += smoothedRows[yy];
+      const average = total / bandHeight;
+      const lowerBias = y / analysisHeight;
+      const score = average * (1 + lowerBias * 0.35);
+      if (!best || score > best.score) best = { y, height: bandHeight, score };
+    }
+  }
+
+  if (!best) return null;
+
+  const columnScores = new Float32Array(analysisWidth);
+  for (let x = 1; x < analysisWidth; x += 1) {
+    let edgeSum = 0;
+    for (let y = best.y; y < best.y + best.height; y += 1) {
+      const idx = y * analysisWidth + x;
+      edgeSum += Math.abs(grayscale[idx] - grayscale[idx - 1]);
+    }
+    columnScores[x] = edgeSum / best.height;
+  }
+
+  let maxColumnScore = 0;
+  for (let x = 0; x < analysisWidth; x += 1) maxColumnScore = Math.max(maxColumnScore, columnScores[x]);
+  const threshold = maxColumnScore * 0.45;
+
+  let left = 0;
+  while (left < analysisWidth && columnScores[left] < threshold) left += 1;
+  let right = analysisWidth - 1;
+  while (right > left && columnScores[right] < threshold) right -= 1;
+
+  if (right - left < analysisWidth * 0.28) {
+    left = Math.round(analysisWidth * 0.08);
+    right = Math.round(analysisWidth * 0.92);
+  }
+
+  const scaleX = img.naturalWidth / analysisWidth;
+  const scaleY = img.naturalHeight / analysisHeight;
+  const padX = (right - left) * 0.08;
+  const padTop = best.height * 0.3;
+  const padBottom = best.height * 0.45;
+
+  return {
+    x: (left - padX) * scaleX,
+    y: (best.y - padTop) * scaleY,
+    width: (right - left + padX * 2) * scaleX,
+    height: (best.height + padTop + padBottom) * scaleY,
+  };
+}
+
 async function cropBarcodeFromImage(imageUrl: string, code?: string): Promise<string | null> {
   try {
     const img = await loadImage(imageUrl);
     const expectedCode = code && hasUsableCode(code) ? normalizeCode(code) : null;
 
-    let cropRect: { x: number; y: number; width: number; height: number } | null = null;
+    let cropRect: CropRect | null = null;
 
     if (typeof (window as any).BarcodeDetector !== 'undefined') {
       try {
@@ -64,7 +173,7 @@ async function cropBarcodeFromImage(imageUrl: string, code?: string): Promise<st
             ? detections.find((item: any) => normalizeCode(item.rawValue || '') === expectedCode)
             : detections[0];
           const picked = matched || detections[0];
-          const box = picked?.boundingBox;
+           const box = picked?.boundingBox;
           if (box && box.width > 0 && box.height > 0) {
             const padX = box.width * 0.18;
             const padTop = box.height * 0.25;
@@ -83,12 +192,15 @@ async function cropBarcodeFromImage(imageUrl: string, code?: string): Promise<st
     }
 
     if (!cropRect) {
-      // Heuristic: barcodes on receipts/coupons are usually in the lower-middle
+      cropRect = detectBarcodeBandFromPixels(img);
+    }
+
+    if (!cropRect) {
       const width = img.naturalWidth * 0.9;
-      const height = img.naturalHeight * 0.3;
+      const height = img.naturalHeight * 0.2;
       cropRect = {
         x: (img.naturalWidth - width) / 2,
-        y: img.naturalHeight * 0.58,
+        y: img.naturalHeight * 0.72,
         width,
         height,
       };
@@ -168,12 +280,12 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
   }, [open, fallbackImageUrl, code]);
 
   // Decide what to show. Priority:
-  //   1. Generated barcode from the extracted code (best for cashier scanners)
-  //   2. Cropped barcode image from the uploaded coupon photo
-  //   3. Original uploaded photo (zoomable)
+  //   1. Cropped barcode image (best when the coupon photo already contains the real barcode)
+  //   2. Original uploaded photo (zoomable)
+  //   3. Generated SVG barcode (fallback when we only have the code text)
   const imageToShow = croppedImageUrl || fallbackImageUrl || null;
   const isShowingCroppedImage = !!croppedImageUrl;
-  const shouldRenderSvg = open && usableCode && !renderError;
+  const shouldRenderSvg = open && !cropLoading && !imageToShow && usableCode && !renderError;
 
   // Render the JsBarcode SVG only when we actually need it
   useEffect(() => {
@@ -248,11 +360,7 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
             {title && <p className="text-xs text-center text-neutral-600 mt-1">{title}</p>}
           </DialogHeader>
 
-          {shouldRenderSvg ? (
-            <div className="flex justify-center rounded-lg bg-white py-4 min-h-[180px]">
-              <svg ref={svgRef} className="max-w-full h-auto" />
-            </div>
-          ) : cropLoading ? (
+          {cropLoading ? (
             <div className="flex flex-col items-center justify-center py-10 gap-3">
               <Loader2 className="w-6 h-6 animate-spin text-neutral-500" />
               <p className="text-sm text-neutral-600">Preparing barcode image…</p>
@@ -310,6 +418,10 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
                   ? 'Barcode cropped from your coupon photo — zoom in if the cashier needs it bigger'
                   : 'Original coupon photo — zoom in on the barcode for the cashier'}
               </p>
+            </div>
+          ) : shouldRenderSvg ? (
+            <div className="flex justify-center bg-white rounded-lg py-2 min-h-[140px]">
+              <svg ref={svgRef} className="max-w-full h-auto" />
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-center">
