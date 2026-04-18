@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
   ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag, Store,
 } from 'lucide-react';
@@ -71,7 +72,14 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const [saleTotalInput, setSaleTotalInput] = useState('');
   const [trackedItems, setTrackedItems] = useState<TrackedItem[]>(savedSession?.trackedItems ?? []);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const initialized = useRef(!!savedSession);
+
+  const cancelTrip = useCallback(() => {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    toast.success('Shopping session ended');
+    onExit();
+  }, [onExit]);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -585,9 +593,19 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   // Main shopping mode view
   return (
     <div className="space-y-4 animate-fade-in">
-      <button onClick={() => { onExit(); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Back to list (session saved)
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={() => { onExit(); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back (session saved)
+        </button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8"
+          onClick={() => setConfirmCancel(true)}
+        >
+          End Trip
+        </Button>
+      </div>
 
       {/* Store name badge */}
       {storeName && (
@@ -745,6 +763,28 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
           </Button>
         </div>
       )}
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>End shopping trip?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pricedItems.length > 0
+                ? `You have ${pricedItems.length} item(s) in your cart. Ending now will discard them — they won't be saved or added to your pantry.`
+                : 'This will end your current shopping session.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Shopping</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={cancelTrip}
+            >
+              End Trip
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
