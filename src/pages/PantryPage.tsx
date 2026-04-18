@@ -367,7 +367,7 @@ export default function PantryPage() {
               Are you sure you want to remove{' '}
               <span className="font-semibold text-foreground">{deleteTarget?.name}</span>
               {deleteTarget && (
-                <> ({deleteTarget.quantity} {deleteTarget.unit})</>
+                <> ({formatQty(deleteTarget.quantity)} {deleteTarget.unit})</>
               )}{' '}
               from your pantry? This can't be undone.
             </AlertDialogDescription>
