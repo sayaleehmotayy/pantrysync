@@ -545,6 +545,59 @@ export default function VoiceCommandBar() {
         )}
       </div>
 
+      {/* Medium-confidence INLINE confirmation card (no modal) */}
+      {mediumActions && mediumActions.length > 0 && (
+        <div className="mt-2 rounded-2xl border border-accent/30 bg-accent/5 p-3 space-y-2 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+            <p className="text-xs font-medium text-accent">Quick confirm</p>
+          </div>
+          {mediumActions.map((a, idx) => (
+            <div key={idx} className="flex items-center gap-2 text-sm">
+              <span className="flex-1 truncate">
+                <span className="font-medium">{a.name}</span>
+                <span className="text-muted-foreground"> · {a.quantity} {a.unit}</span>
+                {a.grams != null && a.unit !== 'g' && a.unit !== 'kg' && (
+                  <span className="text-[11px] text-muted-foreground"> (~{a.grams}g)</span>
+                )}
+              </span>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                value={a.quantity}
+                onChange={e => {
+                  const v = Number(e.target.value);
+                  setMediumActions(prev => prev?.map((p, i) => i === idx ? { ...p, quantity: v } : p) ?? null);
+                }}
+                className="h-7 w-20 text-xs"
+              />
+            </div>
+          ))}
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" variant="ghost" className="h-7 text-xs flex-1" onClick={() => setMediumActions(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 text-xs flex-1"
+              onClick={async () => {
+                const toRun = mediumActions ?? [];
+                setMediumActions(null);
+                for (const a of toRun) {
+                  if (a._originalQuantity != null && a.quantity !== a._originalQuantity) {
+                    await learnCorrection(a);
+                  }
+                }
+                await executeActions(toRun);
+              }}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Low-confidence confirmation dialog */}
       <Dialog open={!!pendingActions} onOpenChange={open => !open && setPendingActions(null)}>
         <DialogContent className="max-w-md">
