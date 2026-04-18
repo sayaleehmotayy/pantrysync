@@ -79,7 +79,7 @@ export default function ExpiryPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {item.quantity} {item.unit} · {item.storage_location}
+                          {formatQty(item.quantity)} {item.unit} · {item.storage_location}
                         </p>
                       </div>
                       <div className="text-right ml-2">
