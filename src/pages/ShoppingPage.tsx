@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, ShoppingCart, Check, AlertTriangle, X, Trash2, Camera, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +45,7 @@ export default function ShoppingPage() {
   const [partialQty, setPartialQty] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [receiptCurrency, setReceiptCurrency] = useState<CurrencyInfo | undefined>();
+  const [deleteTarget, setDeleteTarget] = useState<ShoppingItem | null>(null);
 
   // Fetch most recent receipt currency
   useEffect(() => {
@@ -220,7 +222,7 @@ export default function ShoppingPage() {
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => updateItem.mutate({ id: item.id, status: 'not_found' })}>
                           <X className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteItem.mutate(item.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTarget(item)}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -278,7 +280,7 @@ export default function ShoppingPage() {
                         </Badge>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteItem.mutate(item.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTarget(item)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </CardContent>
@@ -294,6 +296,34 @@ export default function ShoppingPage() {
         onOpenChange={setScannerOpen}
         onAddToPantry={handleScanToPantry}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from shopping list?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove{' '}
+              <span className="font-semibold text-foreground">{deleteTarget?.name}</span>
+              {deleteTarget && (
+                <> ({deleteTarget.quantity} {deleteTarget.unit})</>
+              )}{' '}
+              from your shopping list?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) deleteItem.mutate(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
