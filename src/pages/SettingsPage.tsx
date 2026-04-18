@@ -10,6 +10,7 @@ import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe, M
 import { TIERS, TRIAL_DAYS, getTierByProductId, getMemberLimit, type TierKey } from '@/config/subscription';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from 'next-themes';
+import { useQueryClient } from '@tanstack/react-query';
 
 const CURRENCIES = [
   { code: 'USD', label: 'US Dollar ($)' },
@@ -40,6 +41,7 @@ export default function SettingsPage() {
   const { household, members, userRole, leaveHousehold } = useHousehold();
   const { signOut, user, subscription, checkSubscription } = useAuth();
   const { theme, setTheme } = useTheme();
+  const qc = useQueryClient();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
@@ -123,6 +125,7 @@ export default function SettingsPage() {
     if (error) {
       toast.error('Failed to update currency');
     } else {
+      qc.invalidateQueries({ queryKey: ['user-preferred-currency'] });
       toast.success(`Currency set to ${value}`);
     }
   };

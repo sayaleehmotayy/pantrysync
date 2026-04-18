@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useInventory } from '@/hooks/useInventory';
 import { useHousehold } from '@/contexts/HouseholdContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
 import ShoppingMode from '@/components/ShoppingMode';
-import { getCurrencyInfo, type CurrencyInfo } from '@/lib/currency';
+import { useUserCurrency } from '@/hooks/useUserCurrency';
 import { guessCategory } from '@/lib/categorize';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
@@ -44,24 +43,8 @@ export default function ShoppingPage() {
   const [partialId, setPartialId] = useState<string | null>(null);
   const [partialQty, setPartialQty] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [receiptCurrency, setReceiptCurrency] = useState<CurrencyInfo | undefined>();
+  const userCurrency = useUserCurrency();
   const [deleteTarget, setDeleteTarget] = useState<ShoppingItem | null>(null);
-
-  // Fetch most recent receipt currency
-  useEffect(() => {
-    if (!household?.id) return;
-    supabase
-      .from('receipt_scans')
-      .select('currency')
-      .eq('household_id', household.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .then(({ data }) => {
-        if (data?.[0]?.currency) {
-          setReceiptCurrency(getCurrencyInfo(data[0].currency));
-        }
-      });
-  }, [household?.id]);
 
   const pendingItems = useMemo(() => items.filter(i => i.status === 'pending' || i.status === 'not_found'), [items]);
   const completedItems = useMemo(() => items.filter(i => i.status === 'bought' || i.status === 'partial'), [items]);
@@ -109,7 +92,7 @@ export default function ShoppingPage() {
           items={items}
           onMarkBought={handleShoppingModeBought}
           onExit={() => setShoppingMode(false)}
-          currency={receiptCurrency}
+          currency={userCurrency}
         />
       </div>
     );

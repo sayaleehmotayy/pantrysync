@@ -75,14 +75,22 @@ export function formatCurrency(amount: number, currency: CurrencyInfo): string {
   }
 }
 
-/** React hook for easy currency formatting using user's profile preference */
+/**
+ * React hook for easy currency formatting using user's profile preference.
+ * NOTE: Implemented in `src/hooks/useUserCurrency.ts`. Re-export here so
+ * existing `import { useCurrency } from '@/lib/currency'` keeps working.
+ */
+export { useUserCurrency as useCurrencyInfo } from '@/hooks/useUserCurrency';
+
+// Backwards-compatible useCurrency: returns { formatPrice, currency }
+import { useUserCurrency } from '@/hooks/useUserCurrency';
 export function useCurrency() {
-  const defaultCurrency = detectCurrencyFromLocale();
-  
+  const userCurrency = useUserCurrency();
+
   const formatPrice = (amount: number, currencyCode?: string) => {
-    const info = currencyCode ? getCurrencyInfo(currencyCode) : defaultCurrency;
+    const info = currencyCode ? getCurrencyInfo(currencyCode) : userCurrency;
     return formatCurrency(amount, info);
   };
 
-  return { formatPrice, currency: defaultCurrency };
+  return { formatPrice, currency: userCurrency };
 }
