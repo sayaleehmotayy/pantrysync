@@ -66,7 +66,7 @@ function ItemForm({ onSubmit, initial, submitLabel }: {
   );
 }
 
-function QuickActions({ item, onUse, onAddToShoppingList }: { item: InventoryItem; onUse: (amount: number, action: string) => void; onAddToShoppingList: () => void }) {
+function QuickActions({ item, onUse, onRestock }: { item: InventoryItem; onUse: (amount: number, action: string) => void; onRestock: () => void }) {
   return (
     <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border/50">
       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUse(1, 'Used 1')}>
@@ -78,7 +78,7 @@ function QuickActions({ item, onUse, onAddToShoppingList }: { item: InventoryIte
       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUse(item.quantity, 'Finished')}>
         Finished
       </Button>
-      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onAddToShoppingList}>
+      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRestock}>
         <ShoppingCart className="w-3 h-3 mr-1" /> Restock
       </Button>
     </div>
@@ -96,6 +96,9 @@ export default function PantryPage() {
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
+  const [restockTarget, setRestockTarget] = useState<InventoryItem | null>(null);
+  const [restockQty, setRestockQty] = useState('');
+  const [restockUnit, setRestockUnit] = useState('pieces');
 
   const filtered = useMemo(() => {
     return items.filter(i => {
@@ -270,9 +273,10 @@ export default function PantryPage() {
                         quickUse.mutate({ item, amount, action });
                         if (amount >= item.quantity) setExpandedId(null);
                       }}
-                      onAddToShoppingList={() => {
-                        addShoppingItem.mutate({ name: item.name, quantity: item.min_threshold || 1, unit: item.unit, category: item.category });
-                        toast.success(`${item.name} added to shopping list`);
+                      onRestock={() => {
+                        setRestockTarget(item);
+                        setRestockQty(String(item.min_threshold || 1));
+                        setRestockUnit(item.unit || 'pieces');
                       }}
                     />
                   )}
@@ -307,6 +311,60 @@ export default function PantryPage() {
         onOpenChange={setBarcodeOpen}
         onAddToPantry={handleScanToPantry}
       />
+
+      <Dialog open={!!restockTarget} onOpenChange={open => !open && setRestockTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restock {restockTarget?.name}</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              if (!restockTarget) return;
+              const qty = Number(restockQty);
+              if (!qty || qty <= 0) {
+                toast.error('Enter a valid quantity');
+                return;
+              }
+              addShoppingItem.mutate({
+                name: restockTarget.name,
+                quantity: qty,
+                unit: restockUnit,
+                category: restockTarget.category,
+              });
+              toast.success(`${restockTarget.name} added to shopping list`);
+              setRestockTarget(null);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-muted-foreground">
+              Currently {restockTarget?.quantity} {restockTarget?.unit} in {restockTarget?.storage_location}. How much do you want to restock?
+            </p>
+            <div className="flex gap-3">
+              <Input
+                type="number"
+                placeholder="Amount"
+                value={restockQty}
+                onChange={e => setRestockQty(e.target.value)}
+                min="0.1"
+                step="any"
+                autoFocus
+                required
+                className="flex-1"
+              />
+              <Select value={restockUnit} onValueChange={setRestockUnit}>
+                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent side="bottom" position="popper">
+                  {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full gap-2">
+              <ShoppingCart className="w-4 h-4" /> Add to Shopping List
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
