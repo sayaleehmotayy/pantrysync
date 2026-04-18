@@ -312,6 +312,60 @@ export default function PantryPage() {
         onAddToPantry={handleScanToPantry}
       />
 
+      <Dialog open={!!restockTarget} onOpenChange={open => !open && setRestockTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restock {restockTarget?.name}</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              if (!restockTarget) return;
+              const qty = Number(restockQty);
+              if (!qty || qty <= 0) {
+                toast.error('Enter a valid quantity');
+                return;
+              }
+              addShoppingItem.mutate({
+                name: restockTarget.name,
+                quantity: qty,
+                unit: restockUnit,
+                category: restockTarget.category,
+              });
+              toast.success(`${restockTarget.name} added to shopping list`);
+              setRestockTarget(null);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-muted-foreground">
+              Currently {restockTarget?.quantity} {restockTarget?.unit} in {restockTarget?.storage_location}. How much do you want to restock?
+            </p>
+            <div className="flex gap-3">
+              <Input
+                type="number"
+                placeholder="Amount"
+                value={restockQty}
+                onChange={e => setRestockQty(e.target.value)}
+                min="0.1"
+                step="any"
+                autoFocus
+                required
+                className="flex-1"
+              />
+              <Select value={restockUnit} onValueChange={setRestockUnit}>
+                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent side="bottom" position="popper">
+                  {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full gap-2">
+              <ShoppingCart className="w-4 h-4" /> Add to Shopping List
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
