@@ -66,7 +66,9 @@ export default function ShoppingPage() {
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    addItem.mutate({ name, quantity: Number(quantity), unit, category });
+    // Auto-categorize when user kept the default "Other"
+    const finalCategory = category === 'Other' ? guessCategory(name, 'Other') : category;
+    addItem.mutate({ name, quantity: Number(quantity), unit, category: finalCategory });
     setName(''); setQuantity('1'); setUnit('pieces'); setCategory('Other');
     setAddOpen(false);
   };
