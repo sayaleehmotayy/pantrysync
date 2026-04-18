@@ -422,10 +422,15 @@ export default function CouponsPage() {
                       {item.discount_text && !item.title && <p className="text-sm font-medium mt-1 text-primary truncate">{item.discount_text}</p>}
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                         {item.code && item.code !== 'RECEIPT' && (
-                          <button onClick={() => copyCode(item.code)} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
+                          <button onClick={() => setBarcodeFor(item)} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
                             <Tag className="w-3 h-3 text-primary" />
                             <span className="font-mono font-bold text-xs text-primary">{item.code}</span>
-                            <Copy className="w-3 h-3 text-primary/60" />
+                            <span className="text-[9px] uppercase tracking-wider text-primary/70 font-semibold">Show</span>
+                          </button>
+                        )}
+                        {item.code && item.code !== 'RECEIPT' && (
+                          <button onClick={() => copyCode(item.code)} className="w-6 h-6 rounded-lg bg-muted hover:bg-muted/70 flex items-center justify-center" title="Copy code">
+                            <Copy className="w-3 h-3 text-muted-foreground" />
                           </button>
                         )}
                         {item.code === 'RECEIPT' && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Camera className="w-3 h-3" /> Photo</span>}
