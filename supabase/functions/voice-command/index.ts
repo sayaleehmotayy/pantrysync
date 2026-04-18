@@ -72,6 +72,7 @@ function isUnrealisticGrams(grams: number, pieces: number, category?: string): b
 }
 
 interface InventoryItem { name: string; quantity: number; unit: string; storage_location: string; category: string; }
+interface LearnedOverride { food_key: string; unit: string; grams_per_unit: number; sample_count: number; }
 
 function findInventoryMatch(name: string, inv: InventoryItem[]): InventoryItem | null {
   const n = name.trim().toLowerCase();
