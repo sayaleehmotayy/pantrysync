@@ -321,6 +321,11 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry, onAd
               <DialogTitle className="flex items-center gap-2">
                 <Check className="w-5 h-5 text-primary" /> Product Found
               </DialogTitle>
+              <p className="text-xs text-muted-foreground">
+                {source === 'ai'
+                  ? 'Identified via web search — please review the details.'
+                  : 'Where would you like to add it?'}
+              </p>
             </DialogHeader>
 
             <div className="p-4 pt-2 space-y-3">
