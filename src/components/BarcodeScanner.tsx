@@ -447,7 +447,7 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry, onAd
                   <RotateCcw className="w-4 h-4 mr-1" /> Scan another
                 </Button>
                 <Button className="flex-1" onClick={handleConfirmAdd}>
-                  <Check className="w-4 h-4 mr-1" /> Add to Pantry
+                  <Check className="w-4 h-4 mr-1" /> Add to {destination === 'shopping' ? 'Shopping List' : 'Pantry'}
                 </Button>
               </div>
             </div>
