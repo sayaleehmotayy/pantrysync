@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 // Unit conversion map to a base unit
 const UNIT_TO_BASE: Record<string, { base: string; factor: number }> = {
@@ -65,6 +66,27 @@ export function useShoppingList() {
     },
     enabled: !!household,
   });
+
+  // Realtime: refresh shopping list whenever items change in this household
+  useEffect(() => {
+    if (!household) return;
+    const channel = supabase
+      .channel(`shopping_list:${household.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shopping_list_items',
+          filter: `household_id=eq.${household.id}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ['shopping', household.id] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [household?.id, qc]);
 
   const addItem = useMutation({
     mutationFn: async (item: { name: string; quantity: number; unit: string; category: string }) => {
