@@ -112,7 +112,7 @@ export default function ChatPage() {
       }
 
       if (data) {
-        setMessages(data.map((message) => ({ ...message, sender_name: memberMap.get(message.user_id) || 'Unknown' })));
+        setMessages(data as ChatMessage[]);
       }
       setLoading(false);
     };
@@ -126,7 +126,6 @@ export default function ChatPage() {
         { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `household_id=eq.${household.id}` },
         (payload) => {
           const message = payload.new as ChatMessage;
-          message.sender_name = memberMap.get(message.user_id) || 'Unknown';
           setMessages((prev) => [...prev, message]);
         },
       )
