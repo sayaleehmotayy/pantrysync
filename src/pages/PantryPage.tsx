@@ -95,6 +95,7 @@ export default function PantryPage() {
   const [barcodeOpen, setBarcodeOpen] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
 
   const filtered = useMemo(() => {
     return items.filter(i => {
@@ -257,7 +258,7 @@ export default function PantryPage() {
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditItem(item)}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteItem.mutate({ id: item.id, name: item.name })}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteTarget(item)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -306,6 +307,34 @@ export default function PantryPage() {
         onOpenChange={setBarcodeOpen}
         onAddToPantry={handleScanToPantry}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from pantry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove{' '}
+              <span className="font-semibold text-foreground">{deleteTarget?.name}</span>
+              {deleteTarget && (
+                <> ({deleteTarget.quantity} {deleteTarget.unit})</>
+              )}{' '}
+              from your pantry? This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) deleteItem.mutate({ id: deleteTarget.id, name: deleteTarget.name });
+                setDeleteTarget(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
