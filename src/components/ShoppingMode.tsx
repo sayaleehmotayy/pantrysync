@@ -142,7 +142,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const fmt = (amount: number) => formatCurrency(amount, curr);
 
   const activeItem = activeItemId ? trackedItems.find(i => i.id === activeItemId) : null;
-  const countable = activeItem ? isCountableUnit(activeItem.unit) : true;
+  // Use the unit the shopper actually picked at the store, falling back to the list unit
+  const effectiveUnit = boughtUnit || activeItem?.unit || 'pieces';
+  const countable = isCountableUnit(effectiveUnit);
+  const showPackSize = PACKABLE_UNITS.has(effectiveUnit.toLowerCase());
 
   const qtyFound = quantityInput ? parseFloat(quantityInput) : 0;
   const unitPrice = unitPriceInput ? parseFloat(unitPriceInput) : 0;
