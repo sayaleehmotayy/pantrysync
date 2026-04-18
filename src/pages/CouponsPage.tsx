@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   Plus, Trash2, Camera, Tag, Store, Copy, Calendar, Image as ImageIcon,
-  X, Search, Clock, Info, ChevronDown, ChevronUp, Sparkles,
+  X, Search, Clock, Info, ChevronDown, ChevronUp, Sparkles, AlertTriangle, Loader2,
 } from 'lucide-react';
-import { format, isBefore } from 'date-fns';
+import { format, isBefore, differenceInDays } from 'date-fns';
 import { STORE_REGIONS, ALL_STORE_NAMES, findStoreInfo, type StoreInfo } from '@/config/stores';
 
 interface DiscountCode {
@@ -23,22 +24,47 @@ interface DiscountCode {
   expiry_date: string | null;
   added_by: string;
   created_at: string;
+  title: string | null;
+  discount_text: string | null;
+  min_spend: number | null;
+  restrictions: string | null;
+  conditions: string | null;
+  valid_from: string | null;
+  status: string;
+  expired_at: string | null;
+  delete_after: string | null;
+  ai_confidence: any;
+}
+
+interface ExtractedCoupon {
+  store_name?: string;
+  title?: string;
+  code?: string;
+  discount_text?: string;
+  description?: string;
+  expiry_date?: string;
+  valid_from?: string;
+  min_spend?: number;
+  restrictions?: string;
+  conditions?: string;
+  confidence?: Record<string, 'high' | 'medium' | 'low'>;
 }
 
 const RECENTLY_USED_KEY = 'pantrysync_recent_stores';
-
-function getRecentStores(): string[] {
-  try {
-    const raw = localStorage.getItem(RECENTLY_USED_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
+function getRecentStores(): string[] { try { return JSON.parse(localStorage.getItem(RECENTLY_USED_KEY) || '[]'); } catch { return []; } }
 function addRecentStore(name: string) {
-  const recents = getRecentStores().filter(s => s !== name);
-  recents.unshift(name);
-  localStorage.setItem(RECENTLY_USED_KEY, JSON.stringify(recents.slice(0, 10)));
+  const r = getRecentStores().filter(s => s !== name);
+  r.unshift(name);
+  localStorage.setItem(RECENTLY_USED_KEY, JSON.stringify(r.slice(0, 10)));
 }
+
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
 
 export default function CouponsPage() {
   const { user } = useAuth();
@@ -51,13 +77,11 @@ export default function CouponsPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [storeInfoModal, setStoreInfoModal] = useState<StoreInfo | null>(null);
 
-  // Search
   const [searchQuery, setSearchQuery] = useState('');
   const [aiResults, setAiResults] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimer = useRef<number | null>(null);
 
-  // Browse
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [browseMode, setBrowseMode] = useState(false);
 
@@ -68,66 +92,54 @@ export default function CouponsPage() {
   const [expiryDate, setExpiryDate] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  // Photo form state
+  // Photo / extracted form state
   const [photoStoreName, setPhotoStoreName] = useState('');
+  const [photoTitle, setPhotoTitle] = useState('');
+  const [photoCode, setPhotoCode] = useState('');
+  const [photoDiscountText, setPhotoDiscountText] = useState('');
+  const [photoDescription, setPhotoDescription] = useState('');
   const [photoExpiryDate, setPhotoExpiryDate] = useState('');
+  const [photoValidFrom, setPhotoValidFrom] = useState('');
+  const [photoMinSpend, setPhotoMinSpend] = useState('');
+  const [photoRestrictions, setPhotoRestrictions] = useState('');
+  const [photoConditions, setPhotoConditions] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [extractedConfidence, setExtractedConfidence] = useState<Record<string, string> | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const memberMap = new Map(
-    members.map(m => [m.user_id, m.profile?.display_name || 'Unknown'])
-  );
-
+  const memberMap = new Map(members.map(m => [m.user_id, m.profile?.display_name || 'Unknown']));
   const recentStores = getRecentStores();
 
-  useEffect(() => {
-    if (!household) return;
-    fetchCodes();
-  }, [household]);
+  useEffect(() => { if (household) fetchCodes(); }, [household]);
 
   const fetchCodes = async () => {
     if (!household) return;
     const { data, error } = await supabase
-      .from('discount_codes')
-      .select('*')
-      .eq('household_id', household.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Failed to fetch codes:', error);
-    } else {
-      setCodes(data || []);
-      const urls: Record<string, string> = {};
-      await Promise.all((data || []).filter(d => d.receipt_image_url).map(async (d) => {
-        urls[d.id] = await getSignedUrl(d.receipt_image_url!);
-      }));
-      setSignedUrls(urls);
-    }
+      .from('discount_codes').select('*').eq('household_id', household.id);
+    if (error) { console.error(error); setLoading(false); return; }
+    setCodes((data || []) as DiscountCode[]);
+    const urls: Record<string, string> = {};
+    await Promise.all((data || []).filter(d => d.receipt_image_url).map(async (d) => {
+      urls[d.id] = await getSignedUrl(d.receipt_image_url!);
+    }));
+    setSignedUrls(urls);
     setLoading(false);
   };
 
-  // AI-powered search with debounce
   const doAiSearch = useCallback(async (q: string) => {
     if (q.trim().length < 2) { setAiResults([]); return; }
     setSearching(true);
     try {
-      // First do local fuzzy match
       const lower = q.toLowerCase();
       const localMatches = ALL_STORE_NAMES.filter(n => n.toLowerCase().includes(lower));
-
-      // Then call AI for fuzzy/intent matching
-      const { data, error } = await supabase.functions.invoke('search-stores', {
-        body: { query: q },
-      });
+      const { data, error } = await supabase.functions.invoke('search-stores', { body: { query: q } });
       if (!error && data?.results) {
-        const combined = [...new Set([...localMatches, ...data.results])];
-        setAiResults(combined.slice(0, 12));
-      } else {
-        setAiResults(localMatches.slice(0, 12));
-      }
+        setAiResults([...new Set([...localMatches, ...data.results])].slice(0, 12));
+      } else setAiResults(localMatches.slice(0, 12));
     } catch {
       const lower = q.toLowerCase();
       setAiResults(ALL_STORE_NAMES.filter(n => n.toLowerCase().includes(lower)).slice(0, 12));
@@ -141,13 +153,45 @@ export default function CouponsPage() {
     searchTimer.current = window.setTimeout(() => doAiSearch(val), 400);
   };
 
-  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setCapturedFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setCapturedImage(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    const dataUrl = await fileToBase64(file);
+    setCapturedImage(dataUrl);
+    // Auto-extract
+    runExtraction(dataUrl);
+  };
+
+  const runExtraction = async (dataUrl: string) => {
+    setExtracting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-coupon', {
+        body: { image_base64: dataUrl },
+      });
+      if (error) { toast.error('AI extraction failed — please fill manually'); return; }
+      const ex: ExtractedCoupon = data?.extracted || {};
+      if (ex.store_name) setPhotoStoreName(ex.store_name);
+      if (ex.title) setPhotoTitle(ex.title);
+      if (ex.code) setPhotoCode(ex.code);
+      if (ex.discount_text) setPhotoDiscountText(ex.discount_text);
+      if (ex.description) setPhotoDescription(ex.description);
+      if (ex.expiry_date) setPhotoExpiryDate(ex.expiry_date);
+      if (ex.valid_from) setPhotoValidFrom(ex.valid_from);
+      if (typeof ex.min_spend === 'number') setPhotoMinSpend(String(ex.min_spend));
+      if (ex.restrictions) setPhotoRestrictions(ex.restrictions);
+      if (ex.conditions) setPhotoConditions(ex.conditions);
+      setExtractedConfidence(ex.confidence || null);
+
+      const filled = [ex.store_name, ex.title, ex.code, ex.expiry_date].filter(Boolean).length;
+      if (filled > 0) toast.success(`AI extracted ${filled} field${filled > 1 ? 's' : ''} — review & save`);
+      else toast.info('AI could not extract details — please fill manually');
+    } catch (e) {
+      console.error(e);
+      toast.error('AI extraction failed');
+    } finally {
+      setExtracting(false);
+    }
   };
 
   const uploadReceiptImage = async (file: File): Promise<string | null> => {
@@ -165,52 +209,34 @@ export default function CouponsPage() {
     return data?.signedUrl || '';
   };
 
-  const selectStoreForCode = (name: string) => {
-    setStoreName(name);
-    addRecentStore(name);
-    setCodeDialogOpen(true);
-  };
-
-  const selectStoreForPhoto = (name: string) => {
-    setPhotoStoreName(name);
-    addRecentStore(name);
-    setPhotoDialogOpen(true);
-  };
+  const selectStoreForCode = (name: string) => { setStoreName(name); addRecentStore(name); setCodeDialogOpen(true); };
+  const selectStoreForPhoto = (name: string) => { setPhotoStoreName(name); addRecentStore(name); setPhotoDialogOpen(true); };
 
   const handleCodeSubmit = async () => {
     if (!household || !user) return;
-    if (!storeName.trim() || !code.trim()) {
-      toast.error('Store and code are required'); return;
-    }
+    if (!storeName.trim() || !code.trim()) { toast.error('Store and code are required'); return; }
     setUploading(true);
     const { error } = await supabase.from('discount_codes').insert({
-      household_id: household.id,
-      store_name: storeName.trim(),
-      code: code.trim(),
-      description: description.trim() || null,
-      receipt_image_url: null,
-      expiry_date: expiryDate || null,
-      added_by: user.id,
+      household_id: household.id, store_name: storeName.trim(), code: code.trim(),
+      description: description.trim() || null, receipt_image_url: null,
+      expiry_date: expiryDate || null, added_by: user.id, status: 'active',
     });
-    if (error) {
-      toast.error('Failed to save discount code');
-    } else {
-      toast.success(`Code for ${storeName} saved!`);
-      addRecentStore(storeName);
-      resetCodeForm();
-      setCodeDialogOpen(false);
-      fetchCodes();
-    }
+    if (error) toast.error('Failed to save discount code');
+    else { toast.success(`Code for ${storeName} saved!`); addRecentStore(storeName); resetCodeForm(); setCodeDialogOpen(false); fetchCodes(); }
     setUploading(false);
   };
 
   const handlePhotoSubmit = async () => {
-    if (!household || !user || !capturedFile) {
-      toast.error('Please take or upload a photo'); return;
+    if (!household || !user || !capturedFile) { toast.error('Please take or upload a photo'); return; }
+    if (!photoStoreName.trim()) { toast.error('Please enter a store name'); return; }
+
+    // Low-confidence date guard
+    const expiryConf = extractedConfidence?.expiry_date;
+    if (photoExpiryDate && expiryConf === 'low') {
+      const ok = window.confirm(`AI is unsure about the expiry date "${photoExpiryDate}". Confirm to save?`);
+      if (!ok) return;
     }
-    if (!photoStoreName.trim()) {
-      toast.error('Please enter a store name'); return;
-    }
+
     setUploading(true);
     const imageUrl = await uploadReceiptImage(capturedFile);
     if (!imageUrl) { setUploading(false); return; }
@@ -218,73 +244,69 @@ export default function CouponsPage() {
     const { error } = await supabase.from('discount_codes').insert({
       household_id: household.id,
       store_name: photoStoreName.trim(),
-      code: 'RECEIPT',
-      description: 'Receipt photo',
+      code: photoCode.trim() || 'RECEIPT',
+      title: photoTitle.trim() || null,
+      discount_text: photoDiscountText.trim() || null,
+      description: photoDescription.trim() || 'Receipt photo',
       receipt_image_url: imageUrl,
       expiry_date: photoExpiryDate || null,
+      valid_from: photoValidFrom || null,
+      min_spend: photoMinSpend ? Number(photoMinSpend) : null,
+      restrictions: photoRestrictions.trim() || null,
+      conditions: photoConditions.trim() || null,
       added_by: user.id,
+      status: 'active',
+      extracted_at: extractedConfidence ? new Date().toISOString() : null,
+      ai_confidence: extractedConfidence || null,
     });
-    if (error) {
-      toast.error('Failed to save');
-    } else {
-      toast.success(`Receipt for ${photoStoreName} saved!`);
-      addRecentStore(photoStoreName);
-      resetPhotoForm();
-      setPhotoDialogOpen(false);
-      fetchCodes();
-    }
+    if (error) toast.error('Failed to save');
+    else { toast.success(`Coupon for ${photoStoreName} saved!`); addRecentStore(photoStoreName); resetPhotoForm(); setPhotoDialogOpen(false); fetchCodes(); }
     setUploading(false);
   };
 
   const deleteCode = async (id: string) => {
     const { error } = await supabase.from('discount_codes').delete().eq('id', id);
-    if (error) { toast.error('Failed to delete'); }
+    if (error) toast.error('Failed to delete');
     else { setCodes(prev => prev.filter(c => c.id !== id)); toast.success('Deleted'); }
   };
 
-  const copyCode = (codeText: string) => {
-    navigator.clipboard.writeText(codeText);
-    toast.success('Code copied!');
-  };
+  const copyCode = (codeText: string) => { navigator.clipboard.writeText(codeText); toast.success('Code copied!'); };
 
-  const resetCodeForm = () => {
-    setStoreName(''); setCode(''); setDescription(''); setExpiryDate('');
-  };
-
+  const resetCodeForm = () => { setStoreName(''); setCode(''); setDescription(''); setExpiryDate(''); };
   const resetPhotoForm = () => {
-    setPhotoStoreName(''); setPhotoExpiryDate('');
-    setCapturedImage(null); setCapturedFile(null);
+    setPhotoStoreName(''); setPhotoTitle(''); setPhotoCode(''); setPhotoDiscountText('');
+    setPhotoDescription(''); setPhotoExpiryDate(''); setPhotoValidFrom('');
+    setPhotoMinSpend(''); setPhotoRestrictions(''); setPhotoConditions('');
+    setCapturedImage(null); setCapturedFile(null); setExtractedConfidence(null);
   };
 
-  const isExpired = (date: string | null) => date ? isBefore(new Date(date), new Date()) : false;
+  const isExpired = (date: string | null) => date ? isBefore(new Date(date), new Date(new Date().setHours(0,0,0,0))) : false;
+  const daysToExpiry = (date: string | null): number | null => date ? differenceInDays(new Date(date), new Date(new Date().setHours(0,0,0,0))) : null;
 
   const toggleRegion = (key: string) => {
-    setExpandedRegions(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
+    setExpandedRegions(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   };
 
-  // Group saved codes by store
-  const grouped = codes.reduce<Record<string, DiscountCode[]>>((acc, c) => {
-    (acc[c.store_name] = acc[c.store_name] || []).push(c);
-    return acc;
-  }, {});
+  // Default sort: expiring soonest, then highest min_spend (proxy for value), then newest
+  const sortedCodes = useMemo(() => {
+    return [...codes].sort((a, b) => {
+      const aExp = a.expiry_date ? new Date(a.expiry_date).getTime() : Infinity;
+      const bExp = b.expiry_date ? new Date(b.expiry_date).getTime() : Infinity;
+      if (aExp !== bExp) return aExp - bExp;
+      const aVal = a.min_spend || 0; const bVal = b.min_spend || 0;
+      if (aVal !== bVal) return bVal - aVal;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [codes]);
 
-  // Filter codes by search
   const filteredCodes = searchQuery.trim().length > 0
-    ? codes.filter(c =>
+    ? sortedCodes.filter(c =>
         c.store_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+        (c.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.title || '').toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : codes;
-
-  const filteredGrouped = filteredCodes.reduce<Record<string, DiscountCode[]>>((acc, c) => {
-    (acc[c.store_name] = acc[c.store_name] || []).push(c);
-    return acc;
-  }, {});
+    : sortedCodes;
 
   const StoreChip = ({ name, onAddCode, onAddPhoto }: { name: string; onAddCode: () => void; onAddPhoto: () => void }) => {
     const info = findStoreInfo(name);
@@ -298,15 +320,18 @@ export default function CouponsPage() {
           </button>
         )}
         <div className="flex gap-0.5 ml-auto shrink-0">
-          <button onClick={onAddCode} className="w-6 h-6 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors">
-            <Tag className="w-3 h-3 text-primary" />
-          </button>
-          <button onClick={onAddPhoto} className="w-6 h-6 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors">
-            <Camera className="w-3 h-3 text-primary" />
-          </button>
+          <button onClick={onAddCode} className="w-6 h-6 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center"><Tag className="w-3 h-3 text-primary" /></button>
+          <button onClick={onAddPhoto} className="w-6 h-6 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center"><Camera className="w-3 h-3 text-primary" /></button>
         </div>
       </div>
     );
+  };
+
+  const ConfBadge = ({ field }: { field: string }) => {
+    const c = extractedConfidence?.[field];
+    if (!c) return null;
+    const color = c === 'high' ? 'bg-primary/10 text-primary' : c === 'medium' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-destructive/10 text-destructive';
+    return <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded ${color}`}>AI · {c}</span>;
   };
 
   return (
@@ -314,11 +339,11 @@ export default function CouponsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-display font-bold">Coupons & Deals</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Save & share discount codes</p>
+          <p className="text-xs text-muted-foreground mt-0.5">AI-powered · sorted by expiring soonest</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => { resetPhotoForm(); setPhotoDialogOpen(true); }} className="gap-1.5">
-            <Camera className="w-4 h-4" /> Photo
+            <Sparkles className="w-4 h-4" /> Scan
           </Button>
           <Button size="sm" onClick={() => { resetCodeForm(); setCodeDialogOpen(true); }} className="gap-1.5">
             <Plus className="w-4 h-4" /> Code
@@ -326,40 +351,21 @@ export default function CouponsPage() {
         </div>
       </div>
 
-      {/* AI Search Bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search shops... (AI-powered)"
-          value={searchQuery}
-          onChange={e => handleSearchChange(e.target.value)}
-          className="pl-9 pr-10"
-        />
-        {searching && (
-          <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-pulse" />
-        )}
+        <Input placeholder="Search shops or coupons..." value={searchQuery} onChange={e => handleSearchChange(e.target.value)} className="pl-9 pr-10" />
+        {searching && <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-pulse" />}
       </div>
 
-      {/* AI search results */}
       {searchQuery.trim().length >= 2 && aiResults.length > 0 && (
         <div className="space-y-1">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-1">
-            Matching shops
-          </p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-1">Matching shops</p>
           <div className="grid grid-cols-1 gap-1.5">
-            {aiResults.map(name => (
-              <StoreChip
-                key={name}
-                name={name}
-                onAddCode={() => selectStoreForCode(name)}
-                onAddPhoto={() => selectStoreForPhoto(name)}
-              />
-            ))}
+            {aiResults.map(name => <StoreChip key={name} name={name} onAddCode={() => selectStoreForCode(name)} onAddPhoto={() => selectStoreForPhoto(name)} />)}
           </div>
         </div>
       )}
 
-      {/* Recently Used Stores */}
       {!searchQuery && recentStores.length > 0 && (
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 px-1">
@@ -367,141 +373,105 @@ export default function CouponsPage() {
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Recently Used</p>
           </div>
           <div className="grid grid-cols-1 gap-1.5">
-            {recentStores.slice(0, 5).map(name => (
-              <StoreChip
-                key={name}
-                name={name}
-                onAddCode={() => selectStoreForCode(name)}
-                onAddPhoto={() => selectStoreForPhoto(name)}
-              />
-            ))}
+            {recentStores.slice(0, 5).map(name => <StoreChip key={name} name={name} onAddCode={() => selectStoreForCode(name)} onAddPhoto={() => selectStoreForPhoto(name)} />)}
           </div>
         </div>
       )}
 
-      {/* Saved Codes */}
       {loading ? (
         <div className="flex justify-center py-16 text-muted-foreground">Loading...</div>
       ) : filteredCodes.length === 0 && codes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <Tag className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <h3 className="font-display font-semibold">No discount codes yet</h3>
-          <p className="text-muted-foreground text-sm mt-1">Search for a shop above or add a code</p>
+          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4"><Tag className="w-8 h-8 text-muted-foreground" /></div>
+          <h3 className="font-display font-semibold">No coupons yet</h3>
+          <p className="text-muted-foreground text-sm mt-1">Tap <span className="font-semibold">Scan</span> to extract a coupon photo with AI</p>
         </div>
       ) : filteredCodes.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-8">No codes match "{searchQuery}"</p>
+        <p className="text-sm text-muted-foreground text-center py-8">No coupons match "{searchQuery}"</p>
       ) : (
-        <div className="space-y-3">
-          <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1">
-            Your Saved Codes ({filteredCodes.length})
-          </h2>
-          {Object.entries(filteredGrouped).map(([store, storeCodes]) => (
-            <div key={store} className="space-y-2">
-              <div className="flex items-center gap-2 px-1">
-                <Store className="w-3.5 h-3.5 text-primary" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{store}</h3>
-                <span className="text-[10px] text-muted-foreground">({storeCodes.length})</span>
-                {findStoreInfo(store) && (
-                  <button onClick={() => setStoreInfoModal(findStoreInfo(store)!)} className="text-muted-foreground hover:text-foreground">
-                    <Info className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-              {storeCodes.map(item => (
-                <Card key={item.id} className={`border-border/50 overflow-hidden ${isExpired(item.expiry_date) ? 'opacity-50' : ''}`}>
-                  <CardContent className="p-3">
-                    <div className="flex items-start gap-3">
-                      {item.receipt_image_url && signedUrls[item.id] && (
-                        <button
-                          onClick={() => setPreviewImage(signedUrls[item.id])}
-                          className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted"
-                        >
-                          <img src={signedUrls[item.id]} alt="Receipt" className="w-full h-full object-cover" />
-                        </button>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {item.code !== 'RECEIPT' && (
-                            <button
-                              onClick={() => copyCode(item.code)}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
-                            >
-                              <Tag className="w-3 h-3 text-primary" />
-                              <span className="font-mono font-bold text-sm text-primary">{item.code}</span>
-                              <Copy className="w-3 h-3 text-primary/60" />
-                            </button>
-                          )}
-                          {item.code === 'RECEIPT' && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Camera className="w-3 h-3" /> Receipt photo
-                            </span>
-                          )}
-                          {isExpired(item.expiry_date) && (
-                            <span className="text-[10px] font-semibold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">Expired</span>
-                          )}
-                        </div>
-                        {item.description && item.code !== 'RECEIPT' && (
-                          <p className="text-xs text-muted-foreground mt-1 truncate">{item.description}</p>
+        <div className="space-y-2">
+          <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1">Expiring Soon — Your Coupons ({filteredCodes.length})</h2>
+          {filteredCodes.map(item => {
+            const days = daysToExpiry(item.expiry_date);
+            const expired = isExpired(item.expiry_date) || item.status === 'expired';
+            const expiringSoon = !expired && days !== null && days <= 2;
+            return (
+              <Card key={item.id} className={`border-border/50 overflow-hidden ${expired ? 'opacity-60 border-destructive/30' : expiringSoon ? 'border-amber-500/50' : ''}`}>
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-3">
+                    {item.receipt_image_url && signedUrls[item.id] && (
+                      <button onClick={() => setPreviewImage(signedUrls[item.id])} className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted">
+                        <img src={signedUrls[item.id]} alt="Coupon" className="w-full h-full object-cover" />
+                      </button>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Store className="w-3 h-3 text-primary shrink-0" />
+                        <span className="text-xs font-semibold">{item.store_name}</span>
+                        {expired && <span className="text-[10px] font-semibold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">Expired</span>}
+                        {expiringSoon && (
+                          <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            {days === 0 ? 'Today' : days === 1 ? '1 day' : `${days} days`}
+                          </span>
                         )}
-                        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
-                          <span>by {memberMap.get(item.added_by) || 'Unknown'}</span>
-                          {item.expiry_date && (
-                            <>
-                              <span>·</span>
-                              <span className="flex items-center gap-0.5">
-                                <Calendar className="w-2.5 h-2.5" />
-                                {format(new Date(item.expiry_date), 'MMM d, yyyy')}
-                              </span>
-                            </>
-                          )}
-                        </div>
                       </div>
-                      <Button
-                        variant="ghost" size="icon"
-                        className="shrink-0 h-8 w-8 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => deleteCode(item.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      {item.title && <p className="text-sm font-medium mt-1 truncate">{item.title}</p>}
+                      {item.discount_text && !item.title && <p className="text-sm font-medium mt-1 text-primary truncate">{item.discount_text}</p>}
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {item.code && item.code !== 'RECEIPT' && (
+                          <button onClick={() => copyCode(item.code)} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
+                            <Tag className="w-3 h-3 text-primary" />
+                            <span className="font-mono font-bold text-xs text-primary">{item.code}</span>
+                            <Copy className="w-3 h-3 text-primary/60" />
+                          </button>
+                        )}
+                        {item.code === 'RECEIPT' && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Camera className="w-3 h-3" /> Photo</span>}
+                      </div>
+                      {item.description && <p className="text-xs text-muted-foreground mt-1 truncate">{item.description}</p>}
+                      {(item.min_spend || item.conditions) && (
+                        <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                          {item.min_spend ? `Min spend ${item.min_spend} · ` : ''}{item.conditions || ''}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
+                        <span>by {memberMap.get(item.added_by) || 'Unknown'}</span>
+                        {item.expiry_date && (
+                          <>
+                            <span>·</span>
+                            <span className="flex items-center gap-0.5">
+                              <Calendar className="w-2.5 h-2.5" />
+                              {format(new Date(item.expiry_date), 'MMM d, yyyy')}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ))}
+                    <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8 text-destructive/60 hover:text-destructive hover:bg-destructive/10" onClick={() => deleteCode(item.id)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Browse Shops by Region */}
       <div className="space-y-2">
-        <button
-          onClick={() => setBrowseMode(!browseMode)}
-          className="flex items-center gap-2 px-1 w-full"
-        >
-          <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-            Browse Shops by Region
-          </h2>
+        <button onClick={() => setBrowseMode(!browseMode)} className="flex items-center gap-2 px-1 w-full">
+          <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Browse Shops by Region</h2>
           {browseMode ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
         </button>
-
         {browseMode && STORE_REGIONS.map(region => (
           <div key={region.key} className="border border-border/50 rounded-xl overflow-hidden">
-            <button
-              onClick={() => toggleRegion(region.key)}
-              className="flex items-center justify-between w-full p-3 hover:bg-muted/30 transition-colors"
-            >
+            <button onClick={() => toggleRegion(region.key)} className="flex items-center justify-between w-full p-3 hover:bg-muted/30 transition-colors">
               <span className="flex items-center gap-2">
                 <span className="text-lg">{region.emoji}</span>
                 <span className="text-sm font-semibold">{region.label}</span>
                 <span className="text-[10px] text-muted-foreground">({region.stores.length})</span>
               </span>
-              {expandedRegions.has(region.key) ? (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              )}
+              {expandedRegions.has(region.key) ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
             </button>
             {expandedRegions.has(region.key) && (
               <div className="px-3 pb-3 space-y-1.5">
@@ -511,15 +481,8 @@ export default function CouponsPage() {
                       <span className="font-medium">{store.name}</span>
                       <span className="text-[10px] text-muted-foreground ml-1.5">{store.couponType}</span>
                     </div>
-                    <button onClick={() => setStoreInfoModal(store)} className="shrink-0 text-muted-foreground hover:text-foreground">
-                      <Info className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => selectStoreForCode(store.name)}
-                      className="shrink-0 w-6 h-6 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
-                    >
-                      <Plus className="w-3 h-3 text-primary" />
-                    </button>
+                    <button onClick={() => setStoreInfoModal(store)} className="shrink-0 text-muted-foreground hover:text-foreground"><Info className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => selectStoreForCode(store.name)} className="shrink-0 w-6 h-6 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center"><Plus className="w-3 h-3 text-primary" /></button>
                   </div>
                 ))}
               </div>
@@ -531,17 +494,11 @@ export default function CouponsPage() {
       {/* Add Code Dialog */}
       <Dialog open={codeDialogOpen} onOpenChange={setCodeDialogOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Discount Code</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Add Discount Code</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Store</label>
-              <Input
-                placeholder="Store name"
-                value={storeName}
-                onChange={e => setStoreName(e.target.value)}
-              />
+              <Input placeholder="Store name" value={storeName} onChange={e => setStoreName(e.target.value)} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Discount Code</label>
@@ -562,32 +519,34 @@ export default function CouponsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Photo Dialog */}
+      {/* Photo Dialog with AI Extraction */}
       <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Receipt Photo</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" /> Scan Coupon
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Store</label>
-              <Input
-                placeholder="Store name"
-                value={photoStoreName}
-                onChange={e => setPhotoStoreName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block">Receipt Photo</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block">Photo</label>
               {capturedImage ? (
                 <div className="relative rounded-xl overflow-hidden border border-border">
-                  <img src={capturedImage} alt="Receipt" className="w-full max-h-48 object-cover" />
+                  <img src={capturedImage} alt="Coupon" className="w-full max-h-48 object-cover" />
                   <button
-                    onClick={() => { setCapturedImage(null); setCapturedFile(null); }}
-                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                    onClick={() => { setCapturedImage(null); setCapturedFile(null); setExtractedConfidence(null); }}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center text-white"
                   >
                     <X className="w-4 h-4" />
                   </button>
+                  {extracting && (
+                    <div className="absolute inset-0 bg-background/70 flex items-center justify-center backdrop-blur-sm">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        AI is reading your coupon...
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex gap-2">
@@ -602,12 +561,62 @@ export default function CouponsPage() {
               <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleCapture} />
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Expiry Date (optional)</label>
-              <Input type="date" value={photoExpiryDate} onChange={e => setPhotoExpiryDate(e.target.value)} />
-            </div>
-            <Button className="w-full" onClick={handlePhotoSubmit} disabled={uploading || !capturedFile}>
-              {uploading ? 'Uploading...' : 'Save Receipt'}
+
+            {capturedImage && !extracting && (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-1"><label className="text-xs text-muted-foreground">Store</label><ConfBadge field="store_name" /></div>
+                  <Input placeholder="Store name" value={photoStoreName} onChange={e => setPhotoStoreName(e.target.value)} />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1"><label className="text-xs text-muted-foreground">Offer title</label><ConfBadge field="title" /></div>
+                  <Input placeholder="e.g. 20% off groceries" value={photoTitle} onChange={e => setPhotoTitle(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-1"><label className="text-xs text-muted-foreground">Code</label><ConfBadge field="code" /></div>
+                    <Input placeholder="SAVE20" value={photoCode} onChange={e => setPhotoCode(e.target.value)} className="font-mono" />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1"><label className="text-xs text-muted-foreground">Discount</label><ConfBadge field="discount_text" /></div>
+                    <Input placeholder="20% off" value={photoDiscountText} onChange={e => setPhotoDiscountText(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-1"><label className="text-xs text-muted-foreground">Valid from</label><ConfBadge field="valid_from" /></div>
+                    <Input type="date" value={photoValidFrom} onChange={e => setPhotoValidFrom(e.target.value)} />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs text-muted-foreground font-semibold">Expires *</label>
+                      <ConfBadge field="expiry_date" />
+                    </div>
+                    <Input type="date" value={photoExpiryDate} onChange={e => setPhotoExpiryDate(e.target.value)}
+                      className={extractedConfidence?.expiry_date === 'low' ? 'border-amber-500' : ''} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Min spend</label>
+                  <Input type="number" placeholder="0" value={photoMinSpend} onChange={e => setPhotoMinSpend(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Restrictions</label>
+                  <Input placeholder="e.g. Selected groceries only" value={photoRestrictions} onChange={e => setPhotoRestrictions(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Conditions</label>
+                  <Input placeholder="e.g. In-store only, one-time use" value={photoConditions} onChange={e => setPhotoConditions(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Notes</label>
+                  <Textarea placeholder="Anything else..." value={photoDescription} onChange={e => setPhotoDescription(e.target.value)} rows={2} />
+                </div>
+              </>
+            )}
+
+            <Button className="w-full" onClick={handlePhotoSubmit} disabled={uploading || extracting || !capturedFile}>
+              {uploading ? 'Saving...' : extracting ? 'AI extracting...' : 'Save Coupon'}
             </Button>
           </div>
         </DialogContent>
@@ -617,10 +626,7 @@ export default function CouponsPage() {
       <Dialog open={!!storeInfoModal} onOpenChange={() => setStoreInfoModal(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Store className="w-4 h-4 text-primary" />
-              {storeInfoModal?.name}
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Store className="w-4 h-4 text-primary" />{storeInfoModal?.name}</DialogTitle>
           </DialogHeader>
           {storeInfoModal && (
             <div className="space-y-3">
@@ -632,10 +638,7 @@ export default function CouponsPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">How It Works</p>
                 <p className="text-sm mt-0.5">{storeInfoModal.couponTip}</p>
               </div>
-              <Button
-                className="w-full"
-                onClick={() => { selectStoreForCode(storeInfoModal.name); setStoreInfoModal(null); }}
-              >
+              <Button className="w-full" onClick={() => { selectStoreForCode(storeInfoModal.name); setStoreInfoModal(null); }}>
                 <Plus className="w-4 h-4 mr-1" /> Add Code for {storeInfoModal.name}
               </Button>
             </div>
@@ -643,16 +646,12 @@ export default function CouponsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Full-screen image preview */}
       {previewImage && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
-          <button
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-            onClick={() => setPreviewImage(null)}
-          >
+          <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white" onClick={() => setPreviewImage(null)}>
             <X className="w-5 h-5" />
           </button>
-          <img src={previewImage} alt="Receipt" className="max-w-full max-h-[85vh] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
+          <img src={previewImage} alt="Coupon" className="max-w-full max-h-[85vh] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </div>
