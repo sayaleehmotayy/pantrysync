@@ -501,13 +501,61 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
           <div className="space-y-4">
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">
-                {countable ? 'How many did you find?' : `How much ${activeItem.unit} did you find?`}
+                {countable ? 'How many did you find?' : `How much ${effectiveUnit} did you find?`}
               </p>
               <span className="text-5xl font-bold font-display tabular-nums">
                 {quantityInput || '0'}
               </span>
-              <p className="text-xs text-muted-foreground mt-1">{activeItem.unit}</p>
+              <p className="text-xs text-muted-foreground mt-1">{effectiveUnit}</p>
             </div>
+
+            {/* Unit picker — what did you actually buy it as? */}
+            <div className="max-w-[280px] mx-auto space-y-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Package className="w-3.5 h-3.5" /> Bought as
+              </label>
+              <Select value={boughtUnit} onValueChange={(v) => { setBoughtUnit(v); setPackSizeInput(''); }}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ALL_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {effectiveUnit !== activeItem.unit && (
+                <p className="text-[10px] text-muted-foreground">
+                  List was in {activeItem.unit} — you'll mark this item as fully bought.
+                </p>
+              )}
+            </div>
+
+            {/* Pack size — only when bought as a packable countable unit */}
+            {showPackSize && (
+              <div className="max-w-[280px] mx-auto space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Size per {effectiveUnit.replace(/s$/, '')} (optional)
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder={`e.g. 125`}
+                    value={packSizeInput}
+                    onChange={e => setPackSizeInput(e.target.value)}
+                    className="flex-1 h-9"
+                  />
+                  <Select value={packSizeUnit} onValueChange={setPackSizeUnit}>
+                    <SelectTrigger className="w-20 h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BULK_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {packSizeInput && parseFloat(packSizeInput) > 0 && qtyFound > 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    = {qtyFound} × {packSizeInput} {packSizeUnit} ({(qtyFound * parseFloat(packSizeInput)).toFixed(0)} {packSizeUnit} total)
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', countable ? 'clear' : '.', '0', 'back'].map(key => (
