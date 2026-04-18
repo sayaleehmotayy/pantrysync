@@ -18,6 +18,7 @@ import {
   ChevronRight, Plus, ChefHat, MessageCircle, Check, Trash2, Sparkles
 } from 'lucide-react';
 import { formatDistanceToNow, isBefore, addDays } from 'date-fns';
+import { formatQty } from '@/lib/utils';
 
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp'];
 
