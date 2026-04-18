@@ -38,12 +38,14 @@ interface ProductResult {
   nutritional_info: string | null;
 }
 
-export default function BarcodeScanner({ open, onOpenChange, onAddToPantry }: BarcodeScannerProps) {
+export default function BarcodeScanner({ open, onOpenChange, onAddToPantry, onAddToShoppingList, defaultDestination = 'shopping' }: BarcodeScannerProps) {
   const [step, setStep] = useState<'scan' | 'manual' | 'looking' | 'review' | 'not_found'>('scan');
   const [product, setProduct] = useState<ProductResult | null>(null);
   const [editedProduct, setEditedProduct] = useState<ProductResult & { expiry_date: string }>({} as any);
   const [manualBarcode, setManualBarcode] = useState('');
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [destination, setDestination] = useState<'pantry' | 'shopping'>(defaultDestination);
+  const [source, setSource] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
