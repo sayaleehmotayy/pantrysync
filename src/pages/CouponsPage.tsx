@@ -77,6 +77,7 @@ export default function CouponsPage() {
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [storeInfoModal, setStoreInfoModal] = useState<StoreInfo | null>(null);
+  const [barcodeFor, setBarcodeFor] = useState<DiscountCode | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [aiResults, setAiResults] = useState<string[]>([]);
