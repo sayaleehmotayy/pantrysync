@@ -45,6 +45,7 @@ export default function SettingsPage() {
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedTier, setSelectedTier] = useState<Exclude<TierKey, 'free'>>('duo');
   const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
+  const [shareInviteCode, setShareInviteCode] = useState<string>('');
 
   const currentTier = getTierByProductId(subscription.productId);
   const memberLimit = getMemberLimit(currentTier);
@@ -62,6 +63,56 @@ export default function SettingsPage() {
       });
   }, [user]);
 
+  useEffect(() => {
+    if (!household || userRole !== 'admin') {
+      setShareInviteCode('');
+      return;
+    }
+
+    let cancelled = false;
+
+    const ensureInviteCode = async () => {
+      const { data: existing } = await supabase
+        .from('household_invites')
+        .select('invite_code')
+        .eq('household_id', household.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (existing?.invite_code) {
+        setShareInviteCode(existing.invite_code.toUpperCase());
+        return;
+      }
+
+      const { data: created, error } = await supabase
+        .from('household_invites')
+        .insert({
+          household_id: household.id,
+          created_by: household.created_by,
+          invite_code: household.invite_code,
+          is_active: true,
+        })
+        .select('invite_code')
+        .single();
+
+      if (cancelled) return;
+      if (error) {
+        setShareInviteCode(household.invite_code.toUpperCase());
+        return;
+      }
+
+      setShareInviteCode((created?.invite_code || household.invite_code).toUpperCase());
+    };
+
+    void ensureInviteCode();
+    return () => {
+      cancelled = true;
+    };
+  }, [household, userRole]);
+
   const handleCurrencyChange = async (value: string) => {
     setPreferredCurrency(value);
     if (!user) return;
@@ -77,7 +128,7 @@ export default function SettingsPage() {
   };
 
   const copyInviteCode = () => {
-    navigator.clipboard.writeText(household.invite_code);
+    navigator.clipboard.writeText((shareInviteCode || household.invite_code).toUpperCase());
     toast.success('Invite code copied!');
   };
 
@@ -342,12 +393,12 @@ export default function SettingsPage() {
           <div>
             <p className="text-sm text-muted-foreground mb-1">Invite Code</p>
             <div className="flex items-center gap-2">
-              <code className="bg-muted px-3 py-1.5 rounded-md text-sm font-mono flex-1">{household.invite_code}</code>
+               <code className="bg-muted px-3 py-1.5 rounded-md text-sm font-mono flex-1">{(shareInviteCode || household.invite_code).toUpperCase()}</code>
               <Button size="sm" variant="outline" onClick={copyInviteCode}>
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Share this code with family members</p>
+             <p className="text-xs text-muted-foreground mt-1">Share this code with family members to join this household</p>
           </div>
         </CardContent>
       </Card>

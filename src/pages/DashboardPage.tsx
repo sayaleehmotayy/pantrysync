@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { STRIPE_CONFIG, PRO_FEATURES } from '@/config/subscription';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +40,7 @@ export default function DashboardPage() {
   const [partialId, setPartialId] = useState<string | null>(null);
   const [partialQty, setPartialQty] = useState('');
   const [partialUnit, setPartialUnit] = useState('pieces');
+  const [deleteTarget, setDeleteTarget] = useState<ShoppingItem | null>(null);
 
   const recentlyBought = shopping
     .filter(i => i.status === 'bought')
@@ -282,7 +284,7 @@ export default function DashboardPage() {
                         size="icon"
                         className="h-7 w-7 text-destructive"
                         title="Remove"
-                        onClick={() => deleteItem.mutate(item.id)}
+                        onClick={() => setDeleteTarget(item)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
@@ -351,6 +353,31 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from shopping list?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove{' '}
+              <span className="font-semibold text-foreground">{deleteTarget?.name}</span>
+              {deleteTarget && <> ({deleteTarget.quantity} {deleteTarget.unit})</>}{' '}
+              from your shopping list?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) deleteItem.mutate(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
