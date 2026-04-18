@@ -178,11 +178,66 @@ export default function VoiceCommandBar() {
     qc.invalidateQueries({ queryKey: ['inventory'] });
   }, [household, user, qc]);
 
+  /** When the user edits a low-confidence estimate, persist the corrected per-piece grams. */
+  const learnCorrection = useCallback(async (action: VoiceAction) => {
+    if (!household) return;
+    // Only learn for piece-based items where we have a food_key and a positive piece count.
+    if (!action.food_key || !action.original_pieces || action.original_pieces <= 0) return;
+
+    // Compute corrected grams from the user-edited quantity.
+    let correctedGrams: number | null = null;
+    if (action.unit === 'kg') correctedGrams = action.quantity * 1000;
+    else if (action.unit === 'g') correctedGrams = action.quantity;
+    if (!correctedGrams || correctedGrams <= 0) return;
+
+    const gramsPerPiece = correctedGrams / action.original_pieces;
+    // Sanity guard: ignore absurd corrections (likely typos)
+    if (gramsPerPiece < 5 || gramsPerPiece > 5000) return;
+
+    // Upsert: average with existing if present
+    const { data: existing } = await supabase
+      .from('food_weight_overrides')
+      .select('id, grams_per_unit, sample_count')
+      .eq('household_id', household.id)
+      .eq('food_key', action.food_key)
+      .eq('unit', 'piece')
+      .maybeSingle();
+
+    if (existing) {
+      const newCount = existing.sample_count + 1;
+      const newAvg = (Number(existing.grams_per_unit) * existing.sample_count + gramsPerPiece) / newCount;
+      await supabase.from('food_weight_overrides').update({
+        grams_per_unit: +newAvg.toFixed(1),
+        sample_count: newCount,
+      }).eq('id', existing.id);
+    } else {
+      await supabase.from('food_weight_overrides').insert({
+        household_id: household.id,
+        food_key: action.food_key,
+        unit: 'piece',
+        grams_per_unit: +gramsPerPiece.toFixed(1),
+        sample_count: 1,
+        created_by: user?.id,
+      });
+    }
+    toast.success(`Learned: ${action.food_key.replace(/_/g, ' ')} ≈ ${Math.round(gramsPerPiece)}g per piece`, { duration: 2500 });
+  }, [household, user]);
+
   const processCommand = useCallback(async (text: string) => {
     if (!text.trim()) return;
     setIsProcessing(true);
 
     try {
+      // Fetch this household's learned weight overrides to send alongside the command.
+      let learnedOverrides: any[] = [];
+      if (household) {
+        const { data } = await supabase
+          .from('food_weight_overrides')
+          .select('food_key, unit, grams_per_unit, sample_count')
+          .eq('household_id', household.id);
+        learnedOverrides = data ?? [];
+      }
+
       const { data, error } = await supabase.functions.invoke('voice-command', {
         body: {
           text,
@@ -199,12 +254,17 @@ export default function VoiceCommandBar() {
             unit: i.unit,
             status: i.status,
           })),
+          learnedOverrides,
         },
       });
 
       if (error) throw error;
 
-      const actions: VoiceAction[] = data?.actions || [];
+      const actions: VoiceAction[] = (data?.actions || []).map((a: VoiceAction) => ({
+        ...a,
+        _originalQuantity: a.quantity,
+        _originalGrams: a.grams ?? null,
+      }));
       if (actions.length === 0) {
         toast.info("Couldn't understand that command. Try something like 'I bought 2 boxes of milk'");
         return;
@@ -224,7 +284,7 @@ export default function VoiceCommandBar() {
       setIsProcessing(false);
       setTranscript('');
     }
-  }, [inventory, shopping, executeActions]);
+  }, [inventory, shopping, executeActions, household]);
 
   const toggleListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
