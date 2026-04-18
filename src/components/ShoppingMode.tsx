@@ -292,7 +292,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     } finally {
       setIsFinishing(false);
     }
-  }, [household, user, storeName, budget, totalSpent, curr, pricedItems, startedAt, clearSession, onExit, qc]);
+  }, [household, user, storeName, budget, totalSpent, curr, pricedItems, trackedItems, startedAt, clearSession, onExit, qc]);
 
   // Budget + store setup screen
   if (budget === null) {
