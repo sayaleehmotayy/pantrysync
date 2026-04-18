@@ -26,6 +26,70 @@ function guessStorage(category: string): string {
   return "pantry";
 }
 
+async function aiLookup(barcode: string): Promise<any | null> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return null;
+
+  try {
+    const prompt = `You are a product database assistant. The user scanned barcode "${barcode}". Using your broad knowledge of consumer products from across the internet, identify what product this barcode most likely belongs to.
+
+Return ONLY a JSON object (no markdown, no code fences) with these fields:
+{
+  "name": "Full product name including brand (e.g. 'Coca-Cola Classic 330ml Can')",
+  "brand": "Brand name or null",
+  "category": "One of: Fruits, Vegetables, Dairy, Grains, Snacks, Drinks, Meat, Spices, Frozen, Sauces, Other",
+  "quantity": number (e.g. 330),
+  "unit": "One of: pieces, g, kg, ml, l, bottles, packets",
+  "storage_location": "One of: pantry, fridge, freezer",
+  "ingredients": "Brief ingredients list or null",
+  "nutritional_info": "Brief nutrition summary or null",
+  "found": true if you are reasonably confident this barcode matches a real product, false otherwise
+}
+
+If you cannot identify the product with reasonable confidence, return {"found": false}.`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn("AI lookup failed:", res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    const raw = data.choices?.[0]?.message?.content || "";
+    const jsonStr = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(jsonStr);
+
+    if (!parsed.found || !parsed.name) return null;
+
+    return {
+      name: parsed.name,
+      category: parsed.category || "Other",
+      quantity: Number(parsed.quantity) || 1,
+      unit: parsed.unit || "pieces",
+      storage_location: parsed.storage_location || "pantry",
+      brand: parsed.brand || null,
+      barcode,
+      image_url: null,
+      ingredients: parsed.ingredients || null,
+      nutritional_info: parsed.nutritional_info || null,
+    };
+  } catch (err) {
+    console.error("aiLookup error:", err);
+    return null;
+  }
+}
+
 function parseQuantity(product: any): { quantity: number; unit: string } {
   const qStr = product.quantity || product.product_quantity || "";
   // Try to parse "500 ml", "1.5 L", "200g" etc.
@@ -85,6 +149,14 @@ serve(async (req) => {
     const data = await response.json();
 
     if (data.status !== 1 || !data.product) {
+      // Fallback: ask Lovable AI to identify the product from the barcode using its web knowledge
+      const aiResult = await aiLookup(barcode);
+      if (aiResult) {
+        return new Response(JSON.stringify({ found: true, product: aiResult, source: "ai" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
       return new Response(JSON.stringify({ found: false, barcode }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
