@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useInventory, InventoryItem } from '@/hooks/useInventory';
 import VoiceCommandBar from '@/components/VoiceCommandBar';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
