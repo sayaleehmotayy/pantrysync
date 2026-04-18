@@ -71,7 +71,14 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const [saleTotalInput, setSaleTotalInput] = useState('');
   const [trackedItems, setTrackedItems] = useState<TrackedItem[]>(savedSession?.trackedItems ?? []);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const initialized = useRef(!!savedSession);
+
+  const cancelTrip = useCallback(() => {
+    clearSession();
+    toast.success('Shopping session ended');
+    onExit();
+  }, [onExit]);
 
   useEffect(() => {
     if (initialized.current) return;
