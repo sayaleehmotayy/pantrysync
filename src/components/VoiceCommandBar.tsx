@@ -19,7 +19,7 @@ interface VoiceAction {
   storage_location: string;
   category: string;
   grams?: number | null;
-  confidence?: 'high' | 'low';
+  confidence?: 'high' | 'medium' | 'low';
   reason?: string;
   source?: 'config' | 'learned' | 'ai' | 'raw' | 'fraction';
   original_pieces?: number | null;
