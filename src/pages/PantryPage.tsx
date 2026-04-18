@@ -310,6 +310,8 @@ export default function PantryPage() {
         open={barcodeOpen}
         onOpenChange={setBarcodeOpen}
         onAddToPantry={handleScanToPantry}
+        onAddToShoppingList={(item) => addShoppingItem.mutate(item)}
+        defaultDestination="shopping"
       />
 
       <Dialog open={!!restockTarget} onOpenChange={open => !open && setRestockTarget(null)}>
