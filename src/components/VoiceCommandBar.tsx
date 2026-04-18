@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Mic, MicOff, Loader2, Sparkles } from 'lucide-react';
+import { Mic, MicOff, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,6 +18,12 @@ interface VoiceAction {
   unit: string;
   storage_location: string;
   category: string;
+  grams?: number | null;
+  confidence?: 'high' | 'low';
+  reason?: string;
+  original_pieces?: number | null;
+  original_size?: 'small' | 'medium' | 'large' | null;
+  food_key?: string | null;
 }
 
 export default function VoiceCommandBar() {
