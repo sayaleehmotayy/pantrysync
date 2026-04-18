@@ -64,13 +64,20 @@ export default function ChatPage() {
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionCursorPos, setMentionCursorPos] = useState(0);
   const [readReceipts, setReadReceipts] = useState<ReadReceipt[]>([]);
+  const [extraNames, setExtraNames] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const memberMap = new Map(
-    members.map((member) => [member.user_id, normalizeDisplayName(member.profile?.display_name) || 'Unknown'])
-  );
+  const memberMap = new Map<string, string>();
+  members.forEach((member) => {
+    const name = normalizeDisplayName(member.profile?.display_name);
+    if (name) memberMap.set(member.user_id, name);
+  });
+
+  const resolveSenderName = (userId: string): string => {
+    return memberMap.get(userId) || extraNames[userId] || 'Unknown';
+  };
 
   const mentionOptions: MentionOption[] = [
     { id: 'everyone', label: 'Everyone', isEveryone: true, normalizedLabel: 'everyone' },
@@ -105,7 +112,7 @@ export default function ChatPage() {
       }
 
       if (data) {
-        setMessages(data.map((message) => ({ ...message, sender_name: memberMap.get(message.user_id) || 'Unknown' })));
+        setMessages(data as ChatMessage[]);
       }
       setLoading(false);
     };
@@ -119,7 +126,6 @@ export default function ChatPage() {
         { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `household_id=eq.${household.id}` },
         (payload) => {
           const message = payload.new as ChatMessage;
-          message.sender_name = memberMap.get(message.user_id) || 'Unknown';
           setMessages((prev) => [...prev, message]);
         },
       )
@@ -127,6 +133,32 @@ export default function ChatPage() {
 
     return () => { supabase.removeChannel(channel); };
   }, [household, members]);
+
+  // Lazy-fetch profiles for any sender not in current members (e.g. removed/left users)
+  useEffect(() => {
+    const missingIds = Array.from(new Set(
+      messages
+        .map((m) => m.user_id)
+        .filter((id) => id && id !== user?.id && !memberMap.has(id) && !extraNames[id])
+    ));
+    if (missingIds.length === 0) return;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, display_name')
+        .in('user_id', missingIds);
+      if (data && data.length) {
+        setExtraNames((prev) => {
+          const next = { ...prev };
+          data.forEach((p) => {
+            const name = normalizeDisplayName(p.display_name);
+            if (name) next[p.user_id] = name;
+          });
+          return next;
+        });
+      }
+    })();
+  }, [messages, members, user?.id]);
 
   // Read receipts
   useEffect(() => {
@@ -465,7 +497,7 @@ export default function ChatPage() {
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className="max-w-[80%] group">
                   {!isMe && (
-                    <p className="text-[10px] text-muted-foreground mb-0.5 px-1">{msg.sender_name}</p>
+                    <p className="text-[10px] text-muted-foreground mb-0.5 px-1">{resolveSenderName(msg.user_id)}</p>
                   )}
                   <div className={`rounded-2xl px-3 py-2 text-sm transition-all duration-200 ${isMe ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm'}`}>
                     {renderMessageContent(msg.content)}
