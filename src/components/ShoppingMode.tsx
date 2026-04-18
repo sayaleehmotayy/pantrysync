@@ -82,13 +82,29 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   }, [onExit]);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     const pending = items.filter(i => i.status === 'pending' || i.status === 'not_found');
-    setTrackedItems(pending.map(i => ({
-      id: i.id, dbId: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null, quantityFound: null,
-    })));
-  }, []);
+
+    if (!initialized.current) {
+      initialized.current = true;
+      setTrackedItems(pending.map(i => ({
+        id: i.id, dbId: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null, quantityFound: null,
+      })));
+      return;
+    }
+
+    // Live merge: add any new pending items that aren't already tracked (by dbId)
+    setTrackedItems(prev => {
+      const trackedDbIds = new Set(prev.map(t => t.dbId));
+      const newOnes = pending
+        .filter(i => !trackedDbIds.has(i.id))
+        .map(i => ({
+          id: i.id, dbId: i.id, name: i.name, quantity: i.quantity, unit: i.unit, category: i.category, price: null, quantityFound: null,
+        }));
+      if (newOnes.length === 0) return prev;
+      toast.info(`${newOnes.length} new item${newOnes.length > 1 ? 's' : ''} added to your list`);
+      return [...prev, ...newOnes];
+    });
+  }, [items]);
 
   useEffect(() => {
     if (budget === null && trackedItems.length === 0) return;
