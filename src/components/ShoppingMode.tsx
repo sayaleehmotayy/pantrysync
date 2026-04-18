@@ -264,15 +264,21 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
 
       // Save trip items
       if (pricedItems.length > 0 && trip) {
-        const tripItems = pricedItems.map(item => ({
-          trip_id: trip.id,
-          item_name: item.name,
-          quantity_bought: item.quantityFound ?? item.quantity,
-          unit: item.unit,
-          category: item.category,
-          unit_price: item.price && item.quantityFound ? (isCountableUnit(item.unit) ? item.price / item.quantityFound : null) : null,
-          total_price: item.price ?? 0,
-        }));
+        const tripItems = pricedItems.map(item => {
+          const finalUnit = item.boughtUnit || item.unit;
+          const qty = item.quantityFound ?? item.quantity;
+          return {
+            trip_id: trip.id,
+            item_name: item.packSize
+              ? `${item.name} (${item.packSize} ${item.packSizeUnit}/${finalUnit.replace(/s$/, '')})`
+              : item.name,
+            quantity_bought: qty,
+            unit: finalUnit,
+            category: item.category,
+            unit_price: item.price && qty && isCountableUnit(finalUnit) ? item.price / qty : null,
+            total_price: item.price ?? 0,
+          };
+        });
 
         const { error: itemsError } = await supabase
           .from('shopping_trip_items')
@@ -282,49 +288,95 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
       }
 
       // Commit purchases to pantry + clean up shopping list.
-      // Aggregate by dbId so partial + remaining rows resolve correctly.
-      const boughtByDbId = new Map<string, { name: string; unit: string; category: string; qtyBought: number; originalQty: number }>();
+      // Aggregate by dbId + bought unit + pack size so different forms of the
+      // same shopping item (e.g. "2 tubs × 125 g" vs "300 g") stay separate in pantry.
+      type Bucket = {
+        name: string; unit: string; category: string; qtyBought: number;
+        originalQty: number; originalUnit: string;
+        packSize: number | null; packSizeUnit?: string;
+      };
+      const boughtKey = (item: typeof pricedItems[number]) => {
+        const u = item.boughtUnit || item.unit;
+        return `${item.dbId}|${u}|${item.packSize ?? ''}|${item.packSizeUnit ?? ''}`;
+      };
+      const bucketsByKey = new Map<string, Bucket>();
+      const dbIdsTouched = new Map<string, { originalQty: number; consumedInOriginalUnit: number }>();
+
       for (const item of pricedItems) {
         const qty = item.quantityFound ?? item.quantity;
         if (qty <= 0) continue;
-        const existing = boughtByDbId.get(item.dbId);
+        const finalUnit = item.boughtUnit || item.unit;
+        const key = boughtKey(item);
+        const existing = bucketsByKey.get(key);
         if (existing) {
           existing.qtyBought += qty;
         } else {
           const originalQty = trackedItems
             .filter(t => t.dbId === item.dbId)
             .reduce((s, t) => s + t.quantity, 0);
-          boughtByDbId.set(item.dbId, {
-            name: item.name, unit: item.unit, category: item.category,
-            qtyBought: qty, originalQty,
+          bucketsByKey.set(key, {
+            name: item.name,
+            unit: finalUnit,
+            category: item.category,
+            qtyBought: qty,
+            originalQty,
+            originalUnit: item.unit,
+            packSize: item.packSize ?? null,
+            packSizeUnit: item.packSizeUnit,
           });
+        }
+
+        // Track shopping-list consumption per dbId (only when bought in same unit as list)
+        if (finalUnit === item.unit) {
+          const t = dbIdsTouched.get(item.dbId);
+          const originalQty = trackedItems
+            .filter(tt => tt.dbId === item.dbId)
+            .reduce((s, tt) => s + tt.quantity, 0);
+          if (t) t.consumedInOriginalUnit += qty;
+          else dbIdsTouched.set(item.dbId, { originalQty, consumedInOriginalUnit: qty });
+        } else {
+          // bought in different unit — consider list satisfied
+          const originalQty = trackedItems
+            .filter(tt => tt.dbId === item.dbId)
+            .reduce((s, tt) => s + tt.quantity, 0);
+          dbIdsTouched.set(item.dbId, { originalQty, consumedInOriginalUnit: originalQty });
         }
       }
 
-      for (const [dbId, info] of boughtByDbId) {
+      // Insert/update pantry per bucket — store name with pack-size suffix so
+      // "Yogurt (125 g/tub)" stays distinct from bulk "Yogurt".
+      for (const bucket of bucketsByKey.values()) {
+        const pantryName = bucket.packSize
+          ? `${bucket.name} (${bucket.packSize} ${bucket.packSizeUnit}/${bucket.unit.replace(/s$/, '')})`
+          : bucket.name;
+
         const { data: existing } = await supabase
           .from('inventory_items')
           .select('id, quantity')
           .eq('household_id', household.id)
-          .ilike('name', info.name)
+          .ilike('name', pantryName)
+          .eq('unit', bucket.unit)
           .maybeSingle();
 
         if (existing) {
           await supabase.from('inventory_items')
-            .update({ quantity: Number(existing.quantity) + info.qtyBought })
+            .update({ quantity: Number(existing.quantity) + bucket.qtyBought })
             .eq('id', existing.id);
         } else {
           await supabase.from('inventory_items').insert({
             household_id: household.id,
-            name: info.name,
-            quantity: info.qtyBought,
-            unit: info.unit,
-            category: info.category && info.category !== 'Other' ? info.category : guessCategory(info.name, 'Other'),
+            name: pantryName,
+            quantity: bucket.qtyBought,
+            unit: bucket.unit,
+            category: bucket.category && bucket.category !== 'Other' ? bucket.category : guessCategory(bucket.name, 'Other'),
             added_by: user.id,
           });
         }
+      }
 
-        const remaining = info.originalQty - info.qtyBought;
+      // Clean up shopping list per dbId
+      for (const [dbId, t] of dbIdsTouched) {
+        const remaining = t.originalQty - t.consumedInOriginalUnit;
         if (remaining <= 0) {
           await supabase.from('shopping_list_items').delete().eq('id', dbId);
         } else {
