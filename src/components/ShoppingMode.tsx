@@ -19,10 +19,14 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
 // Countable units where per-unit pricing makes sense
-const COUNTABLE_UNITS = new Set(['pieces', 'packets', 'bags', 'bottles', 'cans', 'boxes', 'cartons', 'packs', 'jars', 'tubs']);
+const COUNTABLE_UNITS = ['pieces', 'tubs', 'bottles', 'cans', 'jars', 'packs', 'packets', 'bags', 'boxes', 'cartons'] as const;
+const BULK_UNITS = ['g', 'kg', 'ml', 'l'] as const;
+const ALL_UNITS = [...COUNTABLE_UNITS, ...BULK_UNITS];
+// Units that typically have a "size per unit" (e.g. 1 tub = 125 g)
+const PACKABLE_UNITS = new Set(['tubs', 'bottles', 'cans', 'jars', 'packs', 'packets', 'bags', 'boxes', 'cartons']);
 
 function isCountableUnit(unit: string): boolean {
-  return COUNTABLE_UNITS.has(unit.toLowerCase());
+  return (COUNTABLE_UNITS as readonly string[]).includes(unit.toLowerCase());
 }
 
 interface ShoppingModeProps {
@@ -41,6 +45,9 @@ interface TrackedItem {
   category: string;
   price: number | null;
   quantityFound: number | null;
+  boughtUnit?: string;       // unit user selected at the store (may differ from list unit)
+  packSize?: number | null;  // e.g. grams per tub
+  packSizeUnit?: string;     // e.g. 'g'
 }
 
 type EntryStep = 'quantity' | 'unitPrice' | 'confirm';
