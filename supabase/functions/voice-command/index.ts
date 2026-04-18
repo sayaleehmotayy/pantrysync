@@ -40,6 +40,23 @@ CRITICAL RULES:
 8. Handle compound sentences: "I had pizza and a glass of milk" = 2 separate actions.
 9. "water" when consumed means bottled water from inventory.
 10. When a user says "I ate/had/consumed/drank X", check if X exists in the pantry. If so, use the existing unit and reduce by the appropriate amount. If the item has quantity in pieces, reduce by 1. If in kg/g/l/ml, reduce by a reasonable single serving.
+11. **CRITICAL UNIT CONVERSION**: When the user says a quantity in a unit DIFFERENT from the unit stored in inventory, you MUST convert it to the inventory's stored unit before deducting. The "quantity" and "unit" fields you return MUST match the inventory item's existing unit.
+
+   Common conversions (use sensible food-density defaults):
+   - 1 cup uncooked rice / grains / flour ≈ 0.2 kg (200 g)
+   - 1 cup sugar ≈ 0.2 kg
+   - 1 cup oats ≈ 0.09 kg (90 g)
+   - 1 cup liquid (milk, water, oil) ≈ 0.24 l (240 ml)
+   - 1 tbsp ≈ 15 ml or 15 g
+   - 1 tsp ≈ 5 ml or 5 g
+   - 1 glass ≈ 0.25 l (250 ml)
+   - 1 bottle of water ≈ 0.5 l
+   - 1 slice of bread ≈ 0.03 kg (30 g)
+   - 1 g = 0.001 kg ; 1 ml = 0.001 l ; 1 kg = 1000 g ; 1 l = 1000 ml
+
+   Example: Inventory has "Basmati Rice (54 kg, pantry)". User says "I ate 2 cups of basmati rice".
+   → 2 cups uncooked rice ≈ 0.4 kg → return: { type: "update_quantity", name: "Basmati Rice", quantity: 0.4, unit: "kg", storage_location: "pantry", category: "Grains" }
+   NEVER return quantity:2, unit:"cups" when inventory stores it in kg — always convert first.
 
 Action types:
 - "remove_inventory": Remove item entirely (ate all, finished, threw away)
