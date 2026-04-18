@@ -66,7 +66,7 @@ function ItemForm({ onSubmit, initial, submitLabel }: {
   );
 }
 
-function QuickActions({ item, onUse, onAddToShoppingList }: { item: InventoryItem; onUse: (amount: number, action: string) => void; onAddToShoppingList: () => void }) {
+function QuickActions({ item, onUse, onRestock }: { item: InventoryItem; onUse: (amount: number, action: string) => void; onRestock: () => void }) {
   return (
     <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border/50">
       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUse(1, 'Used 1')}>
@@ -78,7 +78,7 @@ function QuickActions({ item, onUse, onAddToShoppingList }: { item: InventoryIte
       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUse(item.quantity, 'Finished')}>
         Finished
       </Button>
-      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onAddToShoppingList}>
+      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRestock}>
         <ShoppingCart className="w-3 h-3 mr-1" /> Restock
       </Button>
     </div>
@@ -96,6 +96,9 @@ export default function PantryPage() {
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
+  const [restockTarget, setRestockTarget] = useState<InventoryItem | null>(null);
+  const [restockQty, setRestockQty] = useState('');
+  const [restockUnit, setRestockUnit] = useState('pieces');
 
   const filtered = useMemo(() => {
     return items.filter(i => {
@@ -270,9 +273,10 @@ export default function PantryPage() {
                         quickUse.mutate({ item, amount, action });
                         if (amount >= item.quantity) setExpandedId(null);
                       }}
-                      onAddToShoppingList={() => {
-                        addShoppingItem.mutate({ name: item.name, quantity: item.min_threshold || 1, unit: item.unit, category: item.category });
-                        toast.success(`${item.name} added to shopping list`);
+                      onRestock={() => {
+                        setRestockTarget(item);
+                        setRestockQty(String(item.min_threshold || 1));
+                        setRestockUnit(item.unit || 'pieces');
                       }}
                     />
                   )}
