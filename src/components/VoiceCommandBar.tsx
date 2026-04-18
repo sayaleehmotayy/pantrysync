@@ -19,7 +19,7 @@ interface VoiceAction {
   storage_location: string;
   category: string;
   grams?: number | null;
-  confidence?: 'high' | 'low';
+  confidence?: 'high' | 'medium' | 'low';
   reason?: string;
   source?: 'config' | 'learned' | 'ai' | 'raw' | 'fraction';
   original_pieces?: number | null;
@@ -31,11 +31,19 @@ interface VoiceAction {
   _originalGrams?: number | null;
 }
 
+type UndoSnapshot =
+  | { kind: 'inventory_update'; id: string; previousQuantity: number; name: string }
+  | { kind: 'inventory_delete'; row: any; name: string }
+  | { kind: 'inventory_insert'; id: string; name: string }
+  | { kind: 'shopping_insert'; id: string; name: string }
+  | { kind: 'shopping_delete'; row: any; name: string };
+
 export default function VoiceCommandBar() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [pendingActions, setPendingActions] = useState<VoiceAction[] | null>(null);
+  const [mediumActions, setMediumActions] = useState<VoiceAction[] | null>(null);
   const recognitionRef = useRef<any>(null);
   const { household } = useHousehold();
   const { user } = useAuth();
@@ -43,26 +51,53 @@ export default function VoiceCommandBar() {
   const { data: shopping = [] } = useShoppingList();
   const qc = useQueryClient();
 
-  const executeActions = useCallback(async (actions: VoiceAction[]) => {
+  /** Undo a list of snapshots in reverse order. */
+  const undoSnapshots = useCallback(async (snaps: UndoSnapshot[]) => {
+    for (const s of [...snaps].reverse()) {
+      try {
+        if (s.kind === 'inventory_update') {
+          await supabase.from('inventory_items').update({ quantity: s.previousQuantity }).eq('id', s.id);
+        } else if (s.kind === 'inventory_delete') {
+          await supabase.from('inventory_items').insert(s.row);
+        } else if (s.kind === 'inventory_insert') {
+          await supabase.from('inventory_items').delete().eq('id', s.id);
+        } else if (s.kind === 'shopping_insert') {
+          await supabase.from('shopping_list_items').delete().eq('id', s.id);
+        } else if (s.kind === 'shopping_delete') {
+          await supabase.from('shopping_list_items').insert(s.row);
+        }
+      } catch (e) {
+        console.error('Undo step failed:', e);
+      }
+    }
+    qc.invalidateQueries({ queryKey: ['inventory'] });
+    qc.invalidateQueries({ queryKey: ['shopping'] });
+    toast.success('Reverted');
+  }, [qc]);
+
+  const executeActions = useCallback(async (actions: VoiceAction[], opts: { silent?: boolean } = {}) => {
     if (!household || !user) return;
+    const snapshots: UndoSnapshot[] = [];
+    const summaries: string[] = [];
 
     for (const action of actions) {
       switch (action.type) {
         case 'add_inventory': {
           const { data: existing } = await supabase
             .from('inventory_items')
-            .select('id, quantity')
+            .select('*')
             .eq('household_id', household.id)
             .ilike('name', action.name)
             .maybeSingle();
 
           if (existing) {
+            snapshots.push({ kind: 'inventory_update', id: existing.id, previousQuantity: existing.quantity, name: action.name });
             await supabase.from('inventory_items').update({
               quantity: existing.quantity + action.quantity,
             }).eq('id', existing.id);
-            toast.success(`Updated ${action.name}: +${action.quantity} ${action.unit}`);
+            summaries.push(`+${action.quantity}${action.unit} ${action.name}`);
           } else {
-            await supabase.from('inventory_items').insert({
+            const { data: inserted } = await supabase.from('inventory_items').insert({
               household_id: household.id,
               name: action.name,
               quantity: action.quantity,
@@ -70,69 +105,50 @@ export default function VoiceCommandBar() {
               category: action.category,
               storage_location: action.storage_location,
               added_by: user.id,
-            });
-            toast.success(`Added ${action.quantity} ${action.unit} of ${action.name} to ${action.storage_location}`);
+            }).select('id').single();
+            if (inserted?.id) snapshots.push({ kind: 'inventory_insert', id: inserted.id, name: action.name });
+            summaries.push(`Added ${action.quantity}${action.unit} ${action.name}`);
           }
           break;
         }
 
-        case 'remove_inventory': {
-          const { data: existing } = await supabase
-            .from('inventory_items')
-            .select('id, quantity')
-            .eq('household_id', household.id)
-            .ilike('name', action.name)
-            .maybeSingle();
-
-          if (existing) {
-            if (existing.quantity <= action.quantity) {
-              await supabase.from('inventory_items').delete().eq('id', existing.id);
-              toast.success(`Removed ${action.name} from pantry`);
-            } else {
-              await supabase.from('inventory_items').update({
-                quantity: existing.quantity - action.quantity,
-              }).eq('id', existing.id);
-              toast.success(`Reduced ${action.name} by ${action.quantity}`);
-            }
-          } else {
-            toast.info(`${action.name} not found in pantry`);
-          }
-          break;
-        }
-
+        case 'remove_inventory':
         case 'update_quantity': {
           const { data: existing } = await supabase
             .from('inventory_items')
-            .select('id, quantity')
+            .select('*')
             .eq('household_id', household.id)
             .ilike('name', action.name)
             .maybeSingle();
 
-          if (existing) {
-            const newQty = Math.max(0, existing.quantity - action.quantity);
-            if (newQty <= 0) {
-              await supabase.from('inventory_items').delete().eq('id', existing.id);
-              toast.success(`Used all ${action.name}`);
-            } else {
-              await supabase.from('inventory_items').update({ quantity: newQty }).eq('id', existing.id);
-              toast.success(`Used ${action.quantity} ${action.unit} of ${action.name}, ${newQty} remaining`);
-            }
+          if (!existing) {
+            if (!opts.silent) toast.info(`${action.name} not found in pantry`);
+            break;
+          }
+          const newQty = Math.max(0, existing.quantity - action.quantity);
+          if (newQty <= 0) {
+            snapshots.push({ kind: 'inventory_delete', row: existing, name: action.name });
+            await supabase.from('inventory_items').delete().eq('id', existing.id);
+            summaries.push(`Used all ${action.name}`);
           } else {
-            toast.info(`${action.name} not found in pantry`);
+            snapshots.push({ kind: 'inventory_update', id: existing.id, previousQuantity: existing.quantity, name: action.name });
+            await supabase.from('inventory_items').update({ quantity: newQty }).eq('id', existing.id);
+            summaries.push(`-${action.quantity}${action.unit} ${action.name}`);
           }
           break;
         }
 
         case 'add_shopping': {
-          await supabase.from('shopping_list_items').insert({
+          const { data: inserted } = await supabase.from('shopping_list_items').insert({
             household_id: household.id,
             name: action.name,
             quantity: action.quantity,
             unit: action.unit,
             category: action.category,
             requested_by: user.id,
-          });
-          toast.success(`Added ${action.name} to shopping list`);
+          }).select('id').single();
+          if (inserted?.id) snapshots.push({ kind: 'shopping_insert', id: inserted.id, name: action.name });
+          summaries.push(`Shopping: +${action.name}`);
           qc.invalidateQueries({ queryKey: ['shopping'] });
           break;
         }
@@ -140,15 +156,15 @@ export default function VoiceCommandBar() {
         case 'remove_shopping': {
           const { data: match } = await supabase
             .from('shopping_list_items')
-            .select('id')
+            .select('*')
             .eq('household_id', household.id)
             .ilike('name', action.name)
             .maybeSingle();
-
           if (match) {
+            snapshots.push({ kind: 'shopping_delete', row: match, name: action.name });
             await supabase.from('shopping_list_items').delete().eq('id', match.id);
-            toast.success(`Removed ${action.name} from shopping list`);
-          } else {
+            summaries.push(`Shopping: -${action.name}`);
+          } else if (!opts.silent) {
             toast.info(`${action.name} not found in shopping list`);
           }
           qc.invalidateQueries({ queryKey: ['shopping'] });
@@ -158,15 +174,15 @@ export default function VoiceCommandBar() {
         case 'clear_shopping': {
           const { data: allItems } = await supabase
             .from('shopping_list_items')
-            .select('id')
+            .select('*')
             .eq('household_id', household.id);
-
           if (allItems && allItems.length > 0) {
             for (const item of allItems) {
+              snapshots.push({ kind: 'shopping_delete', row: item, name: item.name });
               await supabase.from('shopping_list_items').delete().eq('id', item.id);
             }
-            toast.success(`Cleared ${allItems.length} items from shopping list`);
-          } else {
+            summaries.push(`Cleared ${allItems.length} shopping items`);
+          } else if (!opts.silent) {
             toast.info('Shopping list is already empty');
           }
           qc.invalidateQueries({ queryKey: ['shopping'] });
@@ -176,7 +192,16 @@ export default function VoiceCommandBar() {
     }
 
     qc.invalidateQueries({ queryKey: ['inventory'] });
-  }, [household, user, qc]);
+
+    if (summaries.length > 0 && !opts.silent) {
+      toast.success(summaries.join(' · '), {
+        duration: 6000,
+        action: snapshots.length > 0
+          ? { label: 'Undo', onClick: () => undoSnapshots(snapshots) }
+          : undefined,
+      });
+    }
+  }, [household, user, qc, undoSnapshots]);
 
   /** When the user edits a low-confidence estimate, persist the corrected per-piece grams. */
   const learnCorrection = useCallback(async (action: VoiceAction) => {
@@ -270,13 +295,17 @@ export default function VoiceCommandBar() {
         return;
       }
 
-      // If any action is low-confidence, show confirmation dialog instead of executing.
-      const needsConfirm = actions.some(a => a.confidence === 'low');
-      if (needsConfirm) {
-        setPendingActions(actions);
-      } else {
-        await executeActions(actions);
-      }
+      // Confidence-based routing:
+      //  HIGH   → auto-deduct silently with undo toast
+      //  MEDIUM → inline confirmation card (compact)
+      //  LOW    → full confirmation modal
+      const lowActions = actions.filter(a => a.confidence === 'low');
+      const mediumOnly = actions.filter(a => a.confidence === 'medium');
+      const highOnly = actions.filter(a => !a.confidence || a.confidence === 'high');
+
+      if (highOnly.length > 0) await executeActions(highOnly);
+      if (mediumOnly.length > 0) setMediumActions(mediumOnly);
+      if (lowActions.length > 0) setPendingActions(lowActions);
     } catch (e: any) {
       console.error('Voice command error:', e);
       toast.error(e.message || 'Failed to process command');
@@ -515,6 +544,59 @@ export default function VoiceCommandBar() {
           </div>
         )}
       </div>
+
+      {/* Medium-confidence INLINE confirmation card (no modal) */}
+      {mediumActions && mediumActions.length > 0 && (
+        <div className="mt-2 rounded-2xl border border-accent/30 bg-accent/5 p-3 space-y-2 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+            <p className="text-xs font-medium text-accent">Quick confirm</p>
+          </div>
+          {mediumActions.map((a, idx) => (
+            <div key={idx} className="flex items-center gap-2 text-sm">
+              <span className="flex-1 truncate">
+                <span className="font-medium">{a.name}</span>
+                <span className="text-muted-foreground"> · {a.quantity} {a.unit}</span>
+                {a.grams != null && a.unit !== 'g' && a.unit !== 'kg' && (
+                  <span className="text-[11px] text-muted-foreground"> (~{a.grams}g)</span>
+                )}
+              </span>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                value={a.quantity}
+                onChange={e => {
+                  const v = Number(e.target.value);
+                  setMediumActions(prev => prev?.map((p, i) => i === idx ? { ...p, quantity: v } : p) ?? null);
+                }}
+                className="h-7 w-20 text-xs"
+              />
+            </div>
+          ))}
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" variant="ghost" className="h-7 text-xs flex-1" onClick={() => setMediumActions(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 text-xs flex-1"
+              onClick={async () => {
+                const toRun = mediumActions ?? [];
+                setMediumActions(null);
+                for (const a of toRun) {
+                  if (a._originalQuantity != null && a.quantity !== a._originalQuantity) {
+                    await learnCorrection(a);
+                  }
+                }
+                await executeActions(toRun);
+              }}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Low-confidence confirmation dialog */}
       <Dialog open={!!pendingActions} onOpenChange={open => !open && setPendingActions(null)}>
