@@ -23,6 +23,13 @@ interface BarcodeScannerProps {
     storage_location?: string;
     min_threshold?: number;
   }) => void;
+  onAddToShoppingList?: (item: {
+    name: string;
+    quantity: number;
+    unit: string;
+    category: string;
+  }) => void;
+  defaultDestination?: 'pantry' | 'shopping';
 }
 
 interface ProductResult {
