@@ -251,7 +251,7 @@ export default function PantryPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm truncate">{item.name}</p>
+                        <p className="font-medium text-sm truncate">{simplified ? simplifyName(item.name) : item.name}</p>
                         {isLowStock(item) && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-warning/15 text-warning text-[10px] font-semibold leading-none flex-shrink-0">
                             <AlertTriangle className="w-3 h-3" />
