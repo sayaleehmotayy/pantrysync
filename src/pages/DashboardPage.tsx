@@ -270,7 +270,7 @@ export default function DashboardPage() {
                       </button>
                     </div>
                     <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      <span className="text-xs text-muted-foreground mr-1">{item.quantity} {item.unit}</span>
+                      <span className="text-xs text-muted-foreground mr-1">{formatQty(item.quantity)} {item.unit}</span>
                       <Button
                         variant="ghost"
                         size="icon"
