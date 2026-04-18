@@ -340,6 +340,31 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry, onAd
                 </div>
               )}
 
+              {/* Destination toggle */}
+              {onAddToShoppingList && (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Add to</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={destination === 'shopping' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setDestination('shopping')}
+                    >
+                      Shopping List
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={destination === 'pantry' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setDestination('pantry')}
+                    >
+                      Pantry
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Product Name</label>
                 <Input
