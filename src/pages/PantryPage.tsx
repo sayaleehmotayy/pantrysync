@@ -7,22 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera, Sparkles } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, format, isBefore, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
-
-// Shorten verbose product names for compact display (e.g. "Nivea Soft Refreshing Moisturizing Cream" -> "Nivea Moisturizing Cream")
-function simplifyName(name: string): string {
-  if (!name) return name;
-  const filler = new Set(['the','a','an','and','of','with','for','to','in','on','soft','refreshing','original','classic','new','fresh','natural','pure','premium','extra','super','ultra','plus','select','choice','best','quality','real','authentic','traditional','special','deluxe','great','value','family','size','pack','bottle','can','jar','tin','box','&']);
-  const words = name.split(/\s+/).filter(Boolean);
-  if (words.length <= 3) return name;
-  const kept = words.filter(w => !filler.has(w.toLowerCase()));
-  const final = (kept.length >= 2 ? kept : words).slice(0, 3);
-  return final.join(' ');
-}
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Frozen', 'Sauces', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'bottles', 'packets'];
