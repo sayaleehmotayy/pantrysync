@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { History, Store, ChevronDown, ChevronUp, ShoppingCart, DollarSign } from 'lucide-react';
 import { getCurrencyInfo, formatCurrency } from '@/lib/currency';
+import { useUserCurrency } from '@/hooks/useUserCurrency';
 
 interface TripItem {
   id: string;
@@ -32,6 +33,7 @@ interface Trip {
 
 export default function ShoppingHistoryPage() {
   const { household } = useHousehold();
+  const userCurrency = useUserCurrency();
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
 
   const { data: trips = [], isLoading } = useQuery({
@@ -87,7 +89,7 @@ export default function ShoppingHistoryPage() {
       ) : (
         <div className="space-y-3">
           {trips.map(trip => {
-            const curr = getCurrencyInfo(trip.currency);
+            const curr = trip.currency ? getCurrencyInfo(trip.currency) : userCurrency;
             const fmt = (n: number) => formatCurrency(n, curr);
             const isExpanded = expandedTrip === trip.id;
 
