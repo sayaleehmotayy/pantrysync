@@ -12,6 +12,7 @@ import {
   ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag, Store,
 } from 'lucide-react';
 import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
+import { guessCategory } from '@/lib/categorize';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
