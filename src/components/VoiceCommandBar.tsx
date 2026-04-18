@@ -30,6 +30,7 @@ export default function VoiceCommandBar() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [pendingActions, setPendingActions] = useState<VoiceAction[] | null>(null);
   const recognitionRef = useRef<any>(null);
   const { household } = useHousehold();
   const { user } = useAuth();
