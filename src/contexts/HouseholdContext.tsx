@@ -111,8 +111,10 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const joinHousehold = async (inviteCode: string) => {
     if (!user) return { error: new Error('Not authenticated') };
 
+    const normalizedInviteCode = inviteCode.trim().toLowerCase();
+
     const { error } = await supabase
-      .rpc('join_household_with_invite', { p_invite_code: inviteCode.trim() });
+      .rpc('join_household_with_invite', { p_invite_code: normalizedInviteCode });
 
     if (error) {
       // Surface the RPC exception message
