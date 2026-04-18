@@ -154,15 +154,24 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry, onAd
 
   const handleConfirmAdd = () => {
     if (!editedProduct) return;
-    onAddToPantry({
-      name: editedProduct.name,
-      quantity: editedProduct.quantity,
-      unit: editedProduct.unit,
-      category: editedProduct.category,
-      expiry_date: editedProduct.expiry_date || null,
-      storage_location: editedProduct.storage_location,
-      min_threshold: 0,
-    });
+    if (destination === 'shopping' && onAddToShoppingList) {
+      onAddToShoppingList({
+        name: editedProduct.name,
+        quantity: editedProduct.quantity,
+        unit: editedProduct.unit,
+        category: editedProduct.category,
+      });
+    } else {
+      onAddToPantry({
+        name: editedProduct.name,
+        quantity: editedProduct.quantity,
+        unit: editedProduct.unit,
+        category: editedProduct.category,
+        expiry_date: editedProduct.expiry_date || null,
+        storage_location: editedProduct.storage_location,
+        min_threshold: 0,
+      });
+    }
     handleClose();
   };
 
