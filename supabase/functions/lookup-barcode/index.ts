@@ -58,13 +58,28 @@ serve(async (req) => {
     }
 
     // Query Open Food Facts API
-    const response = await fetch(
-      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`,
-      { headers: { "User-Agent": "PantrySync/1.0 (contact@pantrysync.app)" } }
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`,
+        { headers: { "User-Agent": "PantrySync/1.0 (contact@pantrysync.app)" } }
+      );
+    } catch (err) {
+      console.error("OpenFoodFacts fetch failed:", err);
+      return new Response(JSON.stringify({ found: false, barcode, error: "Product database unreachable" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
+    // 404 = unknown barcode; any other non-OK = treat as not found rather than crashing
     if (!response.ok) {
-      throw new Error("Failed to query product database");
+      console.warn(`OpenFoodFacts returned ${response.status} for barcode ${barcode}`);
+      await response.body?.cancel();
+      return new Response(JSON.stringify({ found: false, barcode }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
     const data = await response.json();
