@@ -168,12 +168,12 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
   }, [open, fallbackImageUrl, code]);
 
   // Decide what to show. Priority:
-  //   1. Cropped barcode image (best for cashier)
-  //   2. Original uploaded photo (zoomable)
-  //   3. Generated SVG barcode (only when no image was uploaded)
+  //   1. Generated barcode from the extracted code (best for cashier scanners)
+  //   2. Cropped barcode image from the uploaded coupon photo
+  //   3. Original uploaded photo (zoomable)
   const imageToShow = croppedImageUrl || fallbackImageUrl || null;
   const isShowingCroppedImage = !!croppedImageUrl;
-  const shouldRenderSvg = open && !cropLoading && !imageToShow && usableCode && !renderError;
+  const shouldRenderSvg = open && usableCode && !renderError;
 
   // Render the JsBarcode SVG only when we actually need it
   useEffect(() => {
@@ -248,7 +248,11 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
             {title && <p className="text-xs text-center text-neutral-600 mt-1">{title}</p>}
           </DialogHeader>
 
-          {cropLoading ? (
+          {shouldRenderSvg ? (
+            <div className="flex justify-center rounded-lg bg-white py-4 min-h-[180px]">
+              <svg ref={svgRef} className="max-w-full h-auto" />
+            </div>
+          ) : cropLoading ? (
             <div className="flex flex-col items-center justify-center py-10 gap-3">
               <Loader2 className="w-6 h-6 animate-spin text-neutral-500" />
               <p className="text-sm text-neutral-600">Preparing barcode image…</p>
@@ -306,10 +310,6 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
                   ? 'Barcode cropped from your coupon photo — zoom in if the cashier needs it bigger'
                   : 'Original coupon photo — zoom in on the barcode for the cashier'}
               </p>
-            </div>
-          ) : shouldRenderSvg ? (
-            <div className="flex justify-center bg-white rounded-lg py-2 min-h-[140px]">
-              <svg ref={svgRef} className="max-w-full h-auto" />
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-center">
