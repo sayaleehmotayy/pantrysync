@@ -205,7 +205,13 @@ export default function VoiceCommandBar() {
         return;
       }
 
-      await executeActions(actions);
+      // If any action is low-confidence, show confirmation dialog instead of executing.
+      const needsConfirm = actions.some(a => a.confidence === 'low');
+      if (needsConfirm) {
+        setPendingActions(actions);
+      } else {
+        await executeActions(actions);
+      }
     } catch (e: any) {
       console.error('Voice command error:', e);
       toast.error(e.message || 'Failed to process command');
