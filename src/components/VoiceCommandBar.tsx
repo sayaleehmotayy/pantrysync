@@ -21,9 +21,14 @@ interface VoiceAction {
   grams?: number | null;
   confidence?: 'high' | 'low';
   reason?: string;
+  source?: 'config' | 'learned' | 'ai' | 'raw' | 'fraction';
   original_pieces?: number | null;
   original_size?: 'small' | 'medium' | 'large' | null;
   food_key?: string | null;
+  ai_reasoning?: string | null;
+  // Track original AI quantity to detect user edits → save to learned overrides
+  _originalQuantity?: number;
+  _originalGrams?: number | null;
 }
 
 export default function VoiceCommandBar() {
