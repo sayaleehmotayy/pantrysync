@@ -401,23 +401,27 @@ export default function BarcodeScanner({ open, onOpenChange, onAddToPantry, onAd
                     <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground mb-1 block">Storage</label>
-                  <Select value={editedProduct.storage_location} onValueChange={v => setEditedProduct({ ...editedProduct, storage_location: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{LOCATIONS.map(l => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+                {destination === 'pantry' && (
+                  <div className="flex-1">
+                    <label className="text-xs text-muted-foreground mb-1 block">Storage</label>
+                    <Select value={editedProduct.storage_location} onValueChange={v => setEditedProduct({ ...editedProduct, storage_location: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{LOCATIONS.map(l => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Expiry Date</label>
-                <Input
-                  type="date"
-                  value={editedProduct.expiry_date || ''}
-                  onChange={e => setEditedProduct({ ...editedProduct, expiry_date: e.target.value })}
-                />
-              </div>
+              {destination === 'pantry' && (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Expiry Date</label>
+                  <Input
+                    type="date"
+                    value={editedProduct.expiry_date || ''}
+                    onChange={e => setEditedProduct({ ...editedProduct, expiry_date: e.target.value })}
+                  />
+                </div>
+              )}
 
               {/* Extra info */}
               {(product?.brand || product?.barcode || product?.ingredients || product?.nutritional_info) && (
