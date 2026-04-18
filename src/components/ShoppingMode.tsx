@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag, Store,
+  ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag, Store, Package,
 } from 'lucide-react';
 import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
 import { guessCategory } from '@/lib/categorize';
