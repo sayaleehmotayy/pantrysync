@@ -363,12 +363,12 @@ export default function DashboardPage() {
                     <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
                       <Check className="w-3 h-3 text-primary" />
                     </div>
-                    <span>{item.name}</span>
+                    <span>{item.item_name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{item.bought_quantity || item.quantity} {item.unit}</span>
+                    <span className="text-xs text-muted-foreground">{formatQty(item.quantity_bought)} {item.unit}</span>
                     <span className="text-[10px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(item.finished_at), { addSuffix: true })}
                     </span>
                   </div>
                 </div>
