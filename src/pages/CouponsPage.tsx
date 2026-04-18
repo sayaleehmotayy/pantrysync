@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { format, isBefore, differenceInDays } from 'date-fns';
 import { STORE_REGIONS, ALL_STORE_NAMES, findStoreInfo, type StoreInfo } from '@/config/stores';
+import { BarcodeDialog } from '@/components/BarcodeDialog';
 
 interface DiscountCode {
   id: string;
