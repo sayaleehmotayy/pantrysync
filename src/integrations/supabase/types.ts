@@ -135,39 +135,81 @@ export type Database = {
       discount_codes: {
         Row: {
           added_by: string
+          ai_confidence: Json | null
           code: string
+          conditions: string | null
           created_at: string
+          delete_after: string | null
           description: string | null
+          discount_text: string | null
+          expired_at: string | null
           expiry_date: string | null
+          extracted_at: string | null
           household_id: string
           id: string
+          min_spend: number | null
           receipt_image_url: string | null
+          reminder_0d_sent: boolean
+          reminder_1d_sent: boolean
+          reminder_2d_sent: boolean
+          restrictions: string | null
+          status: string
           store_name: string
+          title: string | null
           updated_at: string
+          valid_from: string | null
         }
         Insert: {
           added_by: string
+          ai_confidence?: Json | null
           code: string
+          conditions?: string | null
           created_at?: string
+          delete_after?: string | null
           description?: string | null
+          discount_text?: string | null
+          expired_at?: string | null
           expiry_date?: string | null
+          extracted_at?: string | null
           household_id: string
           id?: string
+          min_spend?: number | null
           receipt_image_url?: string | null
+          reminder_0d_sent?: boolean
+          reminder_1d_sent?: boolean
+          reminder_2d_sent?: boolean
+          restrictions?: string | null
+          status?: string
           store_name: string
+          title?: string | null
           updated_at?: string
+          valid_from?: string | null
         }
         Update: {
           added_by?: string
+          ai_confidence?: Json | null
           code?: string
+          conditions?: string | null
           created_at?: string
+          delete_after?: string | null
           description?: string | null
+          discount_text?: string | null
+          expired_at?: string | null
           expiry_date?: string | null
+          extracted_at?: string | null
           household_id?: string
           id?: string
+          min_spend?: number | null
           receipt_image_url?: string | null
+          reminder_0d_sent?: boolean
+          reminder_1d_sent?: boolean
+          reminder_2d_sent?: boolean
+          restrictions?: string | null
+          status?: string
           store_name?: string
+          title?: string | null
           updated_at?: string
+          valid_from?: string | null
         }
         Relationships: []
       }
