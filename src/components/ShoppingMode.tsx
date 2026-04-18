@@ -75,6 +75,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [entryStep, setEntryStep] = useState<EntryStep>('quantity');
   const [quantityInput, setQuantityInput] = useState('');
+  const [boughtUnit, setBoughtUnit] = useState<string>('pieces');
+  const [packSizeInput, setPackSizeInput] = useState('');
+  const [packSizeUnit, setPackSizeUnit] = useState<string>('g');
   const [unitPriceInput, setUnitPriceInput] = useState('');
   const [useSalePrice, setUseSalePrice] = useState(false);
   const [saleTotalInput, setSaleTotalInput] = useState('');
