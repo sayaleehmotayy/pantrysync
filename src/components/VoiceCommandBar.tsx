@@ -295,13 +295,17 @@ export default function VoiceCommandBar() {
         return;
       }
 
-      // If any action is low-confidence, show confirmation dialog instead of executing.
-      const needsConfirm = actions.some(a => a.confidence === 'low');
-      if (needsConfirm) {
-        setPendingActions(actions);
-      } else {
-        await executeActions(actions);
-      }
+      // Confidence-based routing:
+      //  HIGH   → auto-deduct silently with undo toast
+      //  MEDIUM → inline confirmation card (compact)
+      //  LOW    → full confirmation modal
+      const lowActions = actions.filter(a => a.confidence === 'low');
+      const mediumOnly = actions.filter(a => a.confidence === 'medium');
+      const highOnly = actions.filter(a => !a.confidence || a.confidence === 'high');
+
+      if (highOnly.length > 0) await executeActions(highOnly);
+      if (mediumOnly.length > 0) setMediumActions(mediumOnly);
+      if (lowActions.length > 0) setPendingActions(lowActions);
     } catch (e: any) {
       console.error('Voice command error:', e);
       toast.error(e.message || 'Failed to process command');
