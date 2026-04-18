@@ -134,6 +134,32 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(channel); };
   }, [household, members]);
 
+  // Lazy-fetch profiles for any sender not in current members (e.g. removed/left users)
+  useEffect(() => {
+    const missingIds = Array.from(new Set(
+      messages
+        .map((m) => m.user_id)
+        .filter((id) => id && id !== user?.id && !memberMap.has(id) && !extraNames[id])
+    ));
+    if (missingIds.length === 0) return;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, display_name')
+        .in('user_id', missingIds);
+      if (data && data.length) {
+        setExtraNames((prev) => {
+          const next = { ...prev };
+          data.forEach((p) => {
+            const name = normalizeDisplayName(p.display_name);
+            if (name) next[p.user_id] = name;
+          });
+          return next;
+        });
+      }
+    })();
+  }, [messages, members, user?.id]);
+
   // Read receipts
   useEffect(() => {
     if (!household) return;
