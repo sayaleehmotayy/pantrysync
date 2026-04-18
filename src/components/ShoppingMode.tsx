@@ -592,9 +592,19 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   // Main shopping mode view
   return (
     <div className="space-y-4 animate-fade-in">
-      <button onClick={() => { onExit(); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Back to list (session saved)
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={() => { onExit(); }} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back (session saved)
+        </button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8"
+          onClick={() => setConfirmCancel(true)}
+        >
+          End Trip
+        </Button>
+      </div>
 
       {/* Store name badge */}
       {storeName && (
