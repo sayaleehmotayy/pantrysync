@@ -672,6 +672,7 @@ export default function CouponsPage() {
         code={barcodeFor?.code || ''}
         storeName={barcodeFor?.store_name}
         title={barcodeFor?.title || barcodeFor?.discount_text}
+        fallbackImageUrl={barcodeFor ? signedUrls[barcodeFor.id] : null}
       />
     </div>
   );
