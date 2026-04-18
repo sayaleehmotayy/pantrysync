@@ -661,6 +661,14 @@ export default function CouponsPage() {
           <img src={previewImage} alt="Coupon" className="max-w-full max-h-[85vh] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
         </div>
       )}
+
+      <BarcodeDialog
+        open={!!barcodeFor}
+        onOpenChange={(o) => !o && setBarcodeFor(null)}
+        code={barcodeFor?.code || ''}
+        storeName={barcodeFor?.store_name}
+        title={barcodeFor?.title || barcodeFor?.discount_text}
+      />
     </div>
   );
 }
