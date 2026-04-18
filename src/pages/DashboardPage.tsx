@@ -197,7 +197,7 @@ export default function DashboardPage() {
                     <div className="w-1.5 h-1.5 rounded-full bg-warning" />
                     <span>{item.name}</span>
                   </div>
-                  <span className="text-warning font-semibold text-xs">{item.quantity} {item.unit}</span>
+                  <span className="text-warning font-semibold text-xs">{formatQty(item.quantity)} {item.unit}</span>
                 </div>
               ))}
             </div>
