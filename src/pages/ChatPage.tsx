@@ -69,10 +69,11 @@ export default function ChatPage() {
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const memberMap = new Map(
-    members.map((member) => [member.user_id, normalizeDisplayName(member.profile?.display_name) || ''])
-      .filter(([, name]) => !!name)
-  );
+  const memberMap = new Map<string, string>();
+  members.forEach((member) => {
+    const name = normalizeDisplayName(member.profile?.display_name);
+    if (name) memberMap.set(member.user_id, name);
+  });
 
   const resolveSenderName = (userId: string): string => {
     return memberMap.get(userId) || extraNames[userId] || 'Unknown';
