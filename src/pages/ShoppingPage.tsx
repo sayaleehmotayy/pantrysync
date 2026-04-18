@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
 import ShoppingMode from '@/components/ShoppingMode';
 import { getCurrencyInfo, type CurrencyInfo } from '@/lib/currency';
+import { guessCategory } from '@/lib/categorize';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp'];
@@ -65,7 +66,9 @@ export default function ShoppingPage() {
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    addItem.mutate({ name, quantity: Number(quantity), unit, category });
+    // Auto-categorize when user kept the default "Other"
+    const finalCategory = category === 'Other' ? guessCategory(name, 'Other') : category;
+    addItem.mutate({ name, quantity: Number(quantity), unit, category: finalCategory });
     setName(''); setQuantity('1'); setUnit('pieces'); setCategory('Other');
     setAddOpen(false);
   };

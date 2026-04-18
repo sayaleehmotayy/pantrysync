@@ -12,6 +12,7 @@ import {
   ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag, Store,
 } from 'lucide-react';
 import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
+import { guessCategory } from '@/lib/categorize';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -264,7 +265,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             name: info.name,
             quantity: info.qtyBought,
             unit: info.unit,
-            category: info.category,
+            category: info.category && info.category !== 'Other' ? info.category : guessCategory(info.name, 'Other'),
             added_by: user.id,
           });
         }
