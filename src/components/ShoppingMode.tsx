@@ -640,11 +640,16 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
               <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Quantity found</span>
-                  <span className="font-medium">{qtyFound} {activeItem.unit}</span>
+                  <span className="font-medium">
+                    {qtyFound} {effectiveUnit}
+                    {showPackSize && packSizeInput && parseFloat(packSizeInput) > 0 && (
+                      <span className="text-xs text-muted-foreground ml-1">× {packSizeInput} {packSizeUnit}</span>
+                    )}
+                  </span>
                 </div>
                 {countable ? (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Price per {activeItem.unit.replace(/s$/, '')}</span>
+                    <span className="text-muted-foreground">Price per {effectiveUnit.replace(/s$/, '')}</span>
                     <span className="font-medium">{fmt(unitPrice)}</span>
                   </div>
                 ) : null}
