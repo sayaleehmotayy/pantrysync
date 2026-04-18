@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useInventory } from '@/hooks/useInventory';
 import { useHousehold } from '@/contexts/HouseholdContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
 import ShoppingMode from '@/components/ShoppingMode';
-import { type CurrencyInfo } from '@/lib/currency';
 import { useUserCurrency } from '@/hooks/useUserCurrency';
 import { guessCategory } from '@/lib/categorize';
 
