@@ -280,12 +280,11 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
   }, [open, fallbackImageUrl, code]);
 
   // Decide what to show. Priority:
-  //   1. Cropped barcode image (best when the coupon photo already contains the real barcode)
-  //   2. Original uploaded photo (zoomable)
-  //   3. Generated SVG barcode (fallback when we only have the code text)
-  const imageToShow = croppedImageUrl || fallbackImageUrl || null;
-  const isShowingCroppedImage = !!croppedImageUrl;
-  const shouldRenderSvg = open && !cropLoading && !imageToShow && usableCode && !renderError;
+  //   1. Original uploaded coupon photo (zoomable, no cropping)
+  //   2. Generated SVG barcode (fallback when we only have the code text)
+  const imageToShow = fallbackImageUrl || null;
+  const isShowingCroppedImage = false;
+  const shouldRenderSvg = open && !imageToShow && usableCode && !renderError;
 
   // Render the JsBarcode SVG only when we actually need it
   useEffect(() => {
@@ -360,12 +359,7 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
             {title && <p className="text-xs text-center text-neutral-600 mt-1">{title}</p>}
           </DialogHeader>
 
-          {cropLoading ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-neutral-500" />
-              <p className="text-sm text-neutral-600">Preparing barcode image…</p>
-            </div>
-          ) : imageToShow ? (
+          {imageToShow ? (
             <div className="space-y-3">
               <div
                 className="relative h-[320px] overflow-hidden rounded-lg bg-neutral-100 touch-none select-none"
