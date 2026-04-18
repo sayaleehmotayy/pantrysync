@@ -302,10 +302,12 @@ Extract EVERY item mentioned. Never skip food.`;
         cupAmount: a.cup_amount, cupOfWhat: a.cup_of_what,
         fractionOfContainer: a.fraction_of_container, container: a.container,
         rawQuantity: a.raw_quantity, rawUnit: a.raw_unit,
+        aiEstimateGrams: a.ai_estimate_grams, aiEstimateMl: a.ai_estimate_ml, aiConfidence: a.ai_confidence,
         inventoryItem: invItem, category: a.category,
+        learnedOverrides: learnedOverrides as LearnedOverride[],
       });
 
-      console.log(`[voice-command] ${a.action_name}: ${result.reason} → ${result.quantity} ${result.unit} (${result.confidence})`, { input: a, inv: invItem });
+      console.log(`[voice-command] ${a.action_name}: ${result.reason} → ${result.quantity} ${result.unit} (${result.confidence}, source=${result.source})`, { input: a, inv: invItem });
 
       return {
         type: a.type,
@@ -318,9 +320,11 @@ Extract EVERY item mentioned. Never skip food.`;
         grams: result.grams,
         confidence: result.confidence,
         reason: result.reason,
+        source: result.source,
         original_pieces: a.pieces ?? null,
         original_size: a.size ?? null,
         food_key: a.food_key ?? null,
+        ai_reasoning: a.ai_reasoning ?? null,
       };
     });
 
