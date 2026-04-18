@@ -256,6 +256,11 @@ Extract EVERY item mentioned. Never skip food.`;
                       // Mode D
                       raw_quantity: { type: "number" },
                       raw_unit: { type: "string", enum: ["pieces","g","kg","ml","l","cups","tbsp","tsp","bottles","packs","cans","slices","bars"] },
+                      // Mode E (AI estimate for items not in canonical list)
+                      ai_estimate_grams: { type: "number" },
+                      ai_estimate_ml: { type: "number" },
+                      ai_confidence: { type: "string", enum: ["high","medium","low"] },
+                      ai_reasoning: { type: "string" },
                     },
                     required: ["type","action_name"],
                   },
