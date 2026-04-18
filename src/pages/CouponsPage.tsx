@@ -402,7 +402,7 @@ export default function CouponsPage() {
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
                     {item.receipt_image_url && signedUrls[item.id] && (
-                      <button onClick={() => setPreviewImage(signedUrls[item.id])} className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted">
+                      <button onClick={() => setBarcodeFor(item)} className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted" title="Show at checkout">
                         <img src={signedUrls[item.id]} alt="Coupon" className="w-full h-full object-cover" />
                       </button>
                     )}
