@@ -331,7 +331,7 @@ export default function PantryPage() {
             className="space-y-4"
           >
             <p className="text-sm text-muted-foreground">
-              Currently {restockTarget?.quantity} {restockTarget?.unit} in {restockTarget?.storage_location}. How much do you want to restock?
+              Currently {formatQty(restockTarget?.quantity)} {restockTarget?.unit} in {restockTarget?.storage_location}. How much do you want to restock?
             </p>
             <div className="flex gap-3">
               <Input
