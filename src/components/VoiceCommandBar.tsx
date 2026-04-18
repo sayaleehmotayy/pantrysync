@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Mic, MicOff, Loader2, Sparkles } from 'lucide-react';
+import { Mic, MicOff, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,12 +18,19 @@ interface VoiceAction {
   unit: string;
   storage_location: string;
   category: string;
+  grams?: number | null;
+  confidence?: 'high' | 'low';
+  reason?: string;
+  original_pieces?: number | null;
+  original_size?: 'small' | 'medium' | 'large' | null;
+  food_key?: string | null;
 }
 
 export default function VoiceCommandBar() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [pendingActions, setPendingActions] = useState<VoiceAction[] | null>(null);
   const recognitionRef = useRef<any>(null);
   const { household } = useHousehold();
   const { user } = useAuth();
@@ -196,7 +205,13 @@ export default function VoiceCommandBar() {
         return;
       }
 
-      await executeActions(actions);
+      // If any action is low-confidence, show confirmation dialog instead of executing.
+      const needsConfirm = actions.some(a => a.confidence === 'low');
+      if (needsConfirm) {
+        setPendingActions(actions);
+      } else {
+        await executeActions(actions);
+      }
     } catch (e: any) {
       console.error('Voice command error:', e);
       toast.error(e.message || 'Failed to process command');
@@ -435,6 +450,68 @@ export default function VoiceCommandBar() {
           </div>
         )}
       </div>
+
+      {/* Low-confidence confirmation dialog */}
+      <Dialog open={!!pendingActions} onOpenChange={open => !open && setPendingActions(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-warning" />
+              Confirm pantry changes
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            {pendingActions?.map((a, idx) => (
+              <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-2 bg-muted/30">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium text-sm">{a.name}</p>
+                  <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-warning/15 text-warning font-semibold">
+                    needs review
+                  </span>
+                </div>
+                {a.original_pieces && a.food_key && (
+                  <p className="text-xs text-muted-foreground">
+                    {a.original_pieces} × {a.original_size ?? 'medium'} {a.food_key.replace(/_/g, ' ')}
+                    {a.grams != null && ` ≈ ${a.grams} g`}
+                  </p>
+                )}
+                {a.reason && <p className="text-[11px] text-muted-foreground italic">{a.reason}</p>}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Quantity</label>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={a.quantity}
+                      onChange={e => {
+                        const v = Number(e.target.value);
+                        setPendingActions(prev => prev?.map((p, i) => i === idx ? { ...p, quantity: v } : p) ?? null);
+                      }}
+                    />
+                  </div>
+                  <div className="w-20">
+                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Unit</label>
+                    <Input value={a.unit} disabled />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPendingActions(null)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                const toRun = pendingActions ?? [];
+                setPendingActions(null);
+                await executeActions(toRun);
+              }}
+            >
+              Confirm & deduct
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
