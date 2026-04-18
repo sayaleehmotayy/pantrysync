@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag, Store,
+  ArrowLeft, Check, ShoppingCart, Target, TrendingDown, TrendingUp, Delete, Undo2, Tag, Store, Package,
 } from 'lucide-react';
 import { type CurrencyInfo, formatCurrency, detectCurrencyFromLocale } from '@/lib/currency';
 import { guessCategory } from '@/lib/categorize';
@@ -18,10 +19,14 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
 // Countable units where per-unit pricing makes sense
-const COUNTABLE_UNITS = new Set(['pieces', 'packets', 'bags', 'bottles', 'cans', 'boxes', 'cartons', 'packs', 'jars', 'tubs']);
+const COUNTABLE_UNITS = ['pieces', 'tubs', 'bottles', 'cans', 'jars', 'packs', 'packets', 'bags', 'boxes', 'cartons'] as const;
+const BULK_UNITS = ['g', 'kg', 'ml', 'l'] as const;
+const ALL_UNITS = [...COUNTABLE_UNITS, ...BULK_UNITS];
+// Units that typically have a "size per unit" (e.g. 1 tub = 125 g)
+const PACKABLE_UNITS = new Set(['tubs', 'bottles', 'cans', 'jars', 'packs', 'packets', 'bags', 'boxes', 'cartons']);
 
 function isCountableUnit(unit: string): boolean {
-  return COUNTABLE_UNITS.has(unit.toLowerCase());
+  return (COUNTABLE_UNITS as readonly string[]).includes(unit.toLowerCase());
 }
 
 interface ShoppingModeProps {
@@ -40,6 +45,9 @@ interface TrackedItem {
   category: string;
   price: number | null;
   quantityFound: number | null;
+  boughtUnit?: string;       // unit user selected at the store (may differ from list unit)
+  packSize?: number | null;  // e.g. grams per tub
+  packSizeUnit?: string;     // e.g. 'g'
 }
 
 type EntryStep = 'quantity' | 'unitPrice' | 'confirm';
@@ -67,6 +75,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [entryStep, setEntryStep] = useState<EntryStep>('quantity');
   const [quantityInput, setQuantityInput] = useState('');
+  const [boughtUnit, setBoughtUnit] = useState<string>('pieces');
+  const [packSizeInput, setPackSizeInput] = useState('');
+  const [packSizeUnit, setPackSizeUnit] = useState<string>('g');
   const [unitPriceInput, setUnitPriceInput] = useState('');
   const [useSalePrice, setUseSalePrice] = useState(false);
   const [saleTotalInput, setSaleTotalInput] = useState('');
@@ -131,7 +142,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
   const fmt = (amount: number) => formatCurrency(amount, curr);
 
   const activeItem = activeItemId ? trackedItems.find(i => i.id === activeItemId) : null;
-  const countable = activeItem ? isCountableUnit(activeItem.unit) : true;
+  // Use the unit the shopper actually picked at the store, falling back to the list unit
+  const effectiveUnit = boughtUnit || activeItem?.unit || 'pieces';
+  const countable = isCountableUnit(effectiveUnit);
+  const showPackSize = PACKABLE_UNITS.has(effectiveUnit.toLowerCase());
 
   const qtyFound = quantityInput ? parseFloat(quantityInput) : 0;
   const unitPrice = unitPriceInput ? parseFloat(unitPriceInput) : 0;
@@ -160,6 +174,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     setActiveItemId(id);
     setEntryStep('quantity');
     setQuantityInput('');
+    setBoughtUnit(item.unit); // default to the list unit
+    setPackSizeInput('');
+    setPackSizeUnit('g');
     setUnitPriceInput('');
     setUseSalePrice(false);
     setSaleTotalInput('');
@@ -169,13 +186,25 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     if (!activeItemId || finalTotal <= 0) return;
 
     const item = trackedItems.find(i => i.id === activeItemId);
-    const remainingQty = item ? item.quantity - qtyFound : 0;
+    // Only treat as partial when the bought unit matches the list unit
+    const sameUnit = item && item.unit === effectiveUnit;
+    const remainingQty = sameUnit && item ? item.quantity - qtyFound : 0;
+    const packSizeNum = packSizeInput ? parseFloat(packSizeInput) : null;
 
     setTrackedItems(prev => {
       let updated = prev.map(i =>
-        i.id === activeItemId ? { ...i, price: finalTotal, quantityFound: qtyFound } : i
+        i.id === activeItemId
+          ? {
+              ...i,
+              price: finalTotal,
+              quantityFound: qtyFound,
+              boughtUnit: effectiveUnit,
+              packSize: showPackSize && packSizeNum && packSizeNum > 0 ? packSizeNum : null,
+              packSizeUnit: showPackSize && packSizeNum && packSizeNum > 0 ? packSizeUnit : undefined,
+            }
+          : i
       );
-      // If partial buy, add a new entry for the remaining quantity
+      // If partial buy in same unit, add a new entry for the remaining quantity
       if (remainingQty > 0 && item) {
         const remainingId = item.id.includes('_remaining') ? item.id : item.id + '_remaining';
         updated = [...updated, {
@@ -197,9 +226,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     setEntryStep('quantity');
     setQuantityInput('');
     setUnitPriceInput('');
+    setPackSizeInput('');
     setUseSalePrice(false);
     setSaleTotalInput('');
-  }, [activeItemId, finalTotal, qtyFound, onMarkBought, trackedItems]);
+  }, [activeItemId, finalTotal, qtyFound, onMarkBought, trackedItems, effectiveUnit, showPackSize, packSizeInput, packSizeUnit]);
 
   const undoPrice = useCallback((id: string) => {
     setTrackedItems(prev => prev.map(i =>
@@ -234,15 +264,21 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
 
       // Save trip items
       if (pricedItems.length > 0 && trip) {
-        const tripItems = pricedItems.map(item => ({
-          trip_id: trip.id,
-          item_name: item.name,
-          quantity_bought: item.quantityFound ?? item.quantity,
-          unit: item.unit,
-          category: item.category,
-          unit_price: item.price && item.quantityFound ? (isCountableUnit(item.unit) ? item.price / item.quantityFound : null) : null,
-          total_price: item.price ?? 0,
-        }));
+        const tripItems = pricedItems.map(item => {
+          const finalUnit = item.boughtUnit || item.unit;
+          const qty = item.quantityFound ?? item.quantity;
+          return {
+            trip_id: trip.id,
+            item_name: item.packSize
+              ? `${item.name} (${item.packSize} ${item.packSizeUnit}/${finalUnit.replace(/s$/, '')})`
+              : item.name,
+            quantity_bought: qty,
+            unit: finalUnit,
+            category: item.category,
+            unit_price: item.price && qty && isCountableUnit(finalUnit) ? item.price / qty : null,
+            total_price: item.price ?? 0,
+          };
+        });
 
         const { error: itemsError } = await supabase
           .from('shopping_trip_items')
@@ -252,49 +288,95 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
       }
 
       // Commit purchases to pantry + clean up shopping list.
-      // Aggregate by dbId so partial + remaining rows resolve correctly.
-      const boughtByDbId = new Map<string, { name: string; unit: string; category: string; qtyBought: number; originalQty: number }>();
+      // Aggregate by dbId + bought unit + pack size so different forms of the
+      // same shopping item (e.g. "2 tubs × 125 g" vs "300 g") stay separate in pantry.
+      type Bucket = {
+        name: string; unit: string; category: string; qtyBought: number;
+        originalQty: number; originalUnit: string;
+        packSize: number | null; packSizeUnit?: string;
+      };
+      const boughtKey = (item: typeof pricedItems[number]) => {
+        const u = item.boughtUnit || item.unit;
+        return `${item.dbId}|${u}|${item.packSize ?? ''}|${item.packSizeUnit ?? ''}`;
+      };
+      const bucketsByKey = new Map<string, Bucket>();
+      const dbIdsTouched = new Map<string, { originalQty: number; consumedInOriginalUnit: number }>();
+
       for (const item of pricedItems) {
         const qty = item.quantityFound ?? item.quantity;
         if (qty <= 0) continue;
-        const existing = boughtByDbId.get(item.dbId);
+        const finalUnit = item.boughtUnit || item.unit;
+        const key = boughtKey(item);
+        const existing = bucketsByKey.get(key);
         if (existing) {
           existing.qtyBought += qty;
         } else {
           const originalQty = trackedItems
             .filter(t => t.dbId === item.dbId)
             .reduce((s, t) => s + t.quantity, 0);
-          boughtByDbId.set(item.dbId, {
-            name: item.name, unit: item.unit, category: item.category,
-            qtyBought: qty, originalQty,
+          bucketsByKey.set(key, {
+            name: item.name,
+            unit: finalUnit,
+            category: item.category,
+            qtyBought: qty,
+            originalQty,
+            originalUnit: item.unit,
+            packSize: item.packSize ?? null,
+            packSizeUnit: item.packSizeUnit,
           });
+        }
+
+        // Track shopping-list consumption per dbId (only when bought in same unit as list)
+        if (finalUnit === item.unit) {
+          const t = dbIdsTouched.get(item.dbId);
+          const originalQty = trackedItems
+            .filter(tt => tt.dbId === item.dbId)
+            .reduce((s, tt) => s + tt.quantity, 0);
+          if (t) t.consumedInOriginalUnit += qty;
+          else dbIdsTouched.set(item.dbId, { originalQty, consumedInOriginalUnit: qty });
+        } else {
+          // bought in different unit — consider list satisfied
+          const originalQty = trackedItems
+            .filter(tt => tt.dbId === item.dbId)
+            .reduce((s, tt) => s + tt.quantity, 0);
+          dbIdsTouched.set(item.dbId, { originalQty, consumedInOriginalUnit: originalQty });
         }
       }
 
-      for (const [dbId, info] of boughtByDbId) {
+      // Insert/update pantry per bucket — store name with pack-size suffix so
+      // "Yogurt (125 g/tub)" stays distinct from bulk "Yogurt".
+      for (const bucket of bucketsByKey.values()) {
+        const pantryName = bucket.packSize
+          ? `${bucket.name} (${bucket.packSize} ${bucket.packSizeUnit}/${bucket.unit.replace(/s$/, '')})`
+          : bucket.name;
+
         const { data: existing } = await supabase
           .from('inventory_items')
           .select('id, quantity')
           .eq('household_id', household.id)
-          .ilike('name', info.name)
+          .ilike('name', pantryName)
+          .eq('unit', bucket.unit)
           .maybeSingle();
 
         if (existing) {
           await supabase.from('inventory_items')
-            .update({ quantity: Number(existing.quantity) + info.qtyBought })
+            .update({ quantity: Number(existing.quantity) + bucket.qtyBought })
             .eq('id', existing.id);
         } else {
           await supabase.from('inventory_items').insert({
             household_id: household.id,
-            name: info.name,
-            quantity: info.qtyBought,
-            unit: info.unit,
-            category: info.category && info.category !== 'Other' ? info.category : guessCategory(info.name, 'Other'),
+            name: pantryName,
+            quantity: bucket.qtyBought,
+            unit: bucket.unit,
+            category: bucket.category && bucket.category !== 'Other' ? bucket.category : guessCategory(bucket.name, 'Other'),
             added_by: user.id,
           });
         }
+      }
 
-        const remaining = info.originalQty - info.qtyBought;
+      // Clean up shopping list per dbId
+      for (const [dbId, t] of dbIdsTouched) {
+        const remaining = t.originalQty - t.consumedInOriginalUnit;
         if (remaining <= 0) {
           await supabase.from('shopping_list_items').delete().eq('id', dbId);
         } else {
@@ -419,13 +501,61 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
           <div className="space-y-4">
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">
-                {countable ? 'How many did you find?' : `How much ${activeItem.unit} did you find?`}
+                {countable ? 'How many did you find?' : `How much ${effectiveUnit} did you find?`}
               </p>
               <span className="text-5xl font-bold font-display tabular-nums">
                 {quantityInput || '0'}
               </span>
-              <p className="text-xs text-muted-foreground mt-1">{activeItem.unit}</p>
+              <p className="text-xs text-muted-foreground mt-1">{effectiveUnit}</p>
             </div>
+
+            {/* Unit picker — what did you actually buy it as? */}
+            <div className="max-w-[280px] mx-auto space-y-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Package className="w-3.5 h-3.5" /> Bought as
+              </label>
+              <Select value={boughtUnit} onValueChange={(v) => { setBoughtUnit(v); setPackSizeInput(''); }}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ALL_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {effectiveUnit !== activeItem.unit && (
+                <p className="text-[10px] text-muted-foreground">
+                  List was in {activeItem.unit} — you'll mark this item as fully bought.
+                </p>
+              )}
+            </div>
+
+            {/* Pack size — only when bought as a packable countable unit */}
+            {showPackSize && (
+              <div className="max-w-[280px] mx-auto space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Size per {effectiveUnit.replace(/s$/, '')} (optional)
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder={`e.g. 125`}
+                    value={packSizeInput}
+                    onChange={e => setPackSizeInput(e.target.value)}
+                    className="flex-1 h-9"
+                  />
+                  <Select value={packSizeUnit} onValueChange={setPackSizeUnit}>
+                    <SelectTrigger className="w-20 h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BULK_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {packSizeInput && parseFloat(packSizeInput) > 0 && qtyFound > 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    = {qtyFound} × {packSizeInput} {packSizeUnit} ({(qtyFound * parseFloat(packSizeInput)).toFixed(0)} {packSizeUnit} total)
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', countable ? 'clear' : '.', '0', 'back'].map(key => (
@@ -456,8 +586,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">
                 {countable
-                  ? `Price per 1 ${activeItem.unit.replace(/s$/, '')}?`
-                  : `Total price for ${qtyFound} ${activeItem.unit}?`}
+                  ? `Price per 1 ${effectiveUnit.replace(/s$/, '')}?`
+                  : `Total price for ${qtyFound} ${effectiveUnit}?`}
               </p>
               <span className="text-5xl font-bold font-display tabular-nums">
                 {curr.symbol}{unitPriceInput || '0.00'}
@@ -510,11 +640,16 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
               <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Quantity found</span>
-                  <span className="font-medium">{qtyFound} {activeItem.unit}</span>
+                  <span className="font-medium">
+                    {qtyFound} {effectiveUnit}
+                    {showPackSize && packSizeInput && parseFloat(packSizeInput) > 0 && (
+                      <span className="text-xs text-muted-foreground ml-1">× {packSizeInput} {packSizeUnit}</span>
+                    )}
+                  </span>
                 </div>
                 {countable ? (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Price per {activeItem.unit.replace(/s$/, '')}</span>
+                    <span className="text-muted-foreground">Price per {effectiveUnit.replace(/s$/, '')}</span>
                     <span className="font-medium">{fmt(unitPrice)}</span>
                   </div>
                 ) : null}
@@ -550,7 +685,7 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                   <div className="flex items-center gap-2">
                     <Tag className="w-4 h-4 text-primary shrink-0" />
                     <p className="text-sm text-muted-foreground">
-                      Sale total for {qtyFound} {activeItem.unit}:
+                      Sale total for {qtyFound} {effectiveUnit}:
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -718,7 +853,8 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {item.quantityFound ?? item.quantity} {item.unit}
+                      {item.quantityFound ?? item.quantity} {item.boughtUnit || item.unit}
+                      {item.packSize ? ` × ${item.packSize} ${item.packSizeUnit}` : ''}
                     </p>
                   </div>
                 </div>
