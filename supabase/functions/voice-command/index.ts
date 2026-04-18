@@ -72,6 +72,7 @@ function isUnrealisticGrams(grams: number, pieces: number, category?: string): b
 }
 
 interface InventoryItem { name: string; quantity: number; unit: string; storage_location: string; category: string; }
+interface LearnedOverride { food_key: string; unit: string; grams_per_unit: number; sample_count: number; }
 
 function findInventoryMatch(name: string, inv: InventoryItem[]): InventoryItem | null {
   const n = name.trim().toLowerCase();
@@ -80,68 +81,86 @@ function findInventoryMatch(name: string, inv: InventoryItem[]): InventoryItem |
       ?? null;
 }
 
-/** Convert AI-extracted (foodKey, pieces, size, cupAmount, fraction) into a deduction expressed in inventory units. */
+/** Convert AI-extracted intent into a deduction expressed in inventory units. */
 function computeDeduction(args: {
   foodKey?: string; pieces?: number; size?: FoodSize;
   cupAmount?: number; cupOfWhat?: string;
   fractionOfContainer?: number; container?: string;
   rawQuantity?: number; rawUnit?: string;
+  aiEstimateGrams?: number; aiEstimateMl?: number; aiConfidence?: "high" | "medium" | "low";
   inventoryItem: InventoryItem | null;
   category?: string;
-}): { quantity: number; unit: string; grams: number | null; confidence: "high" | "low"; reason: string } {
+  learnedOverrides?: LearnedOverride[];
+}): { quantity: number; unit: string; grams: number | null; confidence: "high" | "low"; reason: string; source: "config" | "learned" | "ai" | "raw" | "fraction" } {
   const inv = args.inventoryItem;
   const invUnit = inv?.unit ?? args.rawUnit ?? "pieces";
+  const overrides = args.learnedOverrides ?? [];
 
-  // CASE 1: piece-based food via canonical table
+  const toInvUnit = (grams: number, source: "config" | "learned" | "ai", reason: string, confidence: "high" | "low") => {
+    if (invUnit === "kg") return { quantity: +(grams / 1000).toFixed(3), unit: "kg", grams, confidence, reason, source };
+    if (invUnit === "g")  return { quantity: Math.round(grams), unit: "g", grams, confidence, reason, source };
+    if (invUnit === "pieces" && args.pieces) return { quantity: args.pieces, unit: "pieces", grams, confidence, reason, source };
+    return { quantity: args.pieces ?? +(grams / 1000).toFixed(3), unit: invUnit, grams, confidence: "low" as const, reason: `${reason} (unit mismatch ${invUnit})`, source };
+  };
+
+  // CASE 1A: piece-based food → check LEARNED overrides FIRST
   if (args.foodKey && args.pieces && args.pieces > 0) {
+    const learned = overrides.find(o => o.food_key === args.foodKey && o.unit === "piece");
+    if (learned) {
+      const grams = args.pieces * learned.grams_per_unit;
+      return toInvUnit(grams, "learned", `${args.pieces} × ${learned.grams_per_unit}g (learned, ${learned.sample_count} samples)`, "high");
+    }
+    // CASE 1B: piece-based food via canonical config
     const entry = FOOD_WEIGHTS.find(e => e.key === args.foodKey) ?? findFoodEntry(args.foodKey);
     if (entry) {
       const size = args.size ?? "medium";
       const grams = args.pieces * entry.weights[size];
       const realistic = !isUnrealisticGrams(grams, args.pieces, entry.category);
-      const confidence = realistic && args.size ? "high" : (realistic ? "high" : "low");
-
-      // Convert to inventory unit
-      if (invUnit === "kg") return { quantity: +(grams / 1000).toFixed(3), unit: "kg", grams, confidence, reason: `${args.pieces} × ${entry.weights[size]}g (${size} ${entry.key})` };
-      if (invUnit === "g")  return { quantity: grams, unit: "g", grams, confidence, reason: `${args.pieces} × ${entry.weights[size]}g (${size} ${entry.key})` };
-      if (invUnit === "pieces") return { quantity: args.pieces, unit: "pieces", grams, confidence, reason: `${args.pieces} pieces` };
-      // Inventory has a non-mass unit (bottles, packs) — fall back to pieces with low confidence
-      return { quantity: args.pieces, unit: invUnit, grams, confidence: "low", reason: `pieces→${invUnit} mismatch` };
+      return toInvUnit(grams, "config", `${args.pieces} × ${entry.weights[size]}g (${size} ${entry.key})`, realistic ? "high" : "low");
     }
   }
 
-  // CASE 2: cup measurement of a known dry/liquid good
+  // CASE 2: cup of a known dry good
   if (args.cupAmount && args.cupAmount > 0 && args.cupOfWhat) {
     const what = args.cupOfWhat.toLowerCase();
     const dryGrams = Object.keys(CUP_WEIGHTS_G).find(k => what.includes(k));
     if (dryGrams) {
       const grams = args.cupAmount * CUP_WEIGHTS_G[dryGrams];
-      if (invUnit === "kg") return { quantity: +(grams / 1000).toFixed(3), unit: "kg", grams, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_WEIGHTS_G[dryGrams]}g` };
-      if (invUnit === "g")  return { quantity: grams, unit: "g", grams, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_WEIGHTS_G[dryGrams]}g` };
+      if (invUnit === "kg") return { quantity: +(grams / 1000).toFixed(3), unit: "kg", grams, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_WEIGHTS_G[dryGrams]}g`, source: "config" };
+      if (invUnit === "g")  return { quantity: grams, unit: "g", grams, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_WEIGHTS_G[dryGrams]}g`, source: "config" };
     }
-    // Liquid default
     const ml = args.cupAmount * CUP_ML;
-    if (invUnit === "l")  return { quantity: +(ml / 1000).toFixed(3), unit: "l", grams: null, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_ML}ml` };
-    if (invUnit === "ml") return { quantity: ml, unit: "ml", grams: null, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_ML}ml` };
+    if (invUnit === "l")  return { quantity: +(ml / 1000).toFixed(3), unit: "l", grams: null, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_ML}ml`, source: "config" };
+    if (invUnit === "ml") return { quantity: ml, unit: "ml", grams: null, confidence: "high", reason: `${args.cupAmount} cup × ${CUP_ML}ml`, source: "config" };
   }
 
-  // CASE 3: fraction of a container (half the bottle)
+  // CASE 3: fraction of a container
   if (args.fractionOfContainer && args.fractionOfContainer > 0 && inv) {
     const qty = +(args.fractionOfContainer * inv.quantity).toFixed(3);
-    return { quantity: qty, unit: inv.unit, grams: null, confidence: "high", reason: `${args.fractionOfContainer} × current ${inv.quantity} ${inv.unit}` };
+    return { quantity: qty, unit: inv.unit, grams: null, confidence: "high", reason: `${args.fractionOfContainer} × current ${inv.quantity} ${inv.unit}`, source: "fraction" };
   }
 
-  // FALLBACK: trust raw qty/unit if it matches inventory unit
+  // CASE 4: AI ESTIMATE (no config match) — always low confidence, needs confirm
+  if (args.aiEstimateGrams && args.aiEstimateGrams > 0) {
+    const conf: "high" | "low" = "low"; // AI estimates ALWAYS need confirmation
+    return toInvUnit(args.aiEstimateGrams, "ai", `AI estimate ≈ ${args.aiEstimateGrams}g (${args.aiConfidence ?? "medium"} confidence)`, conf);
+  }
+  if (args.aiEstimateMl && args.aiEstimateMl > 0) {
+    if (invUnit === "l")  return { quantity: +(args.aiEstimateMl / 1000).toFixed(3), unit: "l", grams: null, confidence: "low", reason: `AI estimate ≈ ${args.aiEstimateMl}ml`, source: "ai" };
+    if (invUnit === "ml") return { quantity: args.aiEstimateMl, unit: "ml", grams: null, confidence: "low", reason: `AI estimate ≈ ${args.aiEstimateMl}ml`, source: "ai" };
+  }
+
+  // FALLBACK: raw qty/unit
   const qty = args.rawQuantity ?? 1;
   const unit = args.rawUnit ?? invUnit;
-  return { quantity: qty, unit, grams: null, confidence: unit === invUnit ? "high" : "low", reason: "raw extraction" };
+  return { quantity: qty, unit, grams: null, confidence: unit === invUnit ? "high" : "low", reason: "raw extraction", source: "raw" };
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { text, inventoryItems = [], shoppingItems = [] } = await req.json();
+    const { text, inventoryItems = [], shoppingItems = [], learnedOverrides = [] } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -171,8 +190,15 @@ For consumption ("I ate / drank / used / finished"), use type "update_quantity" 
 (C) FRACTION OF A CONTAINER — when user says "half the ketchup bottle", "a quarter of the jar":
   → Set: fraction_of_container (e.g. 0.5, 0.25, 0.33), container (e.g. "bottle","jar","pack")
 
-(D) RAW — only when none of A/B/C fit (e.g. "I bought 3 kg chicken"):
+(D) RAW — when user states an explicit quantity + standard unit (e.g. "I bought 3 kg chicken"):
   → Set: raw_quantity, raw_unit (one of: pieces, g, kg, ml, l)
+
+(E) AI ESTIMATE — for items NOT in the canonical list above and that don't fit B/C/D (e.g. "3 spoons of chole", "a handful of cashews", "a samosa", "a bowl of dal"):
+  → Estimate the most likely real-world weight in grams (or millilitres for liquids) and set:
+     ai_estimate_grams (number) OR ai_estimate_ml (number),
+     ai_confidence ("high" | "medium" | "low"),
+     ai_reasoning (one short sentence explaining the estimate, e.g. "1 tbsp chole curry ≈ 25g, so 3 spoons ≈ 75g")
+  → Be REALISTIC: a samosa ≈ 70g, a bowl of dal ≈ 250g, a handful of nuts ≈ 30g, a spoon of curry ≈ 25g.
 
 Always also set: action_name (display name, capitalized), category (Fruits/Vegetables/Dairy/Grains/Snacks/Drinks/Meat/Spices/Frozen/Sauces/Other), storage_location.
 
@@ -185,6 +211,8 @@ EXAMPLES:
 - "I drank a glass of milk" → mode B: cup_amount=1, cup_of_what="milk", action_name="Milk"
 - "I used half the ketchup bottle" → mode C: fraction_of_container=0.5, container="bottle", action_name="Ketchup"
 - "I bought 3 kg chicken" → type=add_inventory, mode D: raw_quantity=3, raw_unit="kg"
+- "I ate 3 spoons of chole" → mode E: ai_estimate_grams=75, ai_confidence="medium", ai_reasoning="~25g per tbsp curry × 3", action_name="Chole"
+- "I had a samosa" → mode E: ai_estimate_grams=70, ai_confidence="medium", action_name="Samosa"
 
 Extract EVERY item mentioned. Never skip food.`;
 
@@ -228,6 +256,11 @@ Extract EVERY item mentioned. Never skip food.`;
                       // Mode D
                       raw_quantity: { type: "number" },
                       raw_unit: { type: "string", enum: ["pieces","g","kg","ml","l","cups","tbsp","tsp","bottles","packs","cans","slices","bars"] },
+                      // Mode E (AI estimate for items not in canonical list)
+                      ai_estimate_grams: { type: "number" },
+                      ai_estimate_ml: { type: "number" },
+                      ai_confidence: { type: "string", enum: ["high","medium","low"] },
+                      ai_reasoning: { type: "string" },
                     },
                     required: ["type","action_name"],
                   },
@@ -269,10 +302,12 @@ Extract EVERY item mentioned. Never skip food.`;
         cupAmount: a.cup_amount, cupOfWhat: a.cup_of_what,
         fractionOfContainer: a.fraction_of_container, container: a.container,
         rawQuantity: a.raw_quantity, rawUnit: a.raw_unit,
+        aiEstimateGrams: a.ai_estimate_grams, aiEstimateMl: a.ai_estimate_ml, aiConfidence: a.ai_confidence,
         inventoryItem: invItem, category: a.category,
+        learnedOverrides: learnedOverrides as LearnedOverride[],
       });
 
-      console.log(`[voice-command] ${a.action_name}: ${result.reason} → ${result.quantity} ${result.unit} (${result.confidence})`, { input: a, inv: invItem });
+      console.log(`[voice-command] ${a.action_name}: ${result.reason} → ${result.quantity} ${result.unit} (${result.confidence}, source=${result.source})`, { input: a, inv: invItem });
 
       return {
         type: a.type,
@@ -285,9 +320,11 @@ Extract EVERY item mentioned. Never skip food.`;
         grams: result.grams,
         confidence: result.confidence,
         reason: result.reason,
+        source: result.source,
         original_pieces: a.pieces ?? null,
         original_size: a.size ?? null,
         food_key: a.food_key ?? null,
+        ai_reasoning: a.ai_reasoning ?? null,
       };
     });
 

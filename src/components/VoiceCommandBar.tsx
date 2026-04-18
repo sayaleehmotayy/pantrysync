@@ -21,9 +21,14 @@ interface VoiceAction {
   grams?: number | null;
   confidence?: 'high' | 'low';
   reason?: string;
+  source?: 'config' | 'learned' | 'ai' | 'raw' | 'fraction';
   original_pieces?: number | null;
   original_size?: 'small' | 'medium' | 'large' | null;
   food_key?: string | null;
+  ai_reasoning?: string | null;
+  // Track original AI quantity to detect user edits → save to learned overrides
+  _originalQuantity?: number;
+  _originalGrams?: number | null;
 }
 
 export default function VoiceCommandBar() {
@@ -173,11 +178,66 @@ export default function VoiceCommandBar() {
     qc.invalidateQueries({ queryKey: ['inventory'] });
   }, [household, user, qc]);
 
+  /** When the user edits a low-confidence estimate, persist the corrected per-piece grams. */
+  const learnCorrection = useCallback(async (action: VoiceAction) => {
+    if (!household) return;
+    // Only learn for piece-based items where we have a food_key and a positive piece count.
+    if (!action.food_key || !action.original_pieces || action.original_pieces <= 0) return;
+
+    // Compute corrected grams from the user-edited quantity.
+    let correctedGrams: number | null = null;
+    if (action.unit === 'kg') correctedGrams = action.quantity * 1000;
+    else if (action.unit === 'g') correctedGrams = action.quantity;
+    if (!correctedGrams || correctedGrams <= 0) return;
+
+    const gramsPerPiece = correctedGrams / action.original_pieces;
+    // Sanity guard: ignore absurd corrections (likely typos)
+    if (gramsPerPiece < 5 || gramsPerPiece > 5000) return;
+
+    // Upsert: average with existing if present
+    const { data: existing } = await supabase
+      .from('food_weight_overrides')
+      .select('id, grams_per_unit, sample_count')
+      .eq('household_id', household.id)
+      .eq('food_key', action.food_key)
+      .eq('unit', 'piece')
+      .maybeSingle();
+
+    if (existing) {
+      const newCount = existing.sample_count + 1;
+      const newAvg = (Number(existing.grams_per_unit) * existing.sample_count + gramsPerPiece) / newCount;
+      await supabase.from('food_weight_overrides').update({
+        grams_per_unit: +newAvg.toFixed(1),
+        sample_count: newCount,
+      }).eq('id', existing.id);
+    } else {
+      await supabase.from('food_weight_overrides').insert({
+        household_id: household.id,
+        food_key: action.food_key,
+        unit: 'piece',
+        grams_per_unit: +gramsPerPiece.toFixed(1),
+        sample_count: 1,
+        created_by: user?.id,
+      });
+    }
+    toast.success(`Learned: ${action.food_key.replace(/_/g, ' ')} ≈ ${Math.round(gramsPerPiece)}g per piece`, { duration: 2500 });
+  }, [household, user]);
+
   const processCommand = useCallback(async (text: string) => {
     if (!text.trim()) return;
     setIsProcessing(true);
 
     try {
+      // Fetch this household's learned weight overrides to send alongside the command.
+      let learnedOverrides: any[] = [];
+      if (household) {
+        const { data } = await supabase
+          .from('food_weight_overrides')
+          .select('food_key, unit, grams_per_unit, sample_count')
+          .eq('household_id', household.id);
+        learnedOverrides = data ?? [];
+      }
+
       const { data, error } = await supabase.functions.invoke('voice-command', {
         body: {
           text,
@@ -194,12 +254,17 @@ export default function VoiceCommandBar() {
             unit: i.unit,
             status: i.status,
           })),
+          learnedOverrides,
         },
       });
 
       if (error) throw error;
 
-      const actions: VoiceAction[] = data?.actions || [];
+      const actions: VoiceAction[] = (data?.actions || []).map((a: VoiceAction) => ({
+        ...a,
+        _originalQuantity: a.quantity,
+        _originalGrams: a.grams ?? null,
+      }));
       if (actions.length === 0) {
         toast.info("Couldn't understand that command. Try something like 'I bought 2 boxes of milk'");
         return;
@@ -219,7 +284,7 @@ export default function VoiceCommandBar() {
       setIsProcessing(false);
       setTranscript('');
     }
-  }, [inventory, shopping, executeActions]);
+  }, [inventory, shopping, executeActions, household]);
 
   const toggleListening = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -461,42 +526,50 @@ export default function VoiceCommandBar() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-            {pendingActions?.map((a, idx) => (
-              <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-2 bg-muted/30">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium text-sm">{a.name}</p>
-                  <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-warning/15 text-warning font-semibold">
-                    needs review
-                  </span>
-                </div>
-                {a.original_pieces && a.food_key && (
-                  <p className="text-xs text-muted-foreground">
-                    {a.original_pieces} × {a.original_size ?? 'medium'} {a.food_key.replace(/_/g, ' ')}
-                    {a.grams != null && ` ≈ ${a.grams} g`}
-                  </p>
-                )}
-                {a.reason && <p className="text-[11px] text-muted-foreground italic">{a.reason}</p>}
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Quantity</label>
-                    <Input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={a.quantity}
-                      onChange={e => {
-                        const v = Number(e.target.value);
-                        setPendingActions(prev => prev?.map((p, i) => i === idx ? { ...p, quantity: v } : p) ?? null);
-                      }}
-                    />
+            {pendingActions?.map((a, idx) => {
+              const sourceLabel =
+                a.source === 'ai' ? { text: 'AI estimate', cls: 'bg-accent/15 text-accent' }
+                : a.source === 'learned' ? { text: 'learned', cls: 'bg-primary/15 text-primary' }
+                : a.source === 'config' ? { text: 'default', cls: 'bg-muted text-muted-foreground' }
+                : { text: 'needs review', cls: 'bg-warning/15 text-warning' };
+              return (
+                <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-2 bg-muted/30">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-sm">{a.name}</p>
+                    <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold ${sourceLabel.cls}`}>
+                      {sourceLabel.text}
+                    </span>
                   </div>
-                  <div className="w-20">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Unit</label>
-                    <Input value={a.unit} disabled />
+                  {a.original_pieces && a.food_key && (
+                    <p className="text-xs text-muted-foreground">
+                      {a.original_pieces} × {a.original_size ?? 'medium'} {a.food_key.replace(/_/g, ' ')}
+                      {a.grams != null && ` ≈ ${a.grams} g`}
+                    </p>
+                  )}
+                  {a.ai_reasoning && <p className="text-[11px] text-muted-foreground">💡 {a.ai_reasoning}</p>}
+                  {a.reason && <p className="text-[11px] text-muted-foreground italic">{a.reason}</p>}
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Quantity</label>
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={a.quantity}
+                        onChange={e => {
+                          const v = Number(e.target.value);
+                          setPendingActions(prev => prev?.map((p, i) => i === idx ? { ...p, quantity: v } : p) ?? null);
+                        }}
+                      />
+                    </div>
+                    <div className="w-20">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Unit</label>
+                      <Input value={a.unit} disabled />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPendingActions(null)}>Cancel</Button>
@@ -504,6 +577,12 @@ export default function VoiceCommandBar() {
               onClick={async () => {
                 const toRun = pendingActions ?? [];
                 setPendingActions(null);
+                // Persist learned corrections for any action where the user edited the quantity.
+                for (const a of toRun) {
+                  if (a._originalQuantity != null && a.quantity !== a._originalQuantity) {
+                    await learnCorrection(a);
+                  }
+                }
                 await executeActions(toRun);
               }}
             >

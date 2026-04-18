@@ -171,6 +171,50 @@ export type Database = {
         }
         Relationships: []
       }
+      food_weight_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          food_key: string
+          grams_per_unit: number
+          household_id: string
+          id: string
+          sample_count: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          food_key: string
+          grams_per_unit: number
+          household_id: string
+          id?: string
+          sample_count?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          food_key?: string
+          grams_per_unit?: number
+          household_id?: string
+          id?: string
+          sample_count?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_weight_overrides_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       household_invites: {
         Row: {
           created_at: string
