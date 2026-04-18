@@ -418,7 +418,11 @@ export default function CouponsPage() {
                 <CardContent className="p-3">
                   <div className="flex items-start gap-3">
                     {item.receipt_image_url && signedUrls[item.id] && (
-                      <button onClick={() => setBarcodeFor(item)} className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted" title="Show at checkout">
+                      <button
+                        onClick={() => openCouponForCheckout(item)}
+                        className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-border bg-muted"
+                        title="Show at checkout"
+                      >
                         <img src={signedUrls[item.id]} alt="Coupon" className="w-full h-full object-cover" />
                       </button>
                     )}
@@ -438,10 +442,12 @@ export default function CouponsPage() {
                       {item.discount_text && !item.title && <p className="text-sm font-medium mt-1 text-primary truncate">{item.discount_text}</p>}
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                         {item.code && item.code !== 'RECEIPT' && (
-                          <button onClick={() => setBarcodeFor(item)} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
+                          <button onClick={() => openCouponForCheckout(item)} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
                             <Tag className="w-3 h-3 text-primary" />
                             <span className="font-mono font-bold text-xs text-primary">{item.code}</span>
-                            <span className="text-[9px] uppercase tracking-wider text-primary/70 font-semibold">Show</span>
+                            <span className="text-[9px] uppercase tracking-wider text-primary/70 font-semibold">
+                              {openingBarcodeId === item.id ? 'Loading…' : 'Show'}
+                            </span>
                           </button>
                         )}
                         {item.code && item.code !== 'RECEIPT' && (
@@ -450,8 +456,8 @@ export default function CouponsPage() {
                           </button>
                         )}
                         {item.code === 'RECEIPT' && (
-                          <button onClick={() => setBarcodeFor(item)} className="text-[10px] text-primary font-semibold flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20">
-                            <Camera className="w-3 h-3" /> Show photo
+                          <button onClick={() => openCouponForCheckout(item)} className="text-[10px] text-primary font-semibold flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20">
+                            <Camera className="w-3 h-3" /> {openingBarcodeId === item.id ? 'Loading…' : 'Show photo'}
                           </button>
                         )}
                       </div>
