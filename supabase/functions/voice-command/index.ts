@@ -190,8 +190,15 @@ For consumption ("I ate / drank / used / finished"), use type "update_quantity" 
 (C) FRACTION OF A CONTAINER — when user says "half the ketchup bottle", "a quarter of the jar":
   → Set: fraction_of_container (e.g. 0.5, 0.25, 0.33), container (e.g. "bottle","jar","pack")
 
-(D) RAW — only when none of A/B/C fit (e.g. "I bought 3 kg chicken"):
+(D) RAW — when user states an explicit quantity + standard unit (e.g. "I bought 3 kg chicken"):
   → Set: raw_quantity, raw_unit (one of: pieces, g, kg, ml, l)
+
+(E) AI ESTIMATE — for items NOT in the canonical list above and that don't fit B/C/D (e.g. "3 spoons of chole", "a handful of cashews", "a samosa", "a bowl of dal"):
+  → Estimate the most likely real-world weight in grams (or millilitres for liquids) and set:
+     ai_estimate_grams (number) OR ai_estimate_ml (number),
+     ai_confidence ("high" | "medium" | "low"),
+     ai_reasoning (one short sentence explaining the estimate, e.g. "1 tbsp chole curry ≈ 25g, so 3 spoons ≈ 75g")
+  → Be REALISTIC: a samosa ≈ 70g, a bowl of dal ≈ 250g, a handful of nuts ≈ 30g, a spoon of curry ≈ 25g.
 
 Always also set: action_name (display name, capitalized), category (Fruits/Vegetables/Dairy/Grains/Snacks/Drinks/Meat/Spices/Frozen/Sauces/Other), storage_location.
 
@@ -204,6 +211,8 @@ EXAMPLES:
 - "I drank a glass of milk" → mode B: cup_amount=1, cup_of_what="milk", action_name="Milk"
 - "I used half the ketchup bottle" → mode C: fraction_of_container=0.5, container="bottle", action_name="Ketchup"
 - "I bought 3 kg chicken" → type=add_inventory, mode D: raw_quantity=3, raw_unit="kg"
+- "I ate 3 spoons of chole" → mode E: ai_estimate_grams=75, ai_confidence="medium", ai_reasoning="~25g per tbsp curry × 3", action_name="Chole"
+- "I had a samosa" → mode E: ai_estimate_grams=70, ai_confidence="medium", action_name="Samosa"
 
 Extract EVERY item mentioned. Never skip food.`;
 
