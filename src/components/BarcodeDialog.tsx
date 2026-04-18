@@ -23,7 +23,7 @@ function detectFormat(code: string): string {
 }
 
 function hasUsableCode(code: string): boolean {
-  const value = code.trim();
+  const value = (code || '').trim();
   return value.length > 0 && value.toUpperCase() !== 'RECEIPT';
 }
 
@@ -38,6 +38,7 @@ function clamp(value: number, min: number, max: number) {
 async function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Failed to load image'));
     img.decoding = 'async';
@@ -46,77 +47,77 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 async function cropBarcodeFromImage(imageUrl: string, code?: string): Promise<string | null> {
-  const img = await loadImage(imageUrl);
-  const expectedCode = code && hasUsableCode(code) ? normalizeCode(code) : null;
+  try {
+    const img = await loadImage(imageUrl);
+    const expectedCode = code && hasUsableCode(code) ? normalizeCode(code) : null;
 
-  let cropRect: { x: number; y: number; width: number; height: number } | null = null;
+    let cropRect: { x: number; y: number; width: number; height: number } | null = null;
 
-  if ('BarcodeDetector' in window) {
-    try {
-      const detector = new (window as any).BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'],
-      });
-
-      const detections = await detector.detect(img);
-      if (detections.length > 0) {
-        const matched = expectedCode
-          ? detections.find((item: any) => normalizeCode(item.rawValue || '') === expectedCode)
-          : detections[0];
-        const picked = matched || detections[0];
-        const box = picked?.boundingBox;
-
-        if (box) {
-          const padX = box.width * 0.18;
-          const padTop = box.height * 0.22;
-          const padBottom = box.height * 0.48;
-          cropRect = {
-            x: clamp(box.x - padX, 0, img.naturalWidth),
-            y: clamp(box.y - padTop, 0, img.naturalHeight),
-            width: clamp(box.width + padX * 2, 1, img.naturalWidth),
-            height: clamp(box.height + padTop + padBottom, 1, img.naturalHeight),
-          };
+    if (typeof (window as any).BarcodeDetector !== 'undefined') {
+      try {
+        const detector = new (window as any).BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'],
+        });
+        const detections = await detector.detect(img);
+        if (detections && detections.length > 0) {
+          const matched = expectedCode
+            ? detections.find((item: any) => normalizeCode(item.rawValue || '') === expectedCode)
+            : detections[0];
+          const picked = matched || detections[0];
+          const box = picked?.boundingBox;
+          if (box && box.width > 0 && box.height > 0) {
+            const padX = box.width * 0.18;
+            const padTop = box.height * 0.25;
+            const padBottom = box.height * 0.55;
+            cropRect = {
+              x: box.x - padX,
+              y: box.y - padTop,
+              width: box.width + padX * 2,
+              height: box.height + padTop + padBottom,
+            };
+          }
         }
+      } catch (err) {
+        console.debug('[BarcodeDialog] BarcodeDetector failed, using heuristic crop', err);
       }
-    } catch {
-      // ignore and fall back to heuristic crop
     }
+
+    if (!cropRect) {
+      // Heuristic: barcodes on receipts/coupons are usually in the lower-middle
+      const width = img.naturalWidth * 0.9;
+      const height = img.naturalHeight * 0.3;
+      cropRect = {
+        x: (img.naturalWidth - width) / 2,
+        y: img.naturalHeight * 0.58,
+        width,
+        height,
+      };
+    }
+
+    const safeX = clamp(cropRect.x, 0, Math.max(0, img.naturalWidth - 1));
+    const safeY = clamp(cropRect.y, 0, Math.max(0, img.naturalHeight - 1));
+    const safeWidth = clamp(cropRect.width, 1, img.naturalWidth - safeX);
+    const safeHeight = clamp(cropRect.height, 1, img.naturalHeight - safeY);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(safeWidth));
+    canvas.height = Math.max(1, Math.round(safeHeight));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(img, safeX, safeY, safeWidth, safeHeight, 0, 0, canvas.width, canvas.height);
+
+    try {
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      // Canvas tainted (CORS) — caller will fall back to original image
+      console.debug('[BarcodeDialog] canvas tainted, cannot export crop', err);
+      return null;
+    }
+  } catch (err) {
+    console.debug('[BarcodeDialog] cropBarcodeFromImage failed', err);
+    return null;
   }
-
-  if (!cropRect) {
-    const width = img.naturalWidth * 0.86;
-    const height = img.naturalHeight * 0.28;
-    cropRect = {
-      x: (img.naturalWidth - width) / 2,
-      y: img.naturalHeight * 0.6,
-      width,
-      height,
-    };
-  }
-
-  const safeX = clamp(cropRect.x, 0, img.naturalWidth - 1);
-  const safeY = clamp(cropRect.y, 0, img.naturalHeight - 1);
-  const safeWidth = clamp(cropRect.width, 1, img.naturalWidth - safeX);
-  const safeHeight = clamp(cropRect.height, 1, img.naturalHeight - safeY);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(safeWidth));
-  canvas.height = Math.max(1, Math.round(safeHeight));
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-
-  ctx.drawImage(
-    img,
-    safeX,
-    safeY,
-    safeWidth,
-    safeHeight,
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
-
-  return canvas.toDataURL('image/png');
 }
 
 export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fallbackImageUrl }: BarcodeDialogProps) {
@@ -130,13 +131,15 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
 
   const usableCode = useMemo(() => hasUsableCode(code), [code]);
 
+  // Reset transient state every time the dialog opens
   useEffect(() => {
     if (!open) return;
     setRenderError(false);
     setZoom(1);
     setPan({ x: 0, y: 0 });
-  }, [open]);
+  }, [open, code, fallbackImageUrl]);
 
+  // Try to crop the barcode out of the uploaded photo whenever we have one
   useEffect(() => {
     if (!open || !fallbackImageUrl) {
       setCroppedImageUrl(null);
@@ -164,13 +167,24 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
     };
   }, [open, fallbackImageUrl, code]);
 
-  useEffect(() => {
-    if (!open || !usableCode || !svgRef.current || croppedImageUrl) return;
-    setRenderError(false);
+  // Decide what to show. Priority:
+  //   1. Cropped barcode image (best for cashier)
+  //   2. Original uploaded photo (zoomable)
+  //   3. Generated SVG barcode (only when no image was uploaded)
+  const imageToShow = croppedImageUrl || fallbackImageUrl || null;
+  const isShowingCroppedImage = !!croppedImageUrl;
+  const shouldRenderSvg = open && !cropLoading && !imageToShow && usableCode && !renderError;
 
-    try {
-      JsBarcode(svgRef.current, code, {
-        format: detectFormat(code),
+  // Render the JsBarcode SVG only when we actually need it
+  useEffect(() => {
+    if (!shouldRenderSvg) return;
+    const el = svgRef.current;
+    if (!el) return;
+
+    setRenderError(false);
+    const tryRender = (format: string) => {
+      JsBarcode(el, code, {
+        format,
         width: 3,
         height: 110,
         displayValue: true,
@@ -179,23 +193,20 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
         background: '#ffffff',
         lineColor: '#000000',
       });
-    } catch {
+    };
+
+    try {
+      tryRender(detectFormat(code));
+    } catch (err1) {
+      console.debug('[BarcodeDialog] primary format failed', err1);
       try {
-        JsBarcode(svgRef.current, code, {
-          format: 'CODE128',
-          width: 3,
-          height: 110,
-          displayValue: true,
-          fontSize: 18,
-          margin: 12,
-          background: '#ffffff',
-          lineColor: '#000000',
-        });
-      } catch {
+        tryRender('CODE128');
+      } catch (err2) {
+        console.debug('[BarcodeDialog] CODE128 fallback failed', err2);
         setRenderError(true);
       }
     }
-  }, [open, code, usableCode, croppedImageUrl]);
+  }, [shouldRenderSvg, code]);
 
   const copy = () => {
     if (!usableCode) return;
@@ -225,9 +236,6 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
   const onPointerUp = () => {
     dragRef.current = null;
   };
-
-  const imageToShow = croppedImageUrl || (!usableCode || renderError ? fallbackImageUrl : null);
-  const isShowingCroppedImage = !!croppedImageUrl;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -294,18 +302,22 @@ export function BarcodeDialog({ open, onOpenChange, code, storeName, title, fall
                 </Button>
               </div>
               <p className="text-[11px] text-center text-neutral-500">
-                {isShowingCroppedImage ? 'Barcode cropped from the original coupon photo' : 'Zoom into the original coupon photo if needed'}
+                {isShowingCroppedImage
+                  ? 'Barcode cropped from your coupon photo — zoom in if the cashier needs it bigger'
+                  : 'Original coupon photo — zoom in on the barcode for the cashier'}
               </p>
             </div>
-          ) : usableCode && !renderError ? (
-            <div className="flex justify-center bg-white rounded-lg">
+          ) : shouldRenderSvg ? (
+            <div className="flex justify-center bg-white rounded-lg py-2 min-h-[140px]">
               <svg ref={svgRef} className="max-w-full h-auto" />
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <ImageIcon className="w-10 h-10 text-neutral-300 mb-3" />
-              <p className="text-sm text-neutral-600 mb-2">No barcode image could be prepared for this coupon.</p>
-              {usableCode && <p className="font-mono text-base font-bold tracking-wide text-black select-all">{code}</p>}
+              <p className="text-sm text-neutral-600 mb-2">No barcode image available for this coupon.</p>
+              {usableCode && (
+                <p className="font-mono text-base font-bold tracking-wide text-black select-all">{code}</p>
+              )}
             </div>
           )}
 
