@@ -174,6 +174,9 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     setActiveItemId(id);
     setEntryStep('quantity');
     setQuantityInput('');
+    setBoughtUnit(item.unit); // default to the list unit
+    setPackSizeInput('');
+    setPackSizeUnit('g');
     setUnitPriceInput('');
     setUseSalePrice(false);
     setSaleTotalInput('');
@@ -183,13 +186,25 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     if (!activeItemId || finalTotal <= 0) return;
 
     const item = trackedItems.find(i => i.id === activeItemId);
-    const remainingQty = item ? item.quantity - qtyFound : 0;
+    // Only treat as partial when the bought unit matches the list unit
+    const sameUnit = item && item.unit === effectiveUnit;
+    const remainingQty = sameUnit && item ? item.quantity - qtyFound : 0;
+    const packSizeNum = packSizeInput ? parseFloat(packSizeInput) : null;
 
     setTrackedItems(prev => {
       let updated = prev.map(i =>
-        i.id === activeItemId ? { ...i, price: finalTotal, quantityFound: qtyFound } : i
+        i.id === activeItemId
+          ? {
+              ...i,
+              price: finalTotal,
+              quantityFound: qtyFound,
+              boughtUnit: effectiveUnit,
+              packSize: showPackSize && packSizeNum && packSizeNum > 0 ? packSizeNum : null,
+              packSizeUnit: showPackSize && packSizeNum && packSizeNum > 0 ? packSizeUnit : undefined,
+            }
+          : i
       );
-      // If partial buy, add a new entry for the remaining quantity
+      // If partial buy in same unit, add a new entry for the remaining quantity
       if (remainingQty > 0 && item) {
         const remainingId = item.id.includes('_remaining') ? item.id : item.id + '_remaining';
         updated = [...updated, {
@@ -211,9 +226,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
     setEntryStep('quantity');
     setQuantityInput('');
     setUnitPriceInput('');
+    setPackSizeInput('');
     setUseSalePrice(false);
     setSaleTotalInput('');
-  }, [activeItemId, finalTotal, qtyFound, onMarkBought, trackedItems]);
+  }, [activeItemId, finalTotal, qtyFound, onMarkBought, trackedItems, effectiveUnit, showPackSize, packSizeInput, packSizeUnit]);
 
   const undoPrice = useCallback((id: string) => {
     setTrackedItems(prev => prev.map(i =>
