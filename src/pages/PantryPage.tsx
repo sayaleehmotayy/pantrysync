@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, format, isBefore, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
+import { formatQty } from '@/lib/utils';
 
 const CATEGORIES = ['Fruits', 'Vegetables', 'Dairy', 'Grains', 'Snacks', 'Drinks', 'Meat', 'Spices', 'Frozen', 'Sauces', 'Other'];
 const UNITS = ['pieces', 'g', 'kg', 'ml', 'l', 'cups', 'tbsp', 'tsp', 'bottles', 'packets'];
