@@ -67,6 +67,27 @@ export function useShoppingList() {
     enabled: !!household,
   });
 
+  // Realtime: refresh shopping list whenever items change in this household
+  useEffect(() => {
+    if (!household) return;
+    const channel = supabase
+      .channel(`shopping_list:${household.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shopping_list_items',
+          filter: `household_id=eq.${household.id}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ['shopping', household.id] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [household?.id, qc]);
+
   const addItem = useMutation({
     mutationFn: async (item: { name: string; quantity: number; unit: string; category: string }) => {
       if (!household || !user) throw new Error('No household');
