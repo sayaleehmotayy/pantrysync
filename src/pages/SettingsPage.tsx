@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -6,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe, Moon, Sun, Monitor, AlertTriangle } from 'lucide-react';
-import { TIERS, TRIAL_DAYS, AI_FEATURE_BLOCK, getTierByProductId, getMemberLimit, suggestTierForMembers, type TierKey } from '@/config/subscription';
+import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe, Moon, Sun, Monitor, ArrowRightLeft } from 'lucide-react';
+import { getTierByProductId, getMemberLimit } from '@/config/subscription';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
@@ -42,10 +43,8 @@ export default function SettingsPage() {
   const { signOut, user, subscription, checkSubscription } = useAuth();
   const { theme, setTheme } = useTheme();
   const qc = useQueryClient();
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const navigate = useNavigate();
   const [portalLoading, setPortalLoading] = useState(false);
-  const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
-  const [selectedTier, setSelectedTier] = useState<Exclude<TierKey, 'free'>>('family');
   const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
   const [shareInviteCode, setShareInviteCode] = useState<string>('');
 
@@ -133,23 +132,6 @@ export default function SettingsPage() {
   const copyInviteCode = () => {
     navigator.clipboard.writeText((shareInviteCode || household.invite_code).toUpperCase());
     toast.success('Invite code copied!');
-  };
-
-  const handleCheckout = async () => {
-    setCheckoutLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { tier: selectedTier, interval },
-      });
-      if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to start checkout');
-    } finally {
-      setCheckoutLoading(false);
-    }
   };
 
   const handleManageSubscription = async () => {
