@@ -8,11 +8,23 @@ import { formatQty } from '@/lib/utils';
 
 type ExpiryStatus = 'expired' | 'expiring' | 'safe';
 
+// Parse 'YYYY-MM-DD' as a LOCAL calendar date to avoid UTC off-by-one.
+function parseExpiry(dateStr: string): Date {
+  const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  return new Date(dateStr);
+}
+
+function startOfToday(): Date {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
+
 function getExpiryStatus(date: string): ExpiryStatus {
-  const d = new Date(date);
-  const now = new Date();
-  if (isBefore(d, now)) return 'expired';
-  if (isBefore(d, addDays(now, 3))) return 'expiring';
+  const d = parseExpiry(date);
+  const today = startOfToday();
+  if (isBefore(d, today)) return 'expired';
+  if (isBefore(d, addDays(today, 3))) return 'expiring';
   return 'safe';
 }
 
