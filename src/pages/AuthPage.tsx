@@ -61,13 +61,7 @@ export default function AuthPage() {
     setLoading(true);
     setError('');
     const currentOrigin = window.location.origin;
-    const shouldUsePublishedAuthOrigin =
-      currentOrigin.includes('lovableproject.com') ||
-      currentOrigin.includes('id-preview--') ||
-      currentOrigin.includes('localhost') ||
-      currentOrigin.startsWith('capacitor://');
-
-    const authOrigin = shouldUsePublishedAuthOrigin
+    const authOrigin = currentOrigin.startsWith('capacitor://')
       ? 'https://pantrysync.lovable.app'
       : currentOrigin;
 
