@@ -88,78 +88,60 @@ export function useSpendingSummary() {
     queryFn: async () => {
       if (!household) return { total30d: 0, total7d: 0, byStore: [], byWeek: [] };
 
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-      // Fetch price_history, shopping_trips, and receipt_scans in parallel
-      const [priceRes, tripsRes, receiptsRes] = await Promise.all([
-        supabase
-          .from('price_history')
-          .select('*')
-          .eq('household_id', household.id)
-          .gte('recorded_at', thirtyDaysAgo.toISOString())
-          .order('recorded_at', { ascending: true }),
+      // Spending = actual purchase events: shopping_trips + completed receipt_scans.
+      // price_history is excluded — it's per-unit price logging, not a purchase total.
+      const [tripsRes, receiptsRes] = await Promise.all([
         supabase
           .from('shopping_trips')
-          .select('*')
+          .select('id, store_name, total_spent, finished_at')
           .eq('household_id', household.id)
-          .gte('finished_at', thirtyDaysAgo.toISOString())
-          .order('finished_at', { ascending: true }),
+          .gte('finished_at', thirtyDaysAgo.toISOString()),
         supabase
           .from('receipt_scans')
-          .select('*')
+          .select('id, store_name, total_amount, created_at, status')
           .eq('household_id', household.id)
           .eq('status', 'completed')
-          .gte('created_at', thirtyDaysAgo.toISOString())
-          .order('created_at', { ascending: true }),
+          .gte('created_at', thirtyDaysAgo.toISOString()),
       ]);
 
-      if (priceRes.error) throw priceRes.error;
       if (tripsRes.error) throw tripsRes.error;
       if (receiptsRes.error) throw receiptsRes.error;
 
-      const priceRecords = (priceRes.data || []) as PriceRecord[];
-      const trips = (tripsRes.data || []) as Array<{
-        id: string; store_name: string | null; total_spent: number; finished_at: string;
-      }>;
-      const receipts = (receiptsRes.data || []) as Array<{
-        id: string; store_name: string | null; total_amount: number | null; created_at: string;
-      }>;
-
-      // Normalize all sources into a unified spending record list
       type SpendEntry = { amount: number; store: string; date: Date; weekKey: string };
       const entries: SpendEntry[] = [];
 
       const toWeekKey = (d: Date) => {
         const weekStart = new Date(d);
-        weekStart.setDate(d.getDate() - d.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
         return weekStart.toISOString().slice(0, 10);
       };
 
-      priceRecords.forEach(r => {
-        const d = new Date(r.recorded_at);
-        entries.push({ amount: Number(r.price), store: r.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
-      });
-
-      trips.forEach(t => {
+      (tripsRes.data || []).forEach((t: any) => {
+        const amt = Number(t.total_spent) || 0;
+        if (amt <= 0) return;
         const d = new Date(t.finished_at);
-        entries.push({ amount: Number(t.total_spent), store: t.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
+        entries.push({ amount: amt, store: t.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
       });
 
-      receipts.forEach(r => {
-        if (!r.total_amount) return;
+      (receiptsRes.data || []).forEach((r: any) => {
+        const amt = Number(r.total_amount) || 0;
+        if (amt <= 0) return;
         const d = new Date(r.created_at);
-        entries.push({ amount: Number(r.total_amount), store: r.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
+        entries.push({ amount: amt, store: r.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
       });
 
-      const total30d = entries.reduce((sum, e) => sum + e.amount, 0);
+      const total30d = entries
+        .filter(e => e.date >= thirtyDaysAgo && e.date <= now)
+        .reduce((sum, e) => sum + e.amount, 0);
       const total7d = entries
-        .filter(e => e.date >= sevenDaysAgo)
+        .filter(e => e.date >= sevenDaysAgo && e.date <= now)
         .reduce((sum, e) => sum + e.amount, 0);
 
-      // Group by store
       const storeMap = new Map<string, number>();
       entries.forEach(e => {
         storeMap.set(e.store, (storeMap.get(e.store) || 0) + e.amount);
@@ -168,7 +150,6 @@ export function useSpendingSummary() {
         .map(([name, total]) => ({ name, total }))
         .sort((a, b) => b.total - a.total);
 
-      // Group by week
       const weekMap = new Map<string, number>();
       entries.forEach(e => {
         weekMap.set(e.weekKey, (weekMap.get(e.weekKey) || 0) + e.amount);
