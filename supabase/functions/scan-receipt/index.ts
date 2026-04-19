@@ -94,17 +94,7 @@ MULTI-PHOTO DEDUPLICATION:
                     required: ["name", "total_price", "category"],
                   },
                 },
-                coupon_codes: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      code: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["code"],
-                  },
-                },
+              
               },
               required: ["items"],
             },
