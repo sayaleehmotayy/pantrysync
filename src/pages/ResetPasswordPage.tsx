@@ -66,7 +66,8 @@ export default function ResetPasswordPage() {
             setIsRecovery(true);
             cleanUrl();
           } else {
-            setError('This reset link has expired or is invalid. Please request a new one.');
+            // Don't clean the URL — let the submit handler retry the exchange
+            setIsRecovery(true);
           }
         }
         setVerifying(false);
