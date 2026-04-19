@@ -66,7 +66,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {moreOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex items-end">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMoreOpen(false)} />
-          <div className="relative w-full bg-card rounded-t-2xl p-4 pb-8 animate-slide-up shadow-xl">
+          <div
+            className="relative w-full bg-card rounded-t-2xl p-4 animate-slide-up shadow-xl max-h-[85vh] overflow-y-auto"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)' }}
+          >
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display font-semibold text-sm">More</h3>
               <button onClick={() => setMoreOpen(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
