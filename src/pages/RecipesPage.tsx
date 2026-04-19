@@ -209,13 +209,23 @@ export default function RecipesPage() {
                 </div>
               )}
 
-              {/* Add missing button */}
-              {showMatching && (selectedRecipe.missingIngredients.length > 0 || selectedRecipe.insufficientIngredients.length > 0) && (
-                <div className="px-6 pb-6">
-                  <Button className="w-full rounded-xl shadow-md" onClick={() => { addMissingToShoppingList(selectedRecipe); setSelectedRecipe(null); }}>
-                    <Plus className="w-4 h-4 mr-1" /> Add Missing to Shopping List
-                  </Button>
-                </div>
+              {/* Add to shopping list button */}
+              {showMatching ? (
+                (selectedRecipe.missingIngredients.length > 0 || selectedRecipe.insufficientIngredients.length > 0) && (
+                  <div className="px-6 pb-6">
+                    <Button className="w-full rounded-xl shadow-md" onClick={() => { addMissingToShoppingList(selectedRecipe); setSelectedRecipe(null); }}>
+                      <Plus className="w-4 h-4 mr-1" /> Add Missing to Shopping List
+                    </Button>
+                  </div>
+                )
+              ) : (
+                selectedRecipe.ingredients.length > 0 && (
+                  <div className="px-6 pb-6">
+                    <Button className="w-full rounded-xl shadow-md" onClick={() => { addAllToShoppingList(selectedRecipe); setSelectedRecipe(null); }}>
+                      <Plus className="w-4 h-4 mr-1" /> Add Ingredients to Shopping List
+                    </Button>
+                  </div>
+                )
               )}
             </div>
           )}
