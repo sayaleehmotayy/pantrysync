@@ -127,7 +127,11 @@ export default function ResetPasswordPage() {
       setError(error.message);
     } else {
       setSuccess(true);
-      setTimeout(() => navigate('/'), 2000);
+      // Sign out so the user must log in with the new password (clean UX)
+      await supabase.auth.signOut();
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
     }
     setLoading(false);
   };
