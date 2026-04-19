@@ -8,11 +8,23 @@ import { formatQty } from '@/lib/utils';
 
 type ExpiryStatus = 'expired' | 'expiring' | 'safe';
 
+// Parse 'YYYY-MM-DD' as a LOCAL calendar date to avoid UTC off-by-one.
+function parseExpiry(dateStr: string): Date {
+  const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  return new Date(dateStr);
+}
+
+function startOfToday(): Date {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
+
 function getExpiryStatus(date: string): ExpiryStatus {
-  const d = new Date(date);
-  const now = new Date();
-  if (isBefore(d, now)) return 'expired';
-  if (isBefore(d, addDays(now, 3))) return 'expiring';
+  const d = parseExpiry(date);
+  const today = startOfToday();
+  if (isBefore(d, today)) return 'expired';
+  if (isBefore(d, addDays(today, 3))) return 'expiring';
   return 'safe';
 }
 
@@ -36,7 +48,7 @@ export default function ExpiryPage() {
 
   // Sort each group by expiry date
   for (const key of Object.keys(grouped) as ExpiryStatus[]) {
-    grouped[key].sort((a, b) => new Date(a.expiry_date!).getTime() - new Date(b.expiry_date!).getTime());
+    grouped[key].sort((a, b) => parseExpiry(a.expiry_date!).getTime() - parseExpiry(b.expiry_date!).getTime());
   }
 
   const sections: ExpiryStatus[] = ['expired', 'expiring', 'safe'];
@@ -72,7 +84,7 @@ export default function ExpiryPage() {
                 {config.label} ({sectionItems.length})
               </h3>
               {sectionItems.map(item => {
-                const days = differenceInDays(new Date(item.expiry_date!), new Date());
+                const days = differenceInDays(parseExpiry(item.expiry_date!), startOfToday());
                 return (
                   <Card key={item.id} className="border-border/50 shadow-none">
                     <CardContent className="p-3 flex items-center justify-between">
@@ -91,7 +103,7 @@ export default function ExpiryPage() {
                             : `${days}d left`}
                         </span>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {format(new Date(item.expiry_date!), 'MMM d, yyyy')}
+                          {format(parseExpiry(item.expiry_date!), 'MMM d, yyyy')}
                         </p>
                       </div>
                     </CardContent>
