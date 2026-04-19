@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => authSub.unsubscribe();
-  }, [checkSubscription]);
+  }, [checkSubscription, isRecoveryFlow]);
 
   // Periodic check every 60 seconds
   useEffect(() => {
