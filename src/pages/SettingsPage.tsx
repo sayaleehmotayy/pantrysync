@@ -187,7 +187,6 @@ export default function SettingsPage() {
   }, [checkSubscription]);
 
   const tierLabel = currentTier === 'free' ? 'Free' : currentTier.charAt(0).toUpperCase() + currentTier.slice(1);
-  const tiers = Object.values(TIERS);
 
   if (!household) return null;
 
@@ -251,172 +250,74 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Subscription / Billing Card */}
+      {/* Subscription / Billing Card — concise summary, all actions go to /plans */}
       <Card className={`overflow-hidden ${subscription.subscribed ? 'border-primary/30 bg-primary/5' : 'border-border/50'}`}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-display flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            {subscription.subscribed ? 'Household subscription' : 'Choose a plan'}
+            {subscription.subscribed ? 'Your plan' : 'Choose a plan'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {subscription.loading ? (
             <p className="text-sm text-muted-foreground">Checking subscription...</p>
+          ) : subscription.productId === 'admin' ? (
+            <>
+              <Badge className="bg-primary text-primary-foreground">Admin</Badge>
+              <p className="text-sm text-muted-foreground">You have full access to all features as the app administrator.</p>
+            </>
           ) : subscription.subscribed ? (
-            subscription.productId === 'admin' ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-primary text-primary-foreground">Admin</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">You have full access to all features as the app administrator.</p>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className="bg-primary text-primary-foreground">{tierLabel} plan</Badge>
-                  {subscription.trial && <Badge variant="secondary">Free trial</Badge>}
-                  {subscription.householdPro && (
-                    <Badge variant="secondary">Via household</Badge>
-                  )}
-                </div>
-                <div className="text-sm text-muted-foreground space-y-0.5">
-                  <p>
-                    {memberLimit === null
-                      ? 'Unlimited household members.'
-                      : `Up to ${memberLimit} household members (${members.length} used).`}
-                  </p>
-                  <p>
-                    {subscription.trial ? 'Trial ends' : 'Renews'}{' '}
-                    <span className="text-foreground font-medium">
-                      {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : '—'}
-                    </span>
-                  </p>
-                </div>
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className="bg-primary text-primary-foreground">{tierLabel} plan</Badge>
+                {subscription.trial && <Badge variant="secondary">Free trial</Badge>}
+                {subscription.householdPro && <Badge variant="secondary">Via household</Badge>}
+              </div>
+              <div className="text-sm text-muted-foreground space-y-0.5">
+                <p>
+                  {memberLimit === null
+                    ? `Unlimited household members (${members.length} active).`
+                    : `${members.length} of ${memberLimit} household members used.`}
+                </p>
+                <p>
+                  {subscription.trial ? 'Trial ends' : 'Renews'}{' '}
+                  <span className="text-foreground font-medium">
+                    {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : '—'}
+                  </span>
+                </p>
+              </div>
 
-                {/* Downgrade warning if member count exceeds smaller tiers */}
-                {!subscription.householdPro && memberLimit !== null && members.length > 2 && currentTier === 'unlimited' && (
-                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted text-muted-foreground text-xs">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
-                    <span>You have {members.length} members. Downgrading below this count will be blocked — remove members first.</span>
-                  </div>
-                )}
+              {!subscription.householdPro && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button size="sm" onClick={() => navigate('/plans')}>
+                    <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                    Change plan
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
+                    <CreditCard className="w-3.5 h-3.5 mr-1" />
+                    {portalLoading ? 'Loading...' : 'Manage billing'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={checkSubscription}>
+                    Refresh
+                  </Button>
+                </div>
+              )}
 
-                {!subscription.householdPro && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
-                      <CreditCard className="w-3.5 h-3.5 mr-1" />
-                      {portalLoading ? 'Loading...' : 'Manage household subscription'}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={checkSubscription}>
-                      Refresh
-                    </Button>
-                  </div>
-                )}
-
-                {/* Upsell to higher tier when applicable */}
-                {!subscription.householdPro && currentTier !== 'unlimited' && (
-                  <div className="pt-2 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground mb-2">Need more household members?</p>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        const target = currentTier === 'duo' ? 'family' : 'unlimited';
-                        setSelectedTier(target);
-                        handleCheckout();
-                      }}
-                      disabled={checkoutLoading}
-                    >
-                      <Sparkles className="w-3.5 h-3.5 mr-1" />
-                      Upgrade to {currentTier === 'duo' ? 'Family' : 'Unlimited'}
-                    </Button>
-                  </div>
-                )}
-              </>
-            )
+              {subscription.householdPro && (
+                <p className="text-xs text-muted-foreground pt-1">
+                  Your household admin manages billing for everyone.
+                </p>
+              )}
+            </>
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                Unlock the full AI-powered pantry experience for your household.
+                Unlock the AI-powered pantry experience for your whole household — voice updates, recipes, receipt scanning and more.
               </p>
-
-              {/* AI feature block */}
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-                <p className="text-xs font-display font-bold mb-1.5 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" /> {AI_FEATURE_BLOCK.title}
-                </p>
-                <ul className="space-y-1">
-                  {AI_FEATURE_BLOCK.bullets.map((b) => (
-                    <li key={b} className="flex items-start gap-1.5 text-xs">
-                      <Check className="w-3 h-3 text-primary mt-0.5 shrink-0" />
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-[11px] text-muted-foreground italic mt-2">👉 {AI_FEATURE_BLOCK.tagline}</p>
-              </div>
-
-              {/* Interval toggle */}
-              <div className="flex items-center gap-2 bg-muted rounded-lg p-1 w-fit">
-                <button
-                  onClick={() => setInterval('monthly')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${interval === 'monthly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setInterval('yearly')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${interval === 'yearly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
-                >
-                  Yearly
-                  <span className="ml-1 text-xs text-primary font-semibold">Save ~25%</span>
-                </button>
-              </div>
-
-              {/* Tier cards */}
-              <div className="grid grid-cols-3 gap-2">
-                {tiers.map((tier) => {
-                  const price = interval === 'yearly' ? tier.yearly.price : tier.monthly.price;
-                  const suffix = interval === 'yearly' ? '/yr' : '/mo';
-                  const isSelected = selectedTier === tier.key;
-                  const isPopular = tier.key === 'family';
-
-                  return (
-                    <button
-                      key={tier.key}
-                      onClick={() => setSelectedTier(tier.key as Exclude<TierKey, 'free'>)}
-                      className={`relative p-2.5 rounded-xl border-2 text-left transition-all ${
-                        isSelected
-                          ? 'border-primary bg-primary/5 shadow-sm'
-                          : 'border-border/50 hover:border-border'
-                      }`}
-                    >
-                      {isPopular && (
-                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full">
-                          Popular
-                        </span>
-                      )}
-                      {isSelected && (
-                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                        </div>
-                      )}
-                      <p className="font-display font-bold text-xs">{tier.label}</p>
-                      <p className="text-sm font-bold mt-0.5">{price}<span className="text-[10px] font-normal text-muted-foreground">{suffix}</span></p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {tier.memberLimit === null ? '∞ members' : `${tier.memberLimit} members`}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <Button onClick={handleCheckout} disabled={checkoutLoading} className="w-full">
-                <Sparkles className="w-4 h-4 mr-1" />
-                {checkoutLoading ? 'Loading...' : `Start ${TRIAL_DAYS}-day free trial`}
+              <Button size="sm" onClick={() => navigate('/plans')} className="gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                See plans & pricing
               </Button>
-              <p className="text-[11px] text-muted-foreground text-center">
-                Cancel anytime. Your whole household gets access.
-              </p>
             </>
           )}
         </CardContent>
