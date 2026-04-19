@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe, Moon, Sun, Monitor } from 'lucide-react';
-import { TIERS, TRIAL_DAYS, getTierByProductId, getMemberLimit, type TierKey } from '@/config/subscription';
+import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe, Moon, Sun, Monitor, AlertTriangle } from 'lucide-react';
+import { TIERS, TRIAL_DAYS, AI_FEATURE_BLOCK, getTierByProductId, getMemberLimit, suggestTierForMembers, type TierKey } from '@/config/subscription';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
@@ -45,7 +45,7 @@ export default function SettingsPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
-  const [selectedTier, setSelectedTier] = useState<Exclude<TierKey, 'free'>>('duo');
+  const [selectedTier, setSelectedTier] = useState<Exclude<TierKey, 'free'>>('family');
   const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
   const [shareInviteCode, setShareInviteCode] = useState<string>('');
 
@@ -269,11 +269,12 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Subscription Card */}
+      {/* Subscription / Billing Card */}
       <Card className={`overflow-hidden ${subscription.subscribed ? 'border-primary/30 bg-primary/5' : 'border-border/50'}`}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-display flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" /> PantrySync Pro
+            <Sparkles className="w-4 h-4 text-primary" />
+            {subscription.subscribed ? 'Household subscription' : 'Choose a plan'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -290,31 +291,61 @@ export default function SettingsPage() {
             ) : (
               <>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className="bg-primary text-primary-foreground">
-                    {subscription.trial ? 'Free Trial' : tierLabel}
-                  </Badge>
+                  <Badge className="bg-primary text-primary-foreground">{tierLabel} plan</Badge>
+                  {subscription.trial && <Badge variant="secondary">Free trial</Badge>}
                   {subscription.householdPro && (
-                    <Badge variant="secondary">Via Household</Badge>
+                    <Badge variant="secondary">Via household</Badge>
                   )}
-                  <span className="text-sm text-muted-foreground">
-                    {subscription.trial ? 'Trial ends' : 'Renews'}{' '}
-                    {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : '—'}
-                  </span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {tierLabel} plan — {memberLimit === null ? 'unlimited' : `up to ${memberLimit}`} household members.
-                  {subscription.householdPro
-                    ? ' Your household owner has Pro — you have access to all premium features!'
-                    : ' Your entire household benefits from your subscription!'}
-                </p>
+                <div className="text-sm text-muted-foreground space-y-0.5">
+                  <p>
+                    {memberLimit === null
+                      ? 'Unlimited household members.'
+                      : `Up to ${memberLimit} household members (${members.length} used).`}
+                  </p>
+                  <p>
+                    {subscription.trial ? 'Trial ends' : 'Renews'}{' '}
+                    <span className="text-foreground font-medium">
+                      {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : '—'}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Downgrade warning if member count exceeds smaller tiers */}
+                {!subscription.householdPro && memberLimit !== null && members.length > 2 && currentTier === 'unlimited' && (
+                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>You have {members.length} members. Downgrading below this count will be blocked — remove members first.</span>
+                  </div>
+                )}
+
                 {!subscription.householdPro && (
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
                       <CreditCard className="w-3.5 h-3.5 mr-1" />
-                      {portalLoading ? 'Loading...' : 'Manage Subscription'}
+                      {portalLoading ? 'Loading...' : 'Manage household subscription'}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={checkSubscription}>
-                      Refresh Status
+                      Refresh
+                    </Button>
+                  </div>
+                )}
+
+                {/* Upsell to higher tier when applicable */}
+                {!subscription.householdPro && currentTier !== 'unlimited' && (
+                  <div className="pt-2 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground mb-2">Need more household members?</p>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const target = currentTier === 'duo' ? 'family' : 'unlimited';
+                        setSelectedTier(target);
+                        handleCheckout();
+                      }}
+                      disabled={checkoutLoading}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 mr-1" />
+                      Upgrade to {currentTier === 'duo' ? 'Family' : 'Unlimited'}
                     </Button>
                   </div>
                 )}
@@ -323,8 +354,24 @@ export default function SettingsPage() {
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                Upgrade to Pro and unlock AI-powered features, group chat, and more!
+                Unlock the full AI-powered pantry experience for your household.
               </p>
+
+              {/* AI feature block */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+                <p className="text-xs font-display font-bold mb-1.5 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" /> {AI_FEATURE_BLOCK.title}
+                </p>
+                <ul className="space-y-1">
+                  {AI_FEATURE_BLOCK.bullets.map((b) => (
+                    <li key={b} className="flex items-start gap-1.5 text-xs">
+                      <Check className="w-3 h-3 text-primary mt-0.5 shrink-0" />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-muted-foreground italic mt-2">👉 {AI_FEATURE_BLOCK.tagline}</p>
+              </div>
 
               {/* Interval toggle */}
               <div className="flex items-center gap-2 bg-muted rounded-lg p-1 w-fit">
@@ -339,7 +386,7 @@ export default function SettingsPage() {
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${interval === 'yearly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   Yearly
-                  <span className="ml-1 text-xs text-primary font-semibold">Save 33%</span>
+                  <span className="ml-1 text-xs text-primary font-semibold">Save ~25%</span>
                 </button>
               </div>
 
@@ -349,6 +396,7 @@ export default function SettingsPage() {
                   const price = interval === 'yearly' ? tier.yearly.price : tier.monthly.price;
                   const suffix = interval === 'yearly' ? '/yr' : '/mo';
                   const isSelected = selectedTier === tier.key;
+                  const isPopular = tier.key === 'family';
 
                   return (
                     <button
@@ -360,6 +408,11 @@ export default function SettingsPage() {
                           : 'border-border/50 hover:border-border'
                       }`}
                     >
+                      {isPopular && (
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full">
+                          Popular
+                        </span>
+                      )}
                       {isSelected && (
                         <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
                           <Check className="w-2.5 h-2.5 text-primary-foreground" />
@@ -377,8 +430,11 @@ export default function SettingsPage() {
 
               <Button onClick={handleCheckout} disabled={checkoutLoading} className="w-full">
                 <Sparkles className="w-4 h-4 mr-1" />
-                {checkoutLoading ? 'Loading...' : `Start ${TRIAL_DAYS}-Day Free Trial`}
+                {checkoutLoading ? 'Loading...' : `Start ${TRIAL_DAYS}-day free trial`}
               </Button>
+              <p className="text-[11px] text-muted-foreground text-center">
+                Cancel anytime. Your whole household gets access.
+              </p>
             </>
           )}
         </CardContent>
