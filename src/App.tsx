@@ -17,6 +17,7 @@ import ChatPage from "./pages/ChatPage";
 import ExpiryPage from "./pages/ExpiryPage";
 import ActivityPage from "./pages/ActivityPage";
 import SettingsPage from "./pages/SettingsPage";
+import PlansPage from "./pages/PlansPage";
 import AiPage from "./pages/AiPage";
 import CouponsPage from "./pages/CouponsPage";
 import SpendingPage from "./pages/SpendingPage";
@@ -79,6 +80,7 @@ function AppRoutes() {
         <Route path="/expiry" element={<ExpiryPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/plans" element={<PlansPage />} />
         <Route path="/spending" element={<SpendingPage />} />
         <Route path="/shopping-history" element={<ShoppingHistoryPage />} />
         <Route path="/recipes" element={<ProGate feature="Recipe Suggestions"><RecipesPage /></ProGate>} />

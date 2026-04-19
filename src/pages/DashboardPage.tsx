@@ -148,12 +148,9 @@ export default function DashboardPage() {
                 <Button
                   size="sm"
                   className="mt-3 gap-1.5"
-                  onClick={async () => {
-                    const { data } = await supabase.functions.invoke('create-checkout');
-                    if (data?.url) window.open(data.url, '_blank');
-                  }}
+                  onClick={() => navigate('/plans')}
                 >
-                  <Sparkles className="w-3.5 h-3.5" /> Upgrade — {STRIPE_CONFIG.monthly.price}/mo
+                  <Sparkles className="w-3.5 h-3.5" /> See plans — from {STRIPE_CONFIG.monthly.price}/mo
                 </Button>
               </div>
             </div>
