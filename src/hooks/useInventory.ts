@@ -53,6 +53,27 @@ export function useInventory() {
   const addItem = useMutation({
     mutationFn: async (item: { name: string; quantity: number; unit: string; category: string; expiry_date?: string | null; storage_location?: string; min_threshold?: number }) => {
       if (!household || !user) throw new Error('No household');
+
+      // Try to merge into existing item with same name + unit
+      const { data: existing } = await supabase
+        .from('inventory_items')
+        .select('id, quantity, unit')
+        .eq('household_id', household.id)
+        .eq('unit', item.unit)
+        .ilike('name', item.name)
+        .maybeSingle();
+
+      if (existing) {
+        const newQty = Number(existing.quantity) + Number(item.quantity);
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({ quantity: newQty })
+          .eq('id', existing.id);
+        if (error) throw error;
+        await logActivity('added', item.name, `+${item.quantity} ${item.unit} (now ${newQty})`);
+        return { merged: true };
+      }
+
       const { error } = await supabase.from('inventory_items').insert({
         ...item,
         household_id: household.id,
@@ -60,8 +81,13 @@ export function useInventory() {
       });
       if (error) throw error;
       await logActivity('added', item.name, `${item.quantity} ${item.unit}`);
+      return { merged: false };
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); qc.invalidateQueries({ queryKey: ['activity'] }); toast.success('Item added to pantry'); },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      qc.invalidateQueries({ queryKey: ['activity'] });
+      toast.success(res?.merged ? 'Pantry item updated' : 'Item added to pantry');
+    },
     onError: (e) => toast.error(e.message),
   });
 
