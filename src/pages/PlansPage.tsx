@@ -270,6 +270,15 @@ export default function PlansPage() {
                   {tier.memberLimit === null ? 'Unlimited members' : `Up to ${tier.memberLimit} members`}
                 </div>
 
+                <ul className="mt-3 space-y-1.5 border-t border-border/50 pt-3">
+                  {TIER_FEATURES.map((feat) => (
+                    <li key={feat} className="flex items-start gap-2 text-xs">
+                      <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+
                 <div className="mt-4 space-y-2">
                   {/* Render buttons depending on state */}
                   {isAdmin || isHouseholdPro ? (
