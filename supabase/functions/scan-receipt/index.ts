@@ -134,17 +134,9 @@ MULTI-PHOTO DEDUPLICATION:
     }))
     .filter((item: any) => !sensitivePatterns.test(item.name));
 
-  const couponCodes = (Array.isArray(receiptData.coupon_codes) ? receiptData.coupon_codes : [])
-    .filter((c: any) => typeof c.code === 'string' && c.code.trim().length > 0)
-    .map((c: any) => ({
-      code: c.code.substring(0, 100).trim(),
-      description: typeof c.description === 'string' ? c.description.substring(0, 500) : null,
-    }))
-    .filter((c: any) => !sensitivePatterns.test(c.code) && !sensitivePatterns.test(c.description || ''));
-
   return {
     items,
-    coupon_codes: couponCodes,
+    coupon_codes: [],
     store_name: storeName,
     receipt_date: typeof receiptData.receipt_date === 'string' ? receiptData.receipt_date.substring(0, 10) : null,
     total_amount: typeof receiptData.total_amount === 'number' ? receiptData.total_amount : null,
