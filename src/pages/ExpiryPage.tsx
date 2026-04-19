@@ -84,7 +84,7 @@ export default function ExpiryPage() {
                 {config.label} ({sectionItems.length})
               </h3>
               {sectionItems.map(item => {
-                const days = differenceInDays(new Date(item.expiry_date!), new Date());
+                const days = differenceInDays(parseExpiry(item.expiry_date!), startOfToday());
                 return (
                   <Card key={item.id} className="border-border/50 shadow-none">
                     <CardContent className="p-3 flex items-center justify-between">
@@ -103,7 +103,7 @@ export default function ExpiryPage() {
                             : `${days}d left`}
                         </span>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {format(new Date(item.expiry_date!), 'MMM d, yyyy')}
+                          {format(parseExpiry(item.expiry_date!), 'MMM d, yyyy')}
                         </p>
                       </div>
                     </CardContent>
