@@ -63,9 +63,6 @@ export default function SpendingPage() {
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-display font-bold">Spending</h1>
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="w-4 h-4 mr-1" /> Log Price
-        </Button>
       </div>
 
       {/* Summary cards */}
