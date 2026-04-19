@@ -313,8 +313,8 @@ export default function SettingsPage() {
 
                 {/* Downgrade warning if member count exceeds smaller tiers */}
                 {!subscription.householdPro && memberLimit !== null && members.length > 2 && currentTier === 'unlimited' && (
-                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted text-muted-foreground text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" />
                     <span>You have {members.length} members. Downgrading below this count will be blocked — remove members first.</span>
                   </div>
                 )}
