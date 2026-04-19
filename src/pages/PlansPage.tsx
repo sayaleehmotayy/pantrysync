@@ -102,8 +102,12 @@ export default function PlansPage() {
         throw new Error(msg);
       }
       if (data?.requiresCheckout && data?.url) {
-        toast.info('Redirecting to checkout to update your payment method…');
-        window.location.href = data.url;
+        const win = window.open(data.url, '_blank');
+        if (!win) {
+          window.location.href = data.url;
+        } else {
+          toast.info('Complete checkout in the new tab to update your payment method.');
+        }
         return;
       }
       toast.success(`Switched to ${tier.charAt(0).toUpperCase() + tier.slice(1)} plan`);
