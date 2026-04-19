@@ -159,7 +159,6 @@ async function processInBackground(
     await adminClient.from('receipt_scans').update({ status: 'processing' }).eq('id', receiptId);
 
     let allItems: any[] = [];
-    let allCoupons: any[] = [];
     let storeName: string | null = null;
     let receiptDate: string | null = null;
     let totalAmount: number | null = null;
@@ -174,11 +173,6 @@ async function processInBackground(
       const newItems = result.items.filter((it: any) => !existingNames.has(it.name.toLowerCase()));
       allItems = [...allItems, ...newItems];
 
-      // Deduplicate coupons
-      const existingCodes = new Set(allCoupons.map(c => c.code.toLowerCase()));
-      const newCoupons = result.coupon_codes.filter((c: any) => !existingCodes.has(c.code.toLowerCase()));
-      allCoupons = [...allCoupons, ...newCoupons];
-
       // Take first non-null metadata
       if (result.store_name && !storeName) storeName = result.store_name;
       if (result.receipt_date && !receiptDate) receiptDate = result.receipt_date;
@@ -186,14 +180,14 @@ async function processInBackground(
       if (result.currency) currency = result.currency;
     }
 
-    // Save results to DB
+    // Save results to DB (coupon_codes intentionally always empty — handled by dedicated coupon scanner)
     await adminClient.from('receipt_scans').update({
       status: 'completed',
       store_name: storeName,
       receipt_date: receiptDate,
       total_amount: totalAmount,
       currency,
-      processing_result: { items: allItems, coupon_codes: allCoupons },
+      processing_result: { items: allItems, coupon_codes: [] },
     }).eq('id', receiptId);
 
     // Save receipt items
@@ -211,30 +205,7 @@ async function processInBackground(
       );
     }
 
-    // Auto-add coupons to discount_codes
-    if (allCoupons.length > 0 && storeName) {
-      for (const coupon of allCoupons) {
-        const { data: existing } = await adminClient
-          .from('discount_codes')
-          .select('id')
-          .eq('household_id', householdId)
-          .ilike('store_name', storeName)
-          .eq('code', coupon.code)
-          .maybeSingle();
-
-        if (!existing) {
-          await adminClient.from('discount_codes').insert({
-            household_id: householdId,
-            store_name: storeName,
-            code: coupon.code,
-            description: coupon.description || `Found on receipt from ${storeName}`,
-            added_by: userId,
-          });
-        }
-      }
-    }
-
-    console.log(`[SCAN-RECEIPT] Completed receipt ${receiptId}: ${allItems.length} items, ${allCoupons.length} coupons`);
+    console.log(`[SCAN-RECEIPT] Completed receipt ${receiptId}: ${allItems.length} items`);
   } catch (error) {
     console.error(`[SCAN-RECEIPT] Failed receipt ${receiptId}:`, error);
     await adminClient.from('receipt_scans').update({
