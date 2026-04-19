@@ -66,7 +66,8 @@ export default function ResetPasswordPage() {
             setIsRecovery(true);
             cleanUrl();
           } else {
-            setError('This reset link has expired or is invalid. Please request a new one.');
+            // Don't clean the URL — let the submit handler retry the exchange
+            setIsRecovery(true);
           }
         }
         setVerifying(false);
@@ -122,6 +123,28 @@ export default function ResetPasswordPage() {
     }
     setLoading(true);
     setError('');
+
+    // Defensive: if no session yet, try one more time to exchange the code
+    // from the URL before giving up. This avoids "Auth session missing!".
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const tokenHash = params.get('token_hash');
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(window.location.href).catch(() => {});
+      } else if (tokenHash) {
+        await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).catch(() => {});
+      }
+      ({ data: { session } } = await supabase.auth.getSession());
+    }
+
+    if (!session) {
+      setError('Your reset link has expired. Please request a new one.');
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
       setError(error.message);
