@@ -169,6 +169,20 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     } else {
+      // Detect upgrade (target unit_amount > current unit_amount in same currency)
+      const currentAmount = currentItem.price.unit_amount ?? 0;
+      const targetAmount = targetPrice.unit_amount ?? 0;
+      const isUpgrade = targetAmount > currentAmount;
+      const isOnTrial = subscription.status === "trialing" || !!subscription.trial_end;
+
+      // For upgrades: end trial NOW and invoice immediately so the user pays
+      // the new (higher) price right away — no free ride to a bigger plan.
+      // For downgrades: prorate as a credit toward the next invoice (no refund now).
+      const prorationBehavior: Stripe.SubscriptionUpdateParams.ProrationBehavior =
+        isUpgrade ? "always_invoice" : "create_prorations";
+
+      log("In-place swap", { isUpgrade, isOnTrial, prorationBehavior, currentAmount, targetAmount });
+
       updated = await stripe.subscriptions.update(subscription.id, {
         items: [
           {
@@ -176,8 +190,12 @@ serve(async (req) => {
             price: targetPriceId,
           },
         ],
-        proration_behavior: "create_prorations",
-        trial_end: subscription.trial_end ? "now" : undefined,
+        proration_behavior: prorationBehavior,
+        // End trial immediately on upgrade so the new full price is charged now.
+        // On downgrade, preserve the existing trial (no early-end punishment).
+        trial_end: isUpgrade && isOnTrial ? "now" : undefined,
+        // Make sure the invoice is paid out of the default payment method right away
+        payment_behavior: isUpgrade ? "error_if_incomplete" : "default_incomplete",
       });
     }
 
