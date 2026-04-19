@@ -34,13 +34,14 @@ function AppRoutes() {
   const { user, loading: authLoading } = useAuth();
   const { household, loading: hhLoading } = useHousehold();
   const location = useLocation();
+  const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
   usePushNotifications();
 
   // Allow /welcome and /reset-password to render without auth
-  if (location.pathname === '/welcome') {
+  if (normalizedPath === '/welcome') {
     return <WelcomePage />;
   }
-  if (location.pathname === '/reset-password') {
+  if (normalizedPath === '/reset-password') {
     return <ResetPasswordPage />;
   }
 
