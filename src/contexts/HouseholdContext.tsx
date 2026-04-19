@@ -117,8 +117,19 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       .rpc('join_household_with_invite', { p_invite_code: normalizedInviteCode });
 
     if (error) {
-      // Surface the RPC exception message
-      const msg = error.message || 'Failed to join household';
+      // Surface the RPC exception message — friendlier wording for plan-limit errors
+      let msg = error.message || 'Failed to join household';
+      if (/plan limit of (\d+) members/i.test(msg)) {
+        const m = msg.match(/plan limit of (\d+)/i);
+        const limit = m ? Number(m[1]) : null;
+        if (limit === 1) {
+          msg = 'This household is on the Free plan (1 member only). The admin needs to choose a paid plan to add more people.';
+        } else if (limit === 2) {
+          msg = 'This household is on the Duo plan (up to 2 members). Ask the admin to upgrade to Family to add more people.';
+        } else if (limit === 5) {
+          msg = 'This household is on the Family plan (up to 5 members). Ask the admin to upgrade to Unlimited to add more people.';
+        }
+      }
       return { error: new Error(msg) };
     }
 
