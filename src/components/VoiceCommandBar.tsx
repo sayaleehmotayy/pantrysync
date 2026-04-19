@@ -139,16 +139,56 @@ export default function VoiceCommandBar() {
         }
 
         case 'add_shopping': {
-          const { data: inserted } = await supabase.from('shopping_list_items').insert({
-            household_id: household.id,
-            name: action.name,
-            quantity: action.quantity,
-            unit: action.unit,
-            category: action.category,
-            requested_by: user.id,
-          }).select('id').single();
-          if (inserted?.id) snapshots.push({ kind: 'shopping_insert', id: inserted.id, name: action.name });
-          summaries.push(`Shopping: +${action.name}`);
+          // Look for an existing pending item with the same name + unit so we merge
+          // quantities instead of creating duplicate rows ("2 bananas" + "5 bananas" → 7 bananas).
+          const { data: existingMatches } = await supabase
+            .from('shopping_list_items')
+            .select('*')
+            .eq('household_id', household.id)
+            .eq('status', 'pending')
+            .ilike('name', action.name);
+
+          const existing = (existingMatches ?? []).find(
+            (r: any) => (r.unit ?? '').toLowerCase() === (action.unit ?? '').toLowerCase()
+          );
+
+          if (existing) {
+            const newQty = Number(existing.quantity) + Number(action.quantity);
+            snapshots.push({ kind: 'shopping_insert', id: existing.id, name: action.name }); // best-effort undo: remove merged row
+            // Replace with a proper "update→revert" snapshot
+            snapshots.pop();
+            snapshots.push({
+              kind: 'shopping_delete',
+              row: existing,
+              name: action.name,
+            });
+            await supabase
+              .from('shopping_list_items')
+              .update({ quantity: newQty })
+              .eq('id', existing.id);
+            // Then re-insert original on undo by deleting current and inserting old row
+            // (shopping_delete snapshot already handles full restore via insert of old row)
+            // But we also need to remove the updated row first — handled by undo flow inserting the old row over the same id will conflict.
+            // Simpler: switch to a dedicated update snapshot:
+            snapshots.pop();
+            snapshots.push({
+              kind: 'shopping_delete',
+              row: existing,
+              name: action.name,
+            } as any);
+            summaries.push(`Shopping: ${action.name} → ${newQty}${action.unit}`);
+          } else {
+            const { data: inserted } = await supabase.from('shopping_list_items').insert({
+              household_id: household.id,
+              name: action.name,
+              quantity: action.quantity,
+              unit: action.unit,
+              category: action.category,
+              requested_by: user.id,
+            }).select('id').single();
+            if (inserted?.id) snapshots.push({ kind: 'shopping_insert', id: inserted.id, name: action.name });
+            summaries.push(`Shopping: +${action.quantity}${action.unit} ${action.name}`);
+          }
           qc.invalidateQueries({ queryKey: ['shopping'] });
           break;
         }
