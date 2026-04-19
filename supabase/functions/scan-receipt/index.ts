@@ -31,7 +31,7 @@ async function processOnePhoto(
       messages: [
         {
           role: "system",
-          content: `You are a receipt scanning AI that extracts ONLY grocery/shopping item data and coupon/discount codes. Be precise with prices and quantities.
+          content: `You are a receipt scanning AI that extracts ONLY grocery/shopping item data. Be precise with prices and quantities. DO NOT extract coupon or discount codes — coupons are handled by a separate dedicated scanner.
 
 CRITICAL PRIVACY & SECURITY RULES — FOLLOW THESE EXACTLY:
 - NEVER extract, return, or acknowledge any payment information (card numbers, last 4 digits, bank details, account numbers, payment method, authorization codes, transaction IDs, terminal IDs, merchant IDs)
