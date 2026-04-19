@@ -36,6 +36,7 @@ type UndoSnapshot =
   | { kind: 'inventory_delete'; row: any; name: string }
   | { kind: 'inventory_insert'; id: string; name: string }
   | { kind: 'shopping_insert'; id: string; name: string }
+  | { kind: 'shopping_update'; id: string; previousQuantity: number; name: string }
   | { kind: 'shopping_delete'; row: any; name: string };
 
 export default function VoiceCommandBar() {
