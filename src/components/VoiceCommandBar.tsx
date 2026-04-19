@@ -64,6 +64,8 @@ export default function VoiceCommandBar() {
           await supabase.from('inventory_items').delete().eq('id', s.id);
         } else if (s.kind === 'shopping_insert') {
           await supabase.from('shopping_list_items').delete().eq('id', s.id);
+        } else if (s.kind === 'shopping_update') {
+          await supabase.from('shopping_list_items').update({ quantity: s.previousQuantity }).eq('id', s.id);
         } else if (s.kind === 'shopping_delete') {
           await supabase.from('shopping_list_items').insert(s.row);
         }
