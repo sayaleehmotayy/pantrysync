@@ -31,7 +31,7 @@ async function processOnePhoto(
       messages: [
         {
           role: "system",
-          content: `You are a receipt scanning AI that extracts ONLY grocery/shopping item data and coupon/discount codes. Be precise with prices and quantities.
+          content: `You are a receipt scanning AI that extracts ONLY grocery/shopping item data. Be precise with prices and quantities. DO NOT extract coupon or discount codes — coupons are handled by a separate dedicated scanner.
 
 CRITICAL PRIVACY & SECURITY RULES — FOLLOW THESE EXACTLY:
 - NEVER extract, return, or acknowledge any payment information (card numbers, last 4 digits, bank details, account numbers, payment method, authorization codes, transaction IDs, terminal IDs, merchant IDs)
@@ -50,15 +50,7 @@ EXTRACTION RULES:
 - Currency should be the 3-letter ISO code (USD, EUR, GBP, etc)
 - Clean up item names to be human-readable (e.g., "BNL BNNA" → "Banana")
 
-COUPON/DISCOUNT CODE RULES:
-- ONLY extract coupons that are ACTIONABLE for future purchases — meaning the customer can use a specific code, barcode, or QR code on their NEXT visit to save money
-- Examples of VALID coupons to extract: "Scan this barcode to get €5 off your next purchase over €25", "Use code SAVE10 for 10% off next order", "Present this voucher for a free coffee"
-- IGNORE generic promotional text like "better deals available", "save more with our app", "loyalty points earned", "you saved €X today" — these are NOT actionable coupons
-- IGNORE receipt-specific discounts already applied (e.g., "multi-buy discount -€2.00") — these are savings on the CURRENT receipt, not future coupons
-- IGNORE loyalty program references, points summaries, or membership tier info
-- Extract the code/barcode number AND describe the offer clearly (e.g., "€5 off next purchase over €25")
-- If the coupon has an expiry date mentioned, include it in the description
-- Do NOT confuse transaction IDs, receipt numbers, or internal reference codes with coupon codes
+DO NOT extract coupons, promo codes, discount codes, vouchers, or any promotional offers — these are explicitly out of scope for this scanner.
 
 MULTI-PHOTO DEDUPLICATION:
 - This may be one photo of a multi-photo scan of a long receipt
@@ -69,7 +61,7 @@ MULTI-PHOTO DEDUPLICATION:
         {
           role: "user",
           content: [
-            { type: "text", text: "Extract ONLY NEW grocery/shopping items (skip any already extracted), their prices, store name, date, total, and any coupon/promo codes from this receipt section. DO NOT extract any payment details, card numbers, personal info, or sensitive data." },
+            { type: "text", text: "Extract ONLY NEW grocery/shopping items (skip any already extracted), their prices, store name, date, and total from this receipt section. DO NOT extract coupons, promo codes, payment details, card numbers, personal info, or sensitive data." },
             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
           ],
         },
@@ -102,17 +94,7 @@ MULTI-PHOTO DEDUPLICATION:
                     required: ["name", "total_price", "category"],
                   },
                 },
-                coupon_codes: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      code: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["code"],
-                  },
-                },
+              
               },
               required: ["items"],
             },
@@ -152,17 +134,9 @@ MULTI-PHOTO DEDUPLICATION:
     }))
     .filter((item: any) => !sensitivePatterns.test(item.name));
 
-  const couponCodes = (Array.isArray(receiptData.coupon_codes) ? receiptData.coupon_codes : [])
-    .filter((c: any) => typeof c.code === 'string' && c.code.trim().length > 0)
-    .map((c: any) => ({
-      code: c.code.substring(0, 100).trim(),
-      description: typeof c.description === 'string' ? c.description.substring(0, 500) : null,
-    }))
-    .filter((c: any) => !sensitivePatterns.test(c.code) && !sensitivePatterns.test(c.description || ''));
-
   return {
     items,
-    coupon_codes: couponCodes,
+    coupon_codes: [],
     store_name: storeName,
     receipt_date: typeof receiptData.receipt_date === 'string' ? receiptData.receipt_date.substring(0, 10) : null,
     total_amount: typeof receiptData.total_amount === 'number' ? receiptData.total_amount : null,
@@ -185,7 +159,6 @@ async function processInBackground(
     await adminClient.from('receipt_scans').update({ status: 'processing' }).eq('id', receiptId);
 
     let allItems: any[] = [];
-    let allCoupons: any[] = [];
     let storeName: string | null = null;
     let receiptDate: string | null = null;
     let totalAmount: number | null = null;
@@ -200,11 +173,6 @@ async function processInBackground(
       const newItems = result.items.filter((it: any) => !existingNames.has(it.name.toLowerCase()));
       allItems = [...allItems, ...newItems];
 
-      // Deduplicate coupons
-      const existingCodes = new Set(allCoupons.map(c => c.code.toLowerCase()));
-      const newCoupons = result.coupon_codes.filter((c: any) => !existingCodes.has(c.code.toLowerCase()));
-      allCoupons = [...allCoupons, ...newCoupons];
-
       // Take first non-null metadata
       if (result.store_name && !storeName) storeName = result.store_name;
       if (result.receipt_date && !receiptDate) receiptDate = result.receipt_date;
@@ -212,14 +180,14 @@ async function processInBackground(
       if (result.currency) currency = result.currency;
     }
 
-    // Save results to DB
+    // Save results to DB (coupon_codes intentionally always empty — handled by dedicated coupon scanner)
     await adminClient.from('receipt_scans').update({
       status: 'completed',
       store_name: storeName,
       receipt_date: receiptDate,
       total_amount: totalAmount,
       currency,
-      processing_result: { items: allItems, coupon_codes: allCoupons },
+      processing_result: { items: allItems, coupon_codes: [] },
     }).eq('id', receiptId);
 
     // Save receipt items
@@ -237,30 +205,7 @@ async function processInBackground(
       );
     }
 
-    // Auto-add coupons to discount_codes
-    if (allCoupons.length > 0 && storeName) {
-      for (const coupon of allCoupons) {
-        const { data: existing } = await adminClient
-          .from('discount_codes')
-          .select('id')
-          .eq('household_id', householdId)
-          .ilike('store_name', storeName)
-          .eq('code', coupon.code)
-          .maybeSingle();
-
-        if (!existing) {
-          await adminClient.from('discount_codes').insert({
-            household_id: householdId,
-            store_name: storeName,
-            code: coupon.code,
-            description: coupon.description || `Found on receipt from ${storeName}`,
-            added_by: userId,
-          });
-        }
-      }
-    }
-
-    console.log(`[SCAN-RECEIPT] Completed receipt ${receiptId}: ${allItems.length} items, ${allCoupons.length} coupons`);
+    console.log(`[SCAN-RECEIPT] Completed receipt ${receiptId}: ${allItems.length} items`);
   } catch (error) {
     console.error(`[SCAN-RECEIPT] Failed receipt ${receiptId}:`, error);
     await adminClient.from('receipt_scans').update({
