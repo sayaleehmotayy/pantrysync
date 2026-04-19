@@ -142,8 +142,8 @@ export default function VoiceCommandBar() {
         }
 
         case 'add_shopping': {
-          // Look for an existing pending item with the same name + unit so we merge
-          // quantities instead of creating duplicate rows ("2 bananas" + "5 bananas" → 7 bananas).
+          // Merge with existing pending item of same name + unit instead of creating
+          // duplicate rows ("2 bananas" + "5 more bananas" → 7 bananas).
           const { data: existingMatches } = await supabase
             .from('shopping_list_items')
             .select('*')
@@ -157,28 +157,16 @@ export default function VoiceCommandBar() {
 
           if (existing) {
             const newQty = Number(existing.quantity) + Number(action.quantity);
-            snapshots.push({ kind: 'shopping_insert', id: existing.id, name: action.name }); // best-effort undo: remove merged row
-            // Replace with a proper "update→revert" snapshot
-            snapshots.pop();
             snapshots.push({
-              kind: 'shopping_delete',
-              row: existing,
+              kind: 'shopping_update',
+              id: existing.id,
+              previousQuantity: Number(existing.quantity),
               name: action.name,
             });
             await supabase
               .from('shopping_list_items')
               .update({ quantity: newQty })
               .eq('id', existing.id);
-            // Then re-insert original on undo by deleting current and inserting old row
-            // (shopping_delete snapshot already handles full restore via insert of old row)
-            // But we also need to remove the updated row first — handled by undo flow inserting the old row over the same id will conflict.
-            // Simpler: switch to a dedicated update snapshot:
-            snapshots.pop();
-            snapshots.push({
-              kind: 'shopping_delete',
-              row: existing,
-              name: action.name,
-            } as any);
             summaries.push(`Shopping: ${action.name} → ${newQty}${action.unit}`);
           } else {
             const { data: inserted } = await supabase.from('shopping_list_items').insert({
