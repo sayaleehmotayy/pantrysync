@@ -1,20 +1,32 @@
 // Subscription feature configuration for PantrySync
+// All paid plans are billed in EUR. AI capabilities are bundled identically
+// across Duo / Family / Unlimited — only the household member limit changes.
 
 export const FREE_FEATURES = [
-  { key: 'pantry', label: 'Pantry Tracking', description: 'Track all your pantry items' },
-  { key: 'shopping', label: 'Shopping List', description: 'Create and manage shopping lists' },
-  { key: 'expiry', label: 'Expiry Alerts', description: 'Get notified before items expire' },
+  { key: 'pantry', label: 'Basic pantry tracking' },
+  { key: 'shopping', label: 'Basic shopping list' },
+  { key: 'expiry', label: 'Expiry alerts' },
 ] as const;
 
-export const PRO_FEATURES = [
-  { key: 'ai', label: 'AI Assistant', description: 'Smart pantry suggestions and meal planning' },
-  { key: 'voice', label: 'Voice Commands', description: 'Hands-free pantry management' },
-  { key: 'recipes', label: 'Recipe Suggestions', description: 'AI-powered recipes from your ingredients' },
-  { key: 'receipts', label: 'Receipt Scanner', description: 'AI-powered receipt scanning with spending insights' },
-  { key: 'coupons', label: 'Discount Code Scanner', description: 'Scan and store discount codes' },
-  { key: 'chat', label: 'Group Chat', description: 'Chat with household members' },
-  { key: 'analytics', label: 'Advanced Analytics', description: 'Detailed usage insights and reports' },
-  { key: 'support', label: 'Priority Support', description: 'Get help faster when you need it' },
+/** Single AI value-prop block shown identically on every paid tier. */
+export const AI_FEATURE_BLOCK = {
+  title: 'AI-Powered Pantry System',
+  tagline: 'Save time. Reduce waste. Spend smarter.',
+  bullets: [
+    'Voice-controlled pantry updates',
+    'AI recipe suggestions from your ingredients',
+    'Smart shopping & budget tracking',
+    'Receipt & discount scanning',
+    'Real-time household sync & chat',
+  ],
+} as const;
+
+/** Locked teasers shown to Free users. */
+export const LOCKED_TEASERS = [
+  '🔒 Voice pantry updates',
+  '🔒 AI recipes',
+  '🔒 Receipt scanner',
+  '🔒 Smart budget tracking',
 ] as const;
 
 export const PRO_GATED_ROUTES = ['/ai', '/recipes', '/coupons', '/chat', '/receipts'] as const;
@@ -25,9 +37,11 @@ export interface TierConfig {
   key: TierKey;
   label: string;
   memberLimit: number | null; // null = unlimited
-  monthly: { priceId: string; productId: string; price: string };
-  yearly: { priceId: string; productId: string; price: string };
+  monthly: { priceId: string; productId: string; price: string; amount: number };
+  yearly: { priceId: string; productId: string; price: string; amount: number };
 }
+
+export const CURRENCY_SYMBOL = '€';
 
 export const TIERS: Record<Exclude<TierKey, 'free'>, TierConfig> = {
   duo: {
@@ -35,14 +49,16 @@ export const TIERS: Record<Exclude<TierKey, 'free'>, TierConfig> = {
     label: 'Duo',
     memberLimit: 2,
     monthly: {
-      priceId: 'price_1TL9BJAjA7ulr1iaMtf4tEQd',
-      productId: 'prod_UJmkcGNlIWvfoh',
-      price: '$4.99',
+      priceId: 'price_1TO2myAjA7ulr1iap9Qrx9vP',
+      productId: 'prod_UMmLQfrU8s7K5Z',
+      price: '€2.99',
+      amount: 2.99,
     },
     yearly: {
-      priceId: 'price_1TLOC5AjA7ulr1iaKTx0JYLW',
-      productId: 'prod_UK2GPSlm6dNKbC',
-      price: '$39.99',
+      priceId: 'price_1TO2nQAjA7ulr1iafua2Ozq6',
+      productId: 'prod_UMmMruDBeQbqq2',
+      price: '€24.99',
+      amount: 24.99,
     },
   },
   family: {
@@ -50,14 +66,16 @@ export const TIERS: Record<Exclude<TierKey, 'free'>, TierConfig> = {
     label: 'Family',
     memberLimit: 5,
     monthly: {
-      priceId: 'price_1TLPc0AjA7ulr1iaR0FwLhvv',
-      productId: 'prod_UK3jUbJSpStHEx',
-      price: '$7.99',
+      priceId: 'price_1TO2nmAjA7ulr1iaBedyATLN',
+      productId: 'prod_UMmMPePoc6w4tV',
+      price: '€4.99',
+      amount: 4.99,
     },
     yearly: {
-      priceId: 'price_1TLPdIAjA7ulr1iaEPvH2o9Y',
-      productId: 'prod_UK3k0gRfRqH9dl',
-      price: '$63.99',
+      priceId: 'price_1TO2o8AjA7ulr1iap12N8hwi',
+      productId: 'prod_UMmMkbQrw4RvWk',
+      price: '€44.99',
+      amount: 44.99,
     },
   },
   unlimited: {
@@ -65,14 +83,16 @@ export const TIERS: Record<Exclude<TierKey, 'free'>, TierConfig> = {
     label: 'Unlimited',
     memberLimit: null,
     monthly: {
-      priceId: 'price_1TLPcxAjA7ulr1iatcyMNX3K',
-      productId: 'prod_UK3k6GQ1X2Phkl',
-      price: '$9.99',
+      priceId: 'price_1TO2oRAjA7ulr1iaNFYWH0jA',
+      productId: 'prod_UMmNSMB08gx044',
+      price: '€7.99',
+      amount: 7.99,
     },
     yearly: {
-      priceId: 'price_1TLPdjAjA7ulr1iasVS8Yy2B',
-      productId: 'prod_UK3l7pPFppJ6G2',
-      price: '$79.99',
+      priceId: 'price_1TO2ohAjA7ulr1iaiWp60eLC',
+      productId: 'prod_UMmN3UgAX6Nj4X',
+      price: '€69.99',
+      amount: 69.99,
     },
   },
 };
@@ -80,8 +100,22 @@ export const TIERS: Record<Exclude<TierKey, 'free'>, TierConfig> = {
 export const FREE_MEMBER_LIMIT = 1;
 export const TRIAL_DAYS = 7;
 
-/** All product IDs mapped to their tier */
-export const PRODUCT_TO_TIER: Record<string, TierKey> = {};
+/** Legacy USD product IDs from the old single-tier "Pro" plan. Mapped so existing
+ *  subscribers keep their access without re-checkout. */
+export const LEGACY_PRODUCT_TO_TIER: Record<string, TierKey> = {
+  // Old Duo (kept name, mapped to Duo)
+  'prod_UJmkcGNlIWvfoh': 'duo',
+  'prod_UK2GPSlm6dNKbC': 'duo',
+  // Old Family
+  'prod_UK3jUbJSpStHEx': 'family',
+  'prod_UK3k0gRfRqH9dl': 'family',
+  // Old Unlimited
+  'prod_UK3k6GQ1X2Phkl': 'unlimited',
+  'prod_UK3l7pPFppJ6G2': 'unlimited',
+};
+
+/** All product IDs (new EUR + legacy USD) mapped to their tier */
+export const PRODUCT_TO_TIER: Record<string, TierKey> = { ...LEGACY_PRODUCT_TO_TIER };
 for (const tier of Object.values(TIERS)) {
   PRODUCT_TO_TIER[tier.monthly.productId] = tier.key;
   PRODUCT_TO_TIER[tier.yearly.productId] = tier.key;
@@ -99,11 +133,26 @@ export function getMemberLimit(tier: TierKey): number | null {
 }
 
 export function isProFeature(routeOrKey: string): boolean {
-  return PRO_FEATURES.some(f => f.key === routeOrKey) ||
-    PRO_GATED_ROUTES.includes(routeOrKey as any);
+  return PRO_GATED_ROUTES.includes(routeOrKey as any);
 }
 
-// Legacy compat
+/** Returns the smallest tier whose member limit is >= the given count, or
+ *  'unlimited' if none. Used to suggest upgrade targets. */
+export function suggestTierForMembers(memberCount: number): Exclude<TierKey, 'free'> {
+  const order: Array<Exclude<TierKey, 'free'>> = ['duo', 'family', 'unlimited'];
+  for (const key of order) {
+    const limit = TIERS[key].memberLimit;
+    if (limit === null || memberCount <= limit) return key;
+  }
+  return 'unlimited';
+}
+
+// Legacy compat — referenced by older imports
+export const PRO_FEATURES = AI_FEATURE_BLOCK.bullets.map((label, i) => ({
+  key: `ai-${i}`,
+  label,
+  description: '',
+}));
 export const STRIPE_CONFIG = {
   monthly: TIERS.duo.monthly,
   yearly: TIERS.duo.yearly,
