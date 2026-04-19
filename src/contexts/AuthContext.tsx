@@ -42,6 +42,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionState>(createSubscriptionState({ loading: true }));
 
+  const isRecoveryFlow = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+
+    const normalizedPath = window.location.pathname.replace(/\/+$/, '') || '/';
+    const search = window.location.search || '';
+    const hash = window.location.hash || '';
+
+    return (
+      normalizedPath === '/reset-password' ||
+      /[?&]type=recovery\b/.test(search) ||
+      /[?&]token_hash=/.test(search) ||
+      /[?&]code=/.test(search) ||
+      /[#&]type=recovery\b/.test(hash) ||
+      /[#&]access_token=/.test(hash)
+    );
+  }, []);
+
   // Use a ref to always have the latest user email available
   const userEmailRef = useRef<string | null>(null);
 
@@ -100,14 +117,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearAuthState]);
 
   useEffect(() => {
-    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event, session) => {
       const currentUser = session?.user ?? null;
       setSession(session);
       setUser(currentUser);
       userEmailRef.current = currentUser?.email ?? null;
       setLoading(false);
       if (currentUser) {
-        setTimeout(() => checkSubscription(currentUser.email ?? undefined), 0);
+        if (event === 'PASSWORD_RECOVERY' || isRecoveryFlow()) {
+          setSubscription(prev => ({ ...prev, loading: false }));
+        } else {
+          setTimeout(() => checkSubscription(currentUser.email ?? undefined), 0);
+        }
       } else {
         setSubscription({ subscribed: false, productId: null, subscriptionEnd: null, loading: false, trial: false, householdPro: false });
       }
@@ -120,7 +141,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userEmailRef.current = currentUser?.email ?? null;
       setLoading(false);
       if (currentUser) {
-        checkSubscription(currentUser.email ?? undefined);
+        if (isRecoveryFlow()) {
+          setSubscription(prev => ({ ...prev, loading: false }));
+        } else {
+          checkSubscription(currentUser.email ?? undefined);
+        }
       } else {
         setSubscription(prev => ({ ...prev, loading: false }));
       }
@@ -131,10 +156,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Periodic check every 60 seconds
   useEffect(() => {
-    if (!user) return;
+    if (!user || isRecoveryFlow()) return;
     const interval = setInterval(() => checkSubscription(), 60000);
     return () => clearInterval(interval);
-  }, [user, checkSubscription]);
+  }, [user, checkSubscription, isRecoveryFlow]);
 
   const signUp = async (email: string, password: string, displayName: string): Promise<{ error: Error | null; alreadyExists?: boolean }> => {
     const currentOrigin = window.location.origin;
