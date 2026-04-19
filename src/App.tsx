@@ -37,11 +37,25 @@ function AppRoutes() {
   const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
   usePushNotifications();
 
-  // Allow /welcome and /reset-password to render without auth
+  // Allow /welcome to render without auth
   if (normalizedPath === '/welcome') {
     return <WelcomePage />;
   }
-  if (normalizedPath === '/reset-password') {
+
+  // Detect password recovery indicators ANYWHERE in the URL — Supabase email
+  // links may land on '/' or '/reset-password' depending on config. We must
+  // catch them before the auto-signed-in user is routed to the dashboard.
+  const search = location.search || '';
+  const hash = location.hash || '';
+  const isRecoveryUrl =
+    normalizedPath === '/reset-password' ||
+    /[?&]type=recovery\b/.test(search) ||
+    /[?&]token_hash=/.test(search) ||
+    /[?&]code=/.test(search) ||
+    /[#&]type=recovery\b/.test(hash) ||
+    /[#&]access_token=/.test(hash);
+
+  if (isRecoveryUrl) {
     return <ResetPasswordPage />;
   }
 
