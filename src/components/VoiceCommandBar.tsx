@@ -36,6 +36,7 @@ type UndoSnapshot =
   | { kind: 'inventory_delete'; row: any; name: string }
   | { kind: 'inventory_insert'; id: string; name: string }
   | { kind: 'shopping_insert'; id: string; name: string }
+  | { kind: 'shopping_update'; id: string; previousQuantity: number; name: string }
   | { kind: 'shopping_delete'; row: any; name: string };
 
 export default function VoiceCommandBar() {
@@ -63,6 +64,8 @@ export default function VoiceCommandBar() {
           await supabase.from('inventory_items').delete().eq('id', s.id);
         } else if (s.kind === 'shopping_insert') {
           await supabase.from('shopping_list_items').delete().eq('id', s.id);
+        } else if (s.kind === 'shopping_update') {
+          await supabase.from('shopping_list_items').update({ quantity: s.previousQuantity }).eq('id', s.id);
         } else if (s.kind === 'shopping_delete') {
           await supabase.from('shopping_list_items').insert(s.row);
         }
@@ -139,16 +142,44 @@ export default function VoiceCommandBar() {
         }
 
         case 'add_shopping': {
-          const { data: inserted } = await supabase.from('shopping_list_items').insert({
-            household_id: household.id,
-            name: action.name,
-            quantity: action.quantity,
-            unit: action.unit,
-            category: action.category,
-            requested_by: user.id,
-          }).select('id').single();
-          if (inserted?.id) snapshots.push({ kind: 'shopping_insert', id: inserted.id, name: action.name });
-          summaries.push(`Shopping: +${action.name}`);
+          // Merge with existing pending item of same name + unit instead of creating
+          // duplicate rows ("2 bananas" + "5 more bananas" → 7 bananas).
+          const { data: existingMatches } = await supabase
+            .from('shopping_list_items')
+            .select('*')
+            .eq('household_id', household.id)
+            .eq('status', 'pending')
+            .ilike('name', action.name);
+
+          const existing = (existingMatches ?? []).find(
+            (r: any) => (r.unit ?? '').toLowerCase() === (action.unit ?? '').toLowerCase()
+          );
+
+          if (existing) {
+            const newQty = Number(existing.quantity) + Number(action.quantity);
+            snapshots.push({
+              kind: 'shopping_update',
+              id: existing.id,
+              previousQuantity: Number(existing.quantity),
+              name: action.name,
+            });
+            await supabase
+              .from('shopping_list_items')
+              .update({ quantity: newQty })
+              .eq('id', existing.id);
+            summaries.push(`Shopping: ${action.name} → ${newQty}${action.unit}`);
+          } else {
+            const { data: inserted } = await supabase.from('shopping_list_items').insert({
+              household_id: household.id,
+              name: action.name,
+              quantity: action.quantity,
+              unit: action.unit,
+              category: action.category,
+              requested_by: user.id,
+            }).select('id').single();
+            if (inserted?.id) snapshots.push({ kind: 'shopping_insert', id: inserted.id, name: action.name });
+            summaries.push(`Shopping: +${action.quantity}${action.unit} ${action.name}`);
+          }
           qc.invalidateQueries({ queryKey: ['shopping'] });
           break;
         }
