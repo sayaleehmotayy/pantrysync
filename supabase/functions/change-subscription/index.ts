@@ -148,15 +148,26 @@ serve(async (req) => {
     let updated: Stripe.Subscription;
 
     if (currencyMismatch) {
-      log("Currency mismatch — cancel + recreate", { currentCurrency, targetCurrency });
-      // Cancel old sub immediately (no proration credit since currency differs)
+      log("Currency mismatch — routing through Checkout", { currentCurrency, targetCurrency });
+      // Stripe can't switch currencies on an existing subscription, and the
+      // legacy customer may have no payment method on file (trial sub). Cancel
+      // the old sub and send the user to Checkout to enter a card and start
+      // the new EUR subscription cleanly.
       await stripe.subscriptions.cancel(subscription.id, { prorate: false });
-      // Create a fresh subscription on the new price. No trial.
-      updated = await stripe.subscriptions.create({
+
+      const origin = req.headers.get("origin") || "http://localhost:3000";
+      const session = await stripe.checkout.sessions.create({
         customer: customerId,
-        items: [{ price: targetPriceId }],
-        payment_behavior: "allow_incomplete",
+        line_items: [{ price: targetPriceId, quantity: 1 }],
+        mode: "subscription",
+        success_url: `${origin}/settings?checkout=success`,
+        cancel_url: `${origin}/plans?checkout=cancel`,
       });
+
+      return new Response(
+        JSON.stringify({ requiresCheckout: true, url: session.url, tier, interval }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
     } else {
       updated = await stripe.subscriptions.update(subscription.id, {
         items: [
