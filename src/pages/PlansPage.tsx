@@ -64,7 +64,14 @@ export default function PlansPage() {
         throw new Error(msg);
       }
       if (data?.url) {
-        window.location.href = data.url;
+        // Stripe refuses to load inside iframes; the Lovable preview is an iframe,
+        // so a same-tab redirect shows blank. Open in a new tab instead.
+        const win = window.open(data.url, '_blank');
+        if (!win) {
+          window.location.href = data.url; // popup blocked → fallback
+        } else {
+          toast.info('Complete checkout in the new tab, then return here.');
+        }
       }
     } catch (e: any) {
       toast.error(e.message || 'Failed to start checkout');
