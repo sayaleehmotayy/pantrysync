@@ -91,14 +91,39 @@ export function useShoppingList() {
   const addItem = useMutation({
     mutationFn: async (item: { name: string; quantity: number; unit: string; category: string }) => {
       if (!household || !user) throw new Error('No household');
+
+      // Merge into existing pending item with same name + unit
+      const { data: existing } = await supabase
+        .from('shopping_list_items')
+        .select('id, quantity, unit')
+        .eq('household_id', household.id)
+        .eq('status', 'pending')
+        .eq('unit', item.unit)
+        .ilike('name', item.name)
+        .maybeSingle();
+
+      if (existing) {
+        const newQty = Number(existing.quantity) + Number(item.quantity);
+        const { error } = await supabase
+          .from('shopping_list_items')
+          .update({ quantity: newQty })
+          .eq('id', existing.id);
+        if (error) throw error;
+        return { merged: true };
+      }
+
       const { error } = await supabase.from('shopping_list_items').insert({
         ...item,
         household_id: household.id,
         requested_by: user.id,
       });
       if (error) throw error;
+      return { merged: false };
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['shopping'] }); toast.success('Added to shopping list'); },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['shopping'] });
+      toast.success(res?.merged ? 'Updated existing item' : 'Added to shopping list');
+    },
     onError: (e) => toast.error(e.message),
   });
 
