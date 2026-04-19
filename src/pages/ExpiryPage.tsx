@@ -48,7 +48,7 @@ export default function ExpiryPage() {
 
   // Sort each group by expiry date
   for (const key of Object.keys(grouped) as ExpiryStatus[]) {
-    grouped[key].sort((a, b) => new Date(a.expiry_date!).getTime() - new Date(b.expiry_date!).getTime());
+    grouped[key].sort((a, b) => parseExpiry(a.expiry_date!).getTime() - parseExpiry(b.expiry_date!).getTime());
   }
 
   const sections: ExpiryStatus[] = ['expired', 'expiring', 'safe'];
