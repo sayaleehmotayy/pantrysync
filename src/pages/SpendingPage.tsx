@@ -1,13 +1,7 @@
-import React, { useState } from 'react';
-import { useSpendingSummary, usePriceHistory } from '@/hooks/usePriceHistory';
-import { useInventory } from '@/hooks/useInventory';
+import React from 'react';
+import { useSpendingSummary } from '@/hooks/usePriceHistory';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DollarSign, TrendingUp, TrendingDown, Store, Plus } from 'lucide-react';
+import { DollarSign, TrendingUp, Store } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { format } from 'date-fns';
 import { useCurrency } from '@/lib/currency';
@@ -25,31 +19,8 @@ const CHART_COLORS = [
 
 export default function SpendingPage() {
   const { data: summary, isLoading } = useSpendingSummary();
-  const { data: items = [] } = useInventory();
-  const { addPrice } = usePriceHistory();
   const { formatPrice } = useCurrency();
-  const [addOpen, setAddOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState('');
-  const [price, setPrice] = useState('');
-  const [store, setStore] = useState('');
 
-  const handleAddPrice = () => {
-    if (!selectedItem || !price) return;
-    addPrice.mutate({
-      inventory_item_id: selectedItem,
-      price: Number(price),
-      store_name: store || undefined,
-    });
-    setAddOpen(false);
-    setPrice('');
-    setStore('');
-    setSelectedItem('');
-  };
-
-  // Items with prices for the "recent prices" list
-  const itemsWithPrices = items
-    .filter((i: any) => i.last_price)
-    .sort((a: any, b: any) => (b.last_price || 0) - (a.last_price || 0));
 
   if (isLoading) {
     return (
