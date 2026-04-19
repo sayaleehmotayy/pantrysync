@@ -50,15 +50,7 @@ EXTRACTION RULES:
 - Currency should be the 3-letter ISO code (USD, EUR, GBP, etc)
 - Clean up item names to be human-readable (e.g., "BNL BNNA" → "Banana")
 
-COUPON/DISCOUNT CODE RULES:
-- ONLY extract coupons that are ACTIONABLE for future purchases — meaning the customer can use a specific code, barcode, or QR code on their NEXT visit to save money
-- Examples of VALID coupons to extract: "Scan this barcode to get €5 off your next purchase over €25", "Use code SAVE10 for 10% off next order", "Present this voucher for a free coffee"
-- IGNORE generic promotional text like "better deals available", "save more with our app", "loyalty points earned", "you saved €X today" — these are NOT actionable coupons
-- IGNORE receipt-specific discounts already applied (e.g., "multi-buy discount -€2.00") — these are savings on the CURRENT receipt, not future coupons
-- IGNORE loyalty program references, points summaries, or membership tier info
-- Extract the code/barcode number AND describe the offer clearly (e.g., "€5 off next purchase over €25")
-- If the coupon has an expiry date mentioned, include it in the description
-- Do NOT confuse transaction IDs, receipt numbers, or internal reference codes with coupon codes
+DO NOT extract coupons, promo codes, discount codes, vouchers, or any promotional offers — these are explicitly out of scope for this scanner.
 
 MULTI-PHOTO DEDUPLICATION:
 - This may be one photo of a multi-photo scan of a long receipt
@@ -69,7 +61,7 @@ MULTI-PHOTO DEDUPLICATION:
         {
           role: "user",
           content: [
-            { type: "text", text: "Extract ONLY NEW grocery/shopping items (skip any already extracted), their prices, store name, date, total, and any coupon/promo codes from this receipt section. DO NOT extract any payment details, card numbers, personal info, or sensitive data." },
+            { type: "text", text: "Extract ONLY NEW grocery/shopping items (skip any already extracted), their prices, store name, date, and total from this receipt section. DO NOT extract coupons, promo codes, payment details, card numbers, personal info, or sensitive data." },
             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
           ],
         },
