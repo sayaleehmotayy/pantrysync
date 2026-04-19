@@ -185,12 +185,15 @@ serve(async (req) => {
 
       log("In-place swap", { isUpgrade, isOnTrial, prorationBehavior, currentAmount, targetAmount });
 
+      const nowSec = Math.floor(Date.now() / 1000);
+      const trialStillValid = isOnTrial && !!subscription.trial_end && subscription.trial_end > nowSec + 60;
+
       updated = await stripe.subscriptions.update(subscription.id, {
         items: [{ id: currentItem.id, price: targetPriceId }],
         proration_behavior: prorationBehavior,
-        // Preserve trial in all cases — never cut it short on plan change.
-        trial_end: isOnTrial ? (subscription.trial_end ?? undefined) : undefined,
-        payment_behavior: !isOnTrial && isUpgrade ? "error_if_incomplete" : "default_incomplete",
+        // Only re-send trial_end if it's actually still in the future
+        trial_end: trialStillValid ? subscription.trial_end! : undefined,
+        payment_behavior: !trialStillValid && isUpgrade ? "error_if_incomplete" : "default_incomplete",
       });
     }
 
