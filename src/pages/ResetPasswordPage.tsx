@@ -21,12 +21,20 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     let handled = false;
 
+    const cleanUrl = () => {
+      try {
+        window.history.replaceState({}, '', '/reset-password');
+      } catch {}
+    };
+
     const handleRecovery = async () => {
-      // 1) Check URL query params for PKCE flow (token_hash + type=recovery)
       const params = new URLSearchParams(window.location.search);
       const tokenHash = params.get('token_hash');
       const type = params.get('type');
+      const code = params.get('code');
+      const hash = window.location.hash;
 
+      // 1) PKCE flow with token_hash + type=recovery
       if (tokenHash && type === 'recovery') {
         const { error } = await supabase.auth.verifyOtp({
           token_hash: tokenHash,
@@ -35,6 +43,7 @@ export default function ResetPasswordPage() {
         if (!error) {
           handled = true;
           setIsRecovery(true);
+          cleanUrl();
         } else {
           setError('This reset link has expired or is invalid. Please request a new one.');
         }
@@ -42,16 +51,38 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      // 2) Check hash fragment for implicit flow (older / alternative)
-      const hash = window.location.hash;
-      if (hash.includes('type=recovery')) {
-        handled = true;
-        setIsRecovery(true);
+      // 2) PKCE flow with ?code= — Supabase may auto-exchange via detectSessionInUrl
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        if (!error) {
+          handled = true;
+          setIsRecovery(true);
+          cleanUrl();
+        } else {
+          // Auto-exchange may have already consumed the code — check session
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            handled = true;
+            setIsRecovery(true);
+            cleanUrl();
+          } else {
+            setError('This reset link has expired or is invalid. Please request a new one.');
+          }
+        }
         setVerifying(false);
         return;
       }
 
-      // 3) Listen for PASSWORD_RECOVERY event (fires when session is restored from hash)
+      // 3) Implicit flow with hash fragment
+      if (hash.includes('type=recovery') || hash.includes('access_token=')) {
+        handled = true;
+        setIsRecovery(true);
+        cleanUrl();
+        setVerifying(false);
+        return;
+      }
+
+      // 4) Listen for PASSWORD_RECOVERY event
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
         if (event === 'PASSWORD_RECOVERY') {
           handled = true;
@@ -60,11 +91,17 @@ export default function ResetPasswordPage() {
         }
       });
 
-      // Give the auth listener a moment to fire
+      // 5) Fallback — if a session already exists (auto-exchange already happened)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        handled = true;
+        setIsRecovery(true);
+        setVerifying(false);
+        return () => subscription.unsubscribe();
+      }
+
       setTimeout(() => {
-        if (!handled) {
-          setVerifying(false);
-        }
+        if (!handled) setVerifying(false);
       }, 3000);
 
       return () => subscription.unsubscribe();
@@ -90,7 +127,11 @@ export default function ResetPasswordPage() {
       setError(error.message);
     } else {
       setSuccess(true);
-      setTimeout(() => navigate('/'), 2000);
+      // Sign out so the user must log in with the new password (clean UX)
+      await supabase.auth.signOut();
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
     }
     setLoading(false);
   };
@@ -139,12 +180,12 @@ export default function ResetPasswordPage() {
               {success ? 'Password Updated!' : 'Set New Password'}
             </CardTitle>
             <CardDescription>
-              {success ? 'Redirecting you to the app...' : 'Enter your new password below'}
+              {success ? 'Redirecting you to sign in with your new password...' : 'Enter your new password below'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {success ? (
-              <p className="text-sm text-center text-muted-foreground">Your password has been updated successfully.</p>
+              <p className="text-sm text-center text-muted-foreground">Your password has been updated successfully. Please sign in.</p>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="relative">
