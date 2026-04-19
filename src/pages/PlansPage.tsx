@@ -16,6 +16,14 @@ import { toast } from 'sonner';
 
 const FEATURE_ICONS = [Mic, ChefHat, Wallet, Receipt, MessageSquare];
 
+const TIER_FEATURES = [
+  'Voice-controlled pantry updates',
+  'AI recipe suggestions from your ingredients',
+  'Smart shopping & budget tracking',
+  'Receipt & discount scanning',
+  'Real-time household sync & chat',
+];
+
 type PaidTier = Exclude<TierKey, 'free'>;
 
 export default function PlansPage() {
