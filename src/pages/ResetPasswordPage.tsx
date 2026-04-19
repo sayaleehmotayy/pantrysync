@@ -180,12 +180,12 @@ export default function ResetPasswordPage() {
               {success ? 'Password Updated!' : 'Set New Password'}
             </CardTitle>
             <CardDescription>
-              {success ? 'Redirecting you to the app...' : 'Enter your new password below'}
+              {success ? 'Redirecting you to sign in with your new password...' : 'Enter your new password below'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {success ? (
-              <p className="text-sm text-center text-muted-foreground">Your password has been updated successfully.</p>
+              <p className="text-sm text-center text-muted-foreground">Your password has been updated successfully. Please sign in.</p>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="relative">
