@@ -136,21 +136,41 @@ serve(async (req) => {
     }
 
     // ----- PERFORM SWAP -----
-    // Update the subscription item to the new price. Prorate so the user is
-    // credited or charged the difference immediately. Do NOT add a new trial.
-    const updated = await stripe.subscriptions.update(subscription.id, {
-      items: [
-        {
-          id: currentItem.id,
-          price: targetPriceId,
-        },
-      ],
-      proration_behavior: "create_prorations",
-      // Cancel any pending trial — switching plans is an explicit paid action
-      trial_end: subscription.trial_end ? "now" : undefined,
-    });
+    // Stripe does not allow changing the currency of an existing subscription.
+    // If the current sub uses a different currency than the target price, we
+    // must cancel the old subscription and create a fresh one in the new
+    // currency. Otherwise we do an in-place prorated swap.
+    const currentCurrency = currentItem.price.currency?.toLowerCase();
+    const targetPrice = await stripe.prices.retrieve(targetPriceId);
+    const targetCurrency = targetPrice.currency?.toLowerCase();
+    const currencyMismatch = currentCurrency && targetCurrency && currentCurrency !== targetCurrency;
 
-    log("Subscription updated", { subId: updated.id, newPrice: targetPriceId });
+    let updated: Stripe.Subscription;
+
+    if (currencyMismatch) {
+      log("Currency mismatch — cancel + recreate", { currentCurrency, targetCurrency });
+      // Cancel old sub immediately (no proration credit since currency differs)
+      await stripe.subscriptions.cancel(subscription.id, { prorate: false });
+      // Create a fresh subscription on the new price. No trial.
+      updated = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: targetPriceId }],
+        payment_behavior: "allow_incomplete",
+      });
+    } else {
+      updated = await stripe.subscriptions.update(subscription.id, {
+        items: [
+          {
+            id: currentItem.id,
+            price: targetPriceId,
+          },
+        ],
+        proration_behavior: "create_prorations",
+        trial_end: subscription.trial_end ? "now" : undefined,
+      });
+    }
+
+    log("Subscription updated", { subId: updated.id, newPrice: targetPriceId, recreated: currencyMismatch });
 
     // Refresh subscription_cache so the join RPC sees the new product immediately
     const newProductId = typeof updated.items.data[0]?.price?.product === "string"
