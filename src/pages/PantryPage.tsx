@@ -157,8 +157,8 @@ export default function PantryPage() {
           <Button size="icon" variant="outline" className="h-8 w-8 relative" onClick={openScanner} title={isPro ? 'Scan product' : 'Pro feature — upgrade to scan'}>
             <Camera className="w-4 h-4" />
             {!isPro && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center ring-2 ring-background shadow-sm">
-                <Lock className="w-2.5 h-2.5" strokeWidth={3} />
+              <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center ring-2 ring-background shadow-sm">
+                <Lock className="w-3 h-3" strokeWidth={2.5} />
               </span>
             )}
           </Button>
