@@ -178,7 +178,7 @@ export default function ShoppingPage() {
             variant="outline"
             size="sm"
             className="mt-4 gap-1"
-            onClick={() => setScannerOpen(true)}
+            onClick={openScanner}
           >
             <Camera className="w-4 h-4" /> Scan a product to pantry
           </Button>
@@ -256,7 +256,7 @@ export default function ShoppingPage() {
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs gap-1"
-                  onClick={() => setScannerOpen(true)}
+                  onClick={openScanner}
                 >
                   <Camera className="w-3.5 h-3.5" /> Scan to Pantry
                 </Button>
