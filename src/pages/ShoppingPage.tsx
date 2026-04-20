@@ -9,7 +9,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ShoppingCart, Check, AlertTriangle, X, Trash2, Camera, Target } from 'lucide-react';
+import { Plus, ShoppingCart, Check, AlertTriangle, X, Trash2, Camera, Target, Lock } from 'lucide-react';
+import { useProAccess } from '@/hooks/useProAccess';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ProductScanner from '@/components/ProductScanner';
@@ -33,6 +34,8 @@ export default function ShoppingPage() {
   const { household } = useHousehold();
   const [addOpen, setAddOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const { isPro, gate } = useProAccess();
+  const openScanner = () => { if (gate('Product scanning')) setScannerOpen(true); };
   const [shoppingMode, setShoppingMode] = useState(() => {
     try { return !!sessionStorage.getItem('pantrysync_shopping_session'); } catch { return false; }
   });
@@ -106,10 +109,16 @@ export default function ShoppingPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setScannerOpen(true)}
-            className="gap-1"
+            onClick={openScanner}
+            className="gap-1 relative"
+            title={isPro ? 'Scan a product' : 'Pro feature — upgrade to scan'}
           >
             <Camera className="w-4 h-4" /> Scan
+            {!isPro && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-foreground/90 flex items-center justify-center ring-2 ring-background">
+                <Lock className="w-2 h-2 text-background" />
+              </span>
+            )}
           </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
