@@ -62,10 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkSubscription = useCallback(async (emailOverride?: string) => {
     const email = emailOverride ?? userEmailRef.current;
-    if (email === ADMIN_EMAIL) {
-      setSubscription({ subscribed: true, productId: 'admin', subscriptionEnd: null, loading: false, trial: false, householdPro: false });
-      return;
-    }
+    // Admin bypass is now handled server-side in check-subscription edge function
 
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
