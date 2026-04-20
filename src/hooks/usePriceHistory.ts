@@ -86,11 +86,18 @@ export function useSpendingSummary() {
   return useQuery({
     queryKey: ['spending_summary', household?.id],
     queryFn: async () => {
-      if (!household) return { total30d: 0, total7d: 0, byStore: [], byWeek: [] };
+      if (!household) return {
+        total30d: 0, total7d: 0, totalMonth: 0, totalYear: 0,
+        byStore: [], byWeek: [], byMonth: [],
+      };
 
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      // Fetch the wider window (year) so we can derive all buckets client-side.
+      const earliest = startOfYear < thirtyDaysAgo ? startOfYear : thirtyDaysAgo;
 
       // Spending = actual purchase events: shopping_trips + completed receipt_scans.
       // price_history is excluded — it's per-unit price logging, not a purchase total.
@@ -99,13 +106,13 @@ export function useSpendingSummary() {
           .from('shopping_trips')
           .select('id, store_name, total_spent, finished_at')
           .eq('household_id', household.id)
-          .gte('finished_at', thirtyDaysAgo.toISOString()),
+          .gte('finished_at', earliest.toISOString()),
         supabase
           .from('receipt_scans')
           .select('id, store_name, total_amount, created_at, status')
           .eq('household_id', household.id)
           .eq('status', 'completed')
-          .gte('created_at', thirtyDaysAgo.toISOString()),
+          .gte('created_at', earliest.toISOString()),
       ]);
 
       if (tripsRes.error) throw tripsRes.error;
