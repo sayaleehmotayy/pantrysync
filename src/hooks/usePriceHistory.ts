@@ -118,7 +118,7 @@ export function useSpendingSummary() {
       if (tripsRes.error) throw tripsRes.error;
       if (receiptsRes.error) throw receiptsRes.error;
 
-      type SpendEntry = { amount: number; store: string; date: Date; weekKey: string };
+      type SpendEntry = { amount: number; store: string; date: Date; weekKey: string; monthKey: string };
       const entries: SpendEntry[] = [];
 
       const toWeekKey = (d: Date) => {
@@ -127,30 +127,31 @@ export function useSpendingSummary() {
         weekStart.setDate(weekStart.getDate() - weekStart.getDay());
         return weekStart.toISOString().slice(0, 10);
       };
+      const toMonthKey = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-      (tripsRes.data || []).forEach((t: any) => {
-        const amt = Number(t.total_spent) || 0;
+      const push = (amt: number, store: string, d: Date) => {
         if (amt <= 0) return;
-        const d = new Date(t.finished_at);
-        entries.push({ amount: amt, store: t.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
-      });
+        entries.push({ amount: amt, store, date: d, weekKey: toWeekKey(d), monthKey: toMonthKey(d) });
+      };
 
-      (receiptsRes.data || []).forEach((r: any) => {
-        const amt = Number(r.total_amount) || 0;
-        if (amt <= 0) return;
-        const d = new Date(r.created_at);
-        entries.push({ amount: amt, store: r.store_name || 'Unknown', date: d, weekKey: toWeekKey(d) });
-      });
+      (tripsRes.data || []).forEach((t: any) =>
+        push(Number(t.total_spent) || 0, t.store_name || 'Unknown', new Date(t.finished_at))
+      );
+      (receiptsRes.data || []).forEach((r: any) =>
+        push(Number(r.total_amount) || 0, r.store_name || 'Unknown', new Date(r.created_at))
+      );
 
-      const total30d = entries
-        .filter(e => e.date >= thirtyDaysAgo && e.date <= now)
-        .reduce((sum, e) => sum + e.amount, 0);
-      const total7d = entries
-        .filter(e => e.date >= sevenDaysAgo && e.date <= now)
-        .reduce((sum, e) => sum + e.amount, 0);
+      const sumIn = (from: Date) =>
+        entries.filter(e => e.date >= from && e.date <= now).reduce((s, e) => s + e.amount, 0);
+
+      const total7d = sumIn(sevenDaysAgo);
+      const total30d = sumIn(thirtyDaysAgo);
+      const totalMonth = sumIn(startOfMonth);
+      const totalYear = sumIn(startOfYear);
 
       const storeMap = new Map<string, number>();
-      entries.forEach(e => {
+      entries.filter(e => e.date >= thirtyDaysAgo).forEach(e => {
         storeMap.set(e.store, (storeMap.get(e.store) || 0) + e.amount);
       });
       const byStore = Array.from(storeMap.entries())
@@ -158,14 +159,22 @@ export function useSpendingSummary() {
         .sort((a, b) => b.total - a.total);
 
       const weekMap = new Map<string, number>();
-      entries.forEach(e => {
+      entries.filter(e => e.date >= thirtyDaysAgo).forEach(e => {
         weekMap.set(e.weekKey, (weekMap.get(e.weekKey) || 0) + e.amount);
       });
       const byWeek = Array.from(weekMap.entries())
         .map(([week, total]) => ({ week, total }))
         .sort((a, b) => a.week.localeCompare(b.week));
 
-      return { total30d, total7d, byStore, byWeek };
+      const monthMap = new Map<string, number>();
+      entries.filter(e => e.date >= startOfYear).forEach(e => {
+        monthMap.set(e.monthKey, (monthMap.get(e.monthKey) || 0) + e.amount);
+      });
+      const byMonth = Array.from(monthMap.entries())
+        .map(([month, total]) => ({ month, total }))
+        .sort((a, b) => a.month.localeCompare(b.month));
+
+      return { total30d, total7d, totalMonth, totalYear, byStore, byWeek, byMonth };
     },
     enabled: !!household,
   });
