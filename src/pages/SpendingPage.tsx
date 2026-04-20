@@ -136,7 +136,10 @@ export default function SpendingPage() {
                 <BarChart data={weeklyData}>
                   <XAxis
                     dataKey="week"
-                    tickFormatter={v => format(new Date(v), 'MMM d')}
+                    tickFormatter={v => {
+                      const d = v ? new Date(v as string) : null;
+                      return d && !isNaN(d.getTime()) ? format(d, 'MMM d') : '';
+                    }}
                     tick={{ fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
