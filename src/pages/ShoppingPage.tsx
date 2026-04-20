@@ -115,8 +115,8 @@ export default function ShoppingPage() {
           >
             <Camera className="w-4 h-4" /> Scan
             {!isPro && (
-              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-foreground/90 flex items-center justify-center ring-2 ring-background">
-                <Lock className="w-2 h-2 text-background" />
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-primary text-primary-foreground flex items-center justify-center ring-2 ring-background shadow-sm">
+                <Lock className="w-2 h-2" strokeWidth={2.5} />
               </span>
             )}
           </Button>
