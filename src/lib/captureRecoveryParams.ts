@@ -53,9 +53,18 @@ function capture(): CapturedRecovery | null {
   };
 
   // Strip tokens from the URL so Supabase's detectSessionInUrl is a no-op
-  // and so the URL bar is clean. Keep the user on /reset-password.
+  // and so the URL bar is clean. Force pathname to /reset-password so React
+  // Router lands on the recovery screen even if the email link pointed at '/'.
   try {
     window.history.replaceState({}, '', '/reset-password');
+  } catch {
+    // ignore
+  }
+
+  // Also persist to sessionStorage so a hard reload during the flow keeps
+  // recovery context (the in-memory window var would be lost otherwise).
+  try {
+    sessionStorage.setItem('pantrysync_recovery', JSON.stringify(captured));
   } catch {
     // ignore
   }
@@ -63,6 +72,19 @@ function capture(): CapturedRecovery | null {
   return captured;
 }
 
-window.__pantrysyncRecovery = capture();
+// Try to restore from sessionStorage first (handles reload mid-flow), then
+// fall back to capturing fresh from the URL.
+function restore(): CapturedRecovery | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem('pantrysync_recovery');
+    if (raw) return JSON.parse(raw) as CapturedRecovery;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+window.__pantrysyncRecovery = capture() ?? restore();
 
 export {};

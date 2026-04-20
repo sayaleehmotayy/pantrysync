@@ -25,6 +25,42 @@
 </head>
 
   <body>
+    <!-- CRITICAL: capture password-recovery tokens BEFORE any module loads. -->
+    <script>
+      (function () {
+        try {
+          var search = new URLSearchParams(window.location.search || '');
+          var hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+          var type = search.get('type') || hash.get('type');
+          var code = search.get('code') || hash.get('code');
+          var tokenHash = search.get('token_hash') || hash.get('token_hash');
+          var accessToken = hash.get('access_token') || search.get('access_token');
+          var refreshToken = hash.get('refresh_token') || search.get('refresh_token');
+          var path = window.location.pathname.replace(/\/+$/, '') || '/';
+
+          var isRecovery =
+            type === 'recovery' || !!code || !!tokenHash || !!accessToken || path === '/reset-password';
+
+          if (isRecovery) {
+            var captured = {
+              type: type, code: code, tokenHash: tokenHash,
+              accessToken: accessToken, refreshToken: refreshToken,
+              fullUrl: window.location.href,
+            };
+            window.__pantrysyncRecovery = captured;
+            try { sessionStorage.setItem('pantrysync_recovery', JSON.stringify(captured)); } catch (e) {}
+            try { window.history.replaceState({}, '', '/reset-password'); } catch (e) {}
+          } else {
+            try {
+              var raw = sessionStorage.getItem('pantrysync_recovery');
+              if (raw) window.__pantrysyncRecovery = JSON.parse(raw);
+            } catch (e) {}
+          }
+        } catch (e) {
+          console.warn('recovery capture failed', e);
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
