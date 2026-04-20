@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
+import { getRecoveryParams } from '@/lib/authRecovery';
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -19,7 +20,8 @@ export default function ResetPasswordPage() {
   const [verifying, setVerifying] = useState(true);
 
   useEffect(() => {
-    let handled = false;
+    let isActive = true;
+    let unsubscribe: (() => void) | undefined;
 
     const cleanUrl = () => {
       try {
@@ -28,87 +30,63 @@ export default function ResetPasswordPage() {
     };
 
     const handleRecovery = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const tokenHash = params.get('token_hash');
-      const type = params.get('type');
-      const code = params.get('code');
-      const hash = window.location.hash;
+      const { type, code, tokenHash, accessToken, refreshToken } = getRecoveryParams();
+      const hasRecoveryParams = Boolean(code || tokenHash || accessToken || type === 'recovery');
 
-      // 1) PKCE flow with token_hash + type=recovery
-      if (tokenHash && type === 'recovery') {
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: 'recovery',
-        });
-        if (!error) {
-          handled = true;
-          setIsRecovery(true);
-          cleanUrl();
-        } else {
-          setError('This reset link has expired or is invalid. Please request a new one.');
-        }
-        setVerifying(false);
-        return;
-      }
-
-      // 2) PKCE flow with ?code= — Supabase may auto-exchange via detectSessionInUrl
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-        if (!error) {
-          handled = true;
-          setIsRecovery(true);
-          cleanUrl();
-        } else {
-          // Auto-exchange may have already consumed the code — check session
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            handled = true;
-            setIsRecovery(true);
-            cleanUrl();
-          } else {
-            // Don't clean the URL — let the submit handler retry the exchange
-            setIsRecovery(true);
-          }
-        }
-        setVerifying(false);
-        return;
-      }
-
-      // 3) Implicit flow with hash fragment
-      if (hash.includes('type=recovery') || hash.includes('access_token=')) {
-        handled = true;
+      if (hasRecoveryParams && isActive) {
         setIsRecovery(true);
-        cleanUrl();
+        setError('');
+      }
+
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(window.location.href).catch(() => {});
+      } else if (tokenHash && type === 'recovery') {
+        await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).catch(() => {});
+      } else if (accessToken && refreshToken) {
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).catch(() => {});
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        if (!isActive) return;
+        setIsRecovery(true);
         setVerifying(false);
+        cleanUrl();
         return;
       }
 
-      // 4) Listen for PASSWORD_RECOVERY event
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          handled = true;
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+        if (!isActive) return;
+
+        if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && nextSession) {
           setIsRecovery(true);
+          setError('');
           setVerifying(false);
+          cleanUrl();
         }
       });
 
-      // 5) Fallback — if a session already exists (auto-exchange already happened)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        handled = true;
-        setIsRecovery(true);
+      unsubscribe = () => subscription.unsubscribe();
+
+      if (hasRecoveryParams) {
         setVerifying(false);
-        return () => subscription.unsubscribe();
+        return;
       }
 
       setTimeout(() => {
-        if (!handled) setVerifying(false);
+        if (!isActive) return;
+        setVerifying(false);
+        setIsRecovery(false);
+        setError('This reset link is invalid or has expired.');
       }, 3000);
-
-      return () => subscription.unsubscribe();
     };
 
     handleRecovery();
+
+    return () => {
+      isActive = false;
+      unsubscribe?.();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,13 +106,13 @@ export default function ResetPasswordPage() {
     // from the URL before giving up. This avoids "Auth session missing!".
     let { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const tokenHash = params.get('token_hash');
+      const { code, tokenHash, accessToken, refreshToken } = getRecoveryParams();
       if (code) {
         await supabase.auth.exchangeCodeForSession(window.location.href).catch(() => {});
       } else if (tokenHash) {
         await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).catch(() => {});
+      } else if (accessToken && refreshToken) {
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).catch(() => {});
       }
       ({ data: { session } } = await supabase.auth.getSession());
     }
