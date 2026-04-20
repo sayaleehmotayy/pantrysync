@@ -1,3 +1,4 @@
+import "./lib/captureRecoveryParams"; // MUST run before supabase client import
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
