@@ -38,24 +38,11 @@ export default function SpendingPage() {
     );
   }
 
-  const total =
-    range === '7d'
-      ? summary?.total7d || 0
-      : range === '30d'
-      ? summary?.total30d || 0
-      : range === 'month'
-      ? summary?.totalMonth || 0
-      : summary?.totalYear || 0;
+  const total = range === '7d' ? summary?.total7d || 0 : summary?.total30d || 0;
 
-  const showMonthlyChart = range === 'year';
-  const monthlyData = (summary?.byMonth || []).map(m => ({
-    label: format(new Date(m.month + '-01'), 'MMM'),
-    total: m.total,
-  }));
   const weeklyData = summary?.byWeek || [];
 
-  const hasAny =
-    (summary?.byWeek?.length || 0) > 0 || (summary?.byMonth?.length || 0) > 0;
+  const hasAny = (summary?.byWeek?.length || 0) > 0;
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -72,19 +59,13 @@ export default function SpendingPage() {
       >
         <ToggleGroupItem value="7d" size="sm" className="text-xs">7 days</ToggleGroupItem>
         <ToggleGroupItem value="30d" size="sm" className="text-xs">30 days</ToggleGroupItem>
-        <ToggleGroupItem value="month" size="sm" className="text-xs">Monthly</ToggleGroupItem>
-        <ToggleGroupItem value="year" size="sm" className="text-xs">Yearly</ToggleGroupItem>
       </ToggleGroup>
 
       {/* Total card */}
       <Card className="border-border/50">
         <CardContent className="p-4">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
-            {range === 'year' || range === 'month' ? (
-              <Calendar className="w-4.5 h-4.5 text-primary" />
-            ) : (
-              <DollarSign className="w-4.5 h-4.5 text-primary" />
-            )}
+            <DollarSign className="w-4.5 h-4.5 text-primary" />
           </div>
           <p className="text-3xl font-display font-bold">{formatPrice(total)}</p>
           <p className="text-xs text-muted-foreground">{RANGE_LABEL[range]}</p>
