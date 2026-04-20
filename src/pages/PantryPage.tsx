@@ -7,7 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Minus, ShoppingCart, AlertTriangle, Camera, Lock } from 'lucide-react';
+import { useProAccess } from '@/hooks/useProAccess';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow, format, isBefore, addDays } from 'date-fns';
 import { toast } from 'sonner';
@@ -92,6 +93,8 @@ export default function PantryPage() {
   const [filterCat, setFilterCat] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const { isPro, gate } = useProAccess();
+  const openScanner = () => { if (gate('Product scanning')) setScannerOpen(true); };
   
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -151,8 +154,13 @@ export default function PantryPage() {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-display font-bold flex-shrink-0">Pantry</h1>
         <div className="flex gap-1.5">
-          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setScannerOpen(true)} title="Scan product">
+          <Button size="icon" variant="outline" className="h-8 w-8 relative" onClick={openScanner} title={isPro ? 'Scan product' : 'Pro feature — upgrade to scan'}>
             <Camera className="w-4 h-4" />
+            {!isPro && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-foreground/90 flex items-center justify-center ring-2 ring-background">
+                <Lock className="w-2 h-2 text-background" />
+              </span>
+            )}
           </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
