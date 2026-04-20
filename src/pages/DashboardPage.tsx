@@ -35,6 +35,7 @@ function getExpiryStatus(date: string | null): 'safe' | 'expiring' | 'expired' |
 }
 
 export default function DashboardPage() {
+  const { isPro } = useProAccess();
   const { data: inventory = [] } = useInventory();
   const { data: shopping = [], updateItem, deleteItem } = useShoppingList();
   const { household } = useHousehold();
@@ -111,7 +112,7 @@ export default function DashboardPage() {
         <div className="absolute -right-2 -bottom-4 w-20 h-20 rounded-full bg-accent/10 blur-xl" />
       </div>
 
-      {useProAccess().isPro ? <VoiceCommandBar /> : <LockedVoiceBar />}
+      {isPro ? <VoiceCommandBar /> : <LockedVoiceBar />}
 
       {/* Quick actions */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
