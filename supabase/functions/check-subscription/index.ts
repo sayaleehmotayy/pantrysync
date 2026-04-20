@@ -169,6 +169,21 @@ serve(async (req) => {
     const user = userData.user;
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Admin bypass — checked server-side only, never exposed in client bundle
+    const ADMIN_EMAIL = Deno.env.get("ADMIN_EMAIL") || "pantrysync9@gmail.com";
+    if (user.email === ADMIN_EMAIL) {
+      logStep("Admin user detected — granting unlimited access");
+      return new Response(JSON.stringify({
+        subscribed: true,
+        product_id: "admin",
+        subscription_end: null,
+        trial: false,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
     // 1. Check if THIS user has a subscription
