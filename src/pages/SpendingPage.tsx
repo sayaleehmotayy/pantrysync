@@ -18,13 +18,11 @@ const CHART_COLORS = [
   '#84cc16',
 ];
 
-type Range = '7d' | '30d' | 'month' | 'year';
+type Range = '7d' | '30d';
 
 const RANGE_LABEL: Record<Range, string> = {
   '7d': 'Last 7 days',
   '30d': 'Last 30 days',
-  month: 'This month',
-  year: 'This year',
 };
 
 export default function SpendingPage() {
