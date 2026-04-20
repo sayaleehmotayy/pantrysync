@@ -144,7 +144,12 @@ export default function SpendingPage() {
                   <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip
                     formatter={(value: number) => [formatPrice(value), 'Spent']}
-                    labelFormatter={v => `Week of ${format(new Date(v), 'MMM d')}`}
+                    labelFormatter={v => {
+                      const d = v ? new Date(v as string) : null;
+                      return d && !isNaN(d.getTime())
+                        ? `Week of ${format(d, 'MMM d')}`
+                        : '';
+                    }}
                     contentStyle={{
                       borderRadius: '8px',
                       fontSize: '12px',
