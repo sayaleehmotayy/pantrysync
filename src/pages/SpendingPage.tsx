@@ -136,7 +136,10 @@ export default function SpendingPage() {
                 <BarChart data={weeklyData}>
                   <XAxis
                     dataKey="week"
-                    tickFormatter={v => format(new Date(v), 'MMM d')}
+                    tickFormatter={v => {
+                      const d = new Date(v);
+                      return isNaN(d.getTime()) ? '' : format(d, 'MMM d');
+                    }}
                     tick={{ fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
@@ -144,7 +147,10 @@ export default function SpendingPage() {
                   <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip
                     formatter={(value: number) => [formatPrice(value), 'Spent']}
-                    labelFormatter={v => `Week of ${format(new Date(v), 'MMM d')}`}
+                    labelFormatter={v => {
+                      const d = new Date(v as string);
+                      return isNaN(d.getTime()) ? String(v) : `Week of ${format(d, 'MMM d')}`;
+                    }}
                     contentStyle={{
                       borderRadius: '8px',
                       fontSize: '12px',
