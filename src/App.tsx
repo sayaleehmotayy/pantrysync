@@ -39,9 +39,13 @@ function AppRoutes() {
   const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
   usePushNotifications();
 
-  // Detect password recovery FIRST — before any auth/household checks.
-  // Only triggers when actual recovery tokens were captured at boot, not on
-  // bare /reset-password visits (those land on AuthPage / 404 normally).
+  // Public auth pages must win before the normal app shell logic.
+  // The reset email ultimately lands on /reset-password, and that page itself
+  // is responsible for validating tokens / showing the new-password form.
+  if (normalizedPath === '/reset-password') {
+    return <ResetPasswordPage />;
+  }
+
   if (isRecoveryUrl(location)) {
     return <ResetPasswordPage />;
   }

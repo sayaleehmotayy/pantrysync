@@ -76,9 +76,10 @@ export default function ResetPasswordPage() {
 
       setTimeout(() => {
         if (!isActive) return;
+        clearCapturedRecovery();
         setVerifying(false);
         setIsRecovery(false);
-        setError('This reset link is invalid or has expired.');
+        setError('This reset link is invalid or has expired. Please request a new one.');
       }, 3000);
     };
 
