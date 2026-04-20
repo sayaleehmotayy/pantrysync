@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSpendingSummary } from '@/hooks/usePriceHistory';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, TrendingUp, Store, Calendar } from 'lucide-react';
+import { DollarSign, TrendingUp, Store } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { format } from 'date-fns';
 import { useCurrency } from '@/lib/currency';
