@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 const ADMIN_EMAIL = "pantrysync9@gmail.com";
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { isRecoveryUrl } from '@/lib/authRecovery';
 
 interface SubscriptionState {
   subscribed: boolean;
@@ -45,18 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isRecoveryFlow = useCallback(() => {
     if (typeof window === 'undefined') return false;
 
-    const normalizedPath = window.location.pathname.replace(/\/+$/, '') || '/';
-    const search = window.location.search || '';
-    const hash = window.location.hash || '';
-
-    return (
-      normalizedPath === '/reset-password' ||
-      /[?&]type=recovery\b/.test(search) ||
-      /[?&]token_hash=/.test(search) ||
-      /[?&]code=/.test(search) ||
-      /[#&]type=recovery\b/.test(hash) ||
-      /[#&]access_token=/.test(hash)
-    );
+    return isRecoveryUrl(window.location);
   }, []);
 
   // Use a ref to always have the latest user email available

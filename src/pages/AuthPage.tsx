@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
+import { getAuthRedirectOrigin } from '@/lib/authRecovery';
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth();
@@ -60,10 +61,7 @@ export default function AuthPage() {
     }
     setLoading(true);
     setError('');
-    const currentOrigin = window.location.origin;
-    const authOrigin = currentOrigin.startsWith('capacitor://')
-      ? 'https://pantrysync.lovable.app'
-      : currentOrigin;
+    const authOrigin = getAuthRedirectOrigin(window.location.origin);
 
     const { error } = await (await import('@/integrations/supabase/client')).supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${authOrigin}/reset-password`,

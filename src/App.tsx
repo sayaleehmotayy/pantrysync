@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import WelcomePage from "./pages/WelcomePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { usePushNotifications } from "./hooks/usePushNotifications";
+import { isRecoveryUrl } from "./lib/authRecovery";
 
 const queryClient = new QueryClient();
 
@@ -46,17 +47,7 @@ function AppRoutes() {
   // Detect password recovery indicators ANYWHERE in the URL — Supabase email
   // links may land on '/' or '/reset-password' depending on config. We must
   // catch them before the auto-signed-in user is routed to the dashboard.
-  const search = location.search || '';
-  const hash = location.hash || '';
-  const isRecoveryUrl =
-    normalizedPath === '/reset-password' ||
-    /[?&]type=recovery\b/.test(search) ||
-    /[?&]token_hash=/.test(search) ||
-    /[?&]code=/.test(search) ||
-    /[#&]type=recovery\b/.test(hash) ||
-    /[#&]access_token=/.test(hash);
-
-  if (isRecoveryUrl) {
+  if (isRecoveryUrl(location)) {
     return <ResetPasswordPage />;
   }
 
