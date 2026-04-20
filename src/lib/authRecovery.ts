@@ -15,6 +15,18 @@ export function getAuthRedirectOrigin(origin: string) {
 }
 
 export function getRecoveryParams(location: Pick<Location, 'search' | 'hash'> = window.location) {
+  // Prefer params captured synchronously at app boot (before Supabase client init)
+  if (typeof window !== 'undefined' && window.__pantrysyncRecovery) {
+    const c = window.__pantrysyncRecovery;
+    return {
+      type: c.type,
+      code: c.code,
+      tokenHash: c.tokenHash,
+      accessToken: c.accessToken,
+      refreshToken: c.refreshToken,
+    };
+  }
+
   const searchParams = new URLSearchParams(location.search || '');
   const hashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
 
@@ -31,6 +43,7 @@ export function isRecoveryUrl(
   location: Pick<Location, 'pathname' | 'search' | 'hash'> = window.location,
 ) {
   const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
+  if (typeof window !== 'undefined' && window.__pantrysyncRecovery) return true;
   const { type, code, tokenHash, accessToken } = getRecoveryParams(location);
 
   return (
@@ -40,4 +53,15 @@ export function isRecoveryUrl(
     Boolean(tokenHash) ||
     Boolean(accessToken)
   );
+}
+
+export function getCapturedRecoveryUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.__pantrysyncRecovery?.fullUrl ?? null;
+}
+
+export function clearCapturedRecovery() {
+  if (typeof window !== 'undefined') {
+    window.__pantrysyncRecovery = null;
+  }
 }
