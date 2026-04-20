@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
-import { getRecoveryParams } from '@/lib/authRecovery';
+import { getRecoveryParams, getCapturedRecoveryUrl, clearCapturedRecovery } from '@/lib/authRecovery';
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -31,7 +31,8 @@ export default function ResetPasswordPage() {
 
     const handleRecovery = async () => {
       const { type, code, tokenHash, accessToken, refreshToken } = getRecoveryParams();
-      const hasRecoveryParams = Boolean(code || tokenHash || accessToken || type === 'recovery');
+      const capturedUrl = getCapturedRecoveryUrl();
+      const hasRecoveryParams = Boolean(code || tokenHash || accessToken || type === 'recovery' || capturedUrl);
 
       if (hasRecoveryParams && isActive) {
         setIsRecovery(true);
@@ -39,7 +40,7 @@ export default function ResetPasswordPage() {
       }
 
       if (code) {
-        await supabase.auth.exchangeCodeForSession(window.location.href).catch(() => {});
+        await supabase.auth.exchangeCodeForSession(capturedUrl ?? window.location.href).catch(() => {});
       } else if (tokenHash && type === 'recovery') {
         await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).catch(() => {});
       } else if (accessToken && refreshToken) {
@@ -107,8 +108,9 @@ export default function ResetPasswordPage() {
     let { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       const { code, tokenHash, accessToken, refreshToken } = getRecoveryParams();
+      const capturedUrl = getCapturedRecoveryUrl();
       if (code) {
-        await supabase.auth.exchangeCodeForSession(window.location.href).catch(() => {});
+        await supabase.auth.exchangeCodeForSession(capturedUrl ?? window.location.href).catch(() => {});
       } else if (tokenHash) {
         await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).catch(() => {});
       } else if (accessToken && refreshToken) {
@@ -128,6 +130,7 @@ export default function ResetPasswordPage() {
       setError(error.message);
     } else {
       setSuccess(true);
+      clearCapturedRecovery();
       // Sign out so the user must log in with the new password (clean UX)
       await supabase.auth.signOut();
       setTimeout(() => {
