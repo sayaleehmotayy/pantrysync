@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 
-const ADMIN_EMAIL = "pantrysync9@gmail.com";
+
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { isRecoveryUrl } from '@/lib/authRecovery';
