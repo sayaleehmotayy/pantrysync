@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useInventory, InventoryItem } from '@/hooks/useInventory';
 import VoiceCommandBar from '@/components/VoiceCommandBar';
+import LockedVoiceBar from '@/components/LockedVoiceBar';
+import { useProAccess } from '@/hooks/useProAccess';
 import { useShoppingList, ShoppingItem } from '@/hooks/useShoppingList';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +35,7 @@ function getExpiryStatus(date: string | null): 'safe' | 'expiring' | 'expired' |
 }
 
 export default function DashboardPage() {
+  const { isPro } = useProAccess();
   const { data: inventory = [] } = useInventory();
   const { data: shopping = [], updateItem, deleteItem } = useShoppingList();
   const { household } = useHousehold();
@@ -109,7 +112,7 @@ export default function DashboardPage() {
         <div className="absolute -right-2 -bottom-4 w-20 h-20 rounded-full bg-accent/10 blur-xl" />
       </div>
 
-      <VoiceCommandBar />
+      {isPro ? <VoiceCommandBar /> : <LockedVoiceBar />}
 
       {/* Quick actions */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
