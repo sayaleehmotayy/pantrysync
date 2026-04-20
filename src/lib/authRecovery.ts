@@ -63,5 +63,10 @@ export function getCapturedRecoveryUrl(): string | null {
 export function clearCapturedRecovery() {
   if (typeof window !== 'undefined') {
     window.__pantrysyncRecovery = null;
+    try {
+      sessionStorage.removeItem('pantrysync_recovery');
+    } catch {
+      // ignore
+    }
   }
 }
