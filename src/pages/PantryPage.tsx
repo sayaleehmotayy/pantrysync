@@ -219,7 +219,7 @@ export default function PantryPage() {
             variant="outline"
             size="sm"
             className="mt-4 gap-1"
-            onClick={() => setScannerOpen(true)}
+            onClick={openScanner}
           >
             <Camera className="w-4 h-4" /> Scan a product
           </Button>
