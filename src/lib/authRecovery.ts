@@ -42,17 +42,12 @@ export function getRecoveryParams(location: Pick<Location, 'search' | 'hash'> = 
 export function isRecoveryUrl(
   location: Pick<Location, 'pathname' | 'search' | 'hash'> = window.location,
 ) {
-  const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
+  // Only true when boot-time capture stashed real tokens, OR fresh recovery
+  // tokens are still in the URL. Visiting /reset-password alone is NOT
+  // recovery — that would hijack normal navigation app-wide.
   if (typeof window !== 'undefined' && window.__pantrysyncRecovery) return true;
   const { type, code, tokenHash, accessToken } = getRecoveryParams(location);
-
-  return (
-    normalizedPath === '/reset-password' ||
-    type === 'recovery' ||
-    Boolean(code) ||
-    Boolean(tokenHash) ||
-    Boolean(accessToken)
-  );
+  return type === 'recovery' || Boolean(code) || Boolean(tokenHash) || Boolean(accessToken);
 }
 
 export function getCapturedRecoveryUrl(): string | null {
