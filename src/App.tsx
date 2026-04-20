@@ -39,16 +39,17 @@ function AppRoutes() {
   const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
   usePushNotifications();
 
+  // Detect password recovery FIRST — before any auth/household checks.
+  // Recovery URLs may arrive at '/' or '/reset-password'. The captureRecoveryParams
+  // module rewrites the URL to '/reset-password' synchronously, but we also
+  // check window.__pantrysyncRecovery via isRecoveryUrl as a belt-and-braces.
+  if (isRecoveryUrl(location) || normalizedPath === '/reset-password') {
+    return <ResetPasswordPage />;
+  }
+
   // Allow /welcome to render without auth
   if (normalizedPath === '/welcome') {
     return <WelcomePage />;
-  }
-
-  // Detect password recovery indicators ANYWHERE in the URL — Supabase email
-  // links may land on '/' or '/reset-password' depending on config. We must
-  // catch them before the auto-signed-in user is routed to the dashboard.
-  if (isRecoveryUrl(location)) {
-    return <ResetPasswordPage />;
   }
 
   if (authLoading || (user && hhLoading)) {
