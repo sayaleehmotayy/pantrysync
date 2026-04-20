@@ -38,10 +38,12 @@
           var refreshToken = hash.get('refresh_token') || search.get('refresh_token');
           var path = window.location.pathname.replace(/\/+$/, '') || '/';
 
-          var isRecovery =
-            type === 'recovery' || !!code || !!tokenHash || !!accessToken || path === '/reset-password';
+          // Only the presence of real recovery TOKENS in the URL counts as
+          // "fresh recovery". Visiting /reset-password alone must NOT set the
+          // flag — otherwise normal navigation is hijacked across the app.
+          var hasFreshTokens = type === 'recovery' || !!code || !!tokenHash || !!accessToken;
 
-          if (isRecovery) {
+          if (hasFreshTokens) {
             var captured = {
               type: type, code: code, tokenHash: tokenHash,
               accessToken: accessToken, refreshToken: refreshToken,
@@ -50,11 +52,17 @@
             window.__pantrysyncRecovery = captured;
             try { sessionStorage.setItem('pantrysync_recovery', JSON.stringify(captured)); } catch (e) {}
             try { window.history.replaceState({}, '', '/reset-password'); } catch (e) {}
-          } else {
+          } else if (path === '/reset-password') {
+            // On /reset-password without fresh tokens, restore captured params
+            // (e.g. after a hard reload during the flow). Do NOT restore on
+            // any other path — that would turn every page into the reset form.
             try {
               var raw = sessionStorage.getItem('pantrysync_recovery');
               if (raw) window.__pantrysyncRecovery = JSON.parse(raw);
             } catch (e) {}
+          } else {
+            // Normal navigation — clear any stale flag from a previous session.
+            window.__pantrysyncRecovery = null;
           }
         } catch (e) {
           console.warn('recovery capture failed', e);

@@ -40,10 +40,9 @@ function AppRoutes() {
   usePushNotifications();
 
   // Detect password recovery FIRST — before any auth/household checks.
-  // Recovery URLs may arrive at '/' or '/reset-password'. The captureRecoveryParams
-  // module rewrites the URL to '/reset-password' synchronously, but we also
-  // check window.__pantrysyncRecovery via isRecoveryUrl as a belt-and-braces.
-  if (isRecoveryUrl(location) || normalizedPath === '/reset-password') {
+  // Only triggers when actual recovery tokens were captured at boot, not on
+  // bare /reset-password visits (those land on AuthPage / 404 normally).
+  if (isRecoveryUrl(location)) {
     return <ResetPasswordPage />;
   }
 
