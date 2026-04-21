@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { Home, UserPlus, LogOut, History, X } from 'lucide-react';
+import { Home, UserPlus, LogOut, History, Loader2 } from 'lucide-react';
 import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -68,9 +68,14 @@ export default function HouseholdSetup() {
     setRejoiningId(null);
   };
 
-  const handleRemovePast = async (id: string) => {
+  const handleRemovePast = async (id: string, householdName: string) => {
+    setPastMemberships(prev => prev.filter(p => p.id !== id));
     const { error } = await supabase.from('past_household_memberships').delete().eq('id', id);
-    if (!error) setPastMemberships(prev => prev.filter(p => p.id !== id));
+    if (error) {
+      toast.error('Could not remove from history');
+    } else {
+      toast.success(`Removed "${householdName}" from history`);
+    }
   };
 
   return (
@@ -133,36 +138,18 @@ export default function HouseholdSetup() {
                       <History className="w-3.5 h-3.5" />
                       Previous households
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Tap to rejoin instantly. Press &amp; hold to remove from history.
+                    </p>
                     <div className="space-y-2">
                       {pastMemberships.map((p) => (
-                        <div
+                        <PastHouseholdRow
                           key={p.id}
-                          className="flex items-center gap-2 p-2 rounded-lg border border-border/50 bg-muted/30"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{p.household_name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Left {formatDistanceToNow(new Date(p.left_at), { addSuffix: true })}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            disabled={rejoiningId === p.household_id}
-                            onClick={() => handleRejoin(p.household_id)}
-                            className="h-8 text-xs"
-                          >
-                            {rejoiningId === p.household_id ? '...' : 'Rejoin'}
-                          </Button>
-                          <button
-                            type="button"
-                            aria-label="Remove from history"
-                            onClick={() => handleRemovePast(p.id)}
-                            className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                          past={p}
+                          isJoining={rejoiningId === p.household_id}
+                          onTap={() => handleRejoin(p.household_id)}
+                          onLongPress={() => handleRemovePast(p.id, p.household_name)}
+                        />
                       ))}
                     </div>
                   </div>
@@ -179,5 +166,86 @@ export default function HouseholdSetup() {
         </div>
       </div>
     </div>
+  );
+}
+
+interface PastHouseholdRowProps {
+  past: { id: string; household_id: string; household_name: string; left_at: string };
+  isJoining: boolean;
+  onTap: () => void;
+  onLongPress: () => void;
+}
+
+function PastHouseholdRow({ past, isJoining, onTap, onLongPress }: PastHouseholdRowProps) {
+  const timerRef = useRef<number | null>(null);
+  const triggeredRef = useRef(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const progressTimerRef = useRef<number | null>(null);
+  const HOLD_MS = 600;
+
+  const clearTimers = () => {
+    if (timerRef.current) { window.clearTimeout(timerRef.current); timerRef.current = null; }
+    if (progressTimerRef.current) { window.clearInterval(progressTimerRef.current); progressTimerRef.current = null; }
+    setHoldProgress(0);
+  };
+
+  const startHold = () => {
+    triggeredRef.current = false;
+    const startedAt = Date.now();
+    progressTimerRef.current = window.setInterval(() => {
+      setHoldProgress(Math.min(100, ((Date.now() - startedAt) / HOLD_MS) * 100));
+    }, 16);
+    timerRef.current = window.setTimeout(() => {
+      triggeredRef.current = true;
+      clearTimers();
+      // Haptic feedback when supported
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(30); } catch { /* ignore */ }
+      }
+      onLongPress();
+    }, HOLD_MS);
+  };
+
+  const cancelHold = () => clearTimers();
+
+  const handleClick = () => {
+    if (triggeredRef.current || isJoining) return;
+    onTap();
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={isJoining}
+      onClick={handleClick}
+      onPointerDown={startHold}
+      onPointerUp={cancelHold}
+      onPointerLeave={cancelHold}
+      onPointerCancel={cancelHold}
+      onContextMenu={(e) => e.preventDefault()}
+      className="relative w-full overflow-hidden flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/60 active:bg-muted transition-colors text-left disabled:opacity-60 select-none"
+      style={{ touchAction: 'manipulation', WebkitUserSelect: 'none' }}
+    >
+      {holdProgress > 0 && (
+        <span
+          aria-hidden
+          className="absolute inset-y-0 left-0 bg-destructive/20 transition-[width] duration-75 ease-linear pointer-events-none"
+          style={{ width: `${holdProgress}%` }}
+        />
+      )}
+      <div className="relative flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{past.household_name}</p>
+        <p className="text-xs text-muted-foreground">
+          Left {formatDistanceToNow(new Date(past.left_at), { addSuffix: true })}
+        </p>
+      </div>
+      <div className="relative">
+        {isJoining ? (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        ) : (
+          <UserPlus className="w-4 h-4 text-primary" />
+        )}
+      </div>
+    </button>
   );
 }
