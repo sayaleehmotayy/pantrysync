@@ -130,8 +130,12 @@ serve(async (req) => {
   const product = item?.price?.product;
   const productId = typeof product === "string" ? product : product?.id ?? null;
 
-  const currentPeriodEnd = typeof (subscription as any).current_period_end === "number"
-    ? new Date((subscription as any).current_period_end * 1000).toISOString()
+  // Stripe API 2025-08-27.basil moved current_period_end onto the subscription item
+  const itemAny = item as any;
+  const rawCurrentPeriodEnd = itemAny?.current_period_end
+    ?? (subscription as any).current_period_end;
+  const currentPeriodEnd = typeof rawCurrentPeriodEnd === "number"
+    ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
     : null;
 
   const trialEnd = typeof (subscription as any).trial_end === "number"
