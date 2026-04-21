@@ -133,36 +133,18 @@ export default function HouseholdSetup() {
                       <History className="w-3.5 h-3.5" />
                       Previous households
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Tap to rejoin instantly. Press &amp; hold to remove from history.
+                    </p>
                     <div className="space-y-2">
                       {pastMemberships.map((p) => (
-                        <div
+                        <PastHouseholdRow
                           key={p.id}
-                          className="flex items-center gap-2 p-2 rounded-lg border border-border/50 bg-muted/30"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{p.household_name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Left {formatDistanceToNow(new Date(p.left_at), { addSuffix: true })}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            disabled={rejoiningId === p.household_id}
-                            onClick={() => handleRejoin(p.household_id)}
-                            className="h-8 text-xs"
-                          >
-                            {rejoiningId === p.household_id ? '...' : 'Rejoin'}
-                          </Button>
-                          <button
-                            type="button"
-                            aria-label="Remove from history"
-                            onClick={() => handleRemovePast(p.id)}
-                            className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                          past={p}
+                          isJoining={rejoiningId === p.household_id}
+                          onTap={() => handleRejoin(p.household_id)}
+                          onLongPress={() => handleRemovePast(p.id, p.household_name)}
+                        />
                       ))}
                     </div>
                   </div>
