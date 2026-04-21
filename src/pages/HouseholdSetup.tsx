@@ -1,20 +1,43 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { Home, UserPlus, LogOut } from 'lucide-react';
+import { Home, UserPlus, LogOut, History, X } from 'lucide-react';
 import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
+
+interface PastMembership {
+  id: string;
+  household_id: string;
+  household_name: string;
+  left_at: string;
+}
 
 export default function HouseholdSetup() {
   const { createHousehold, joinHousehold } = useHousehold();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [tab, setTab] = useState<'create' | 'join'>('create');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pastMemberships, setPastMemberships] = useState<PastMembership[]>([]);
+  const [rejoiningId, setRejoiningId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from('past_household_memberships')
+        .select('id, household_id, household_name, left_at')
+        .order('left_at', { ascending: false });
+      if (data) setPastMemberships(data as PastMembership[]);
+    })();
+  }, [user]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +55,24 @@ export default function HouseholdSetup() {
     setLoading(false);
   };
 
+  const handleRejoin = async (householdId: string) => {
+    setRejoiningId(householdId); setError('');
+    const { error } = await supabase.rpc('rejoin_past_household', { p_household_id: householdId });
+    if (error) {
+      setError(error.message);
+      toast.error(error.message);
+    } else {
+      toast.success('Welcome back!');
+      window.location.reload();
+    }
+    setRejoiningId(null);
+  };
+
+  const handleRemovePast = async (id: string) => {
+    const { error } = await supabase.from('past_household_memberships').delete().eq('id', id);
+    if (!error) setPastMemberships(prev => prev.filter(p => p.id !== id));
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-sm animate-fade-in">
@@ -47,14 +88,14 @@ export default function HouseholdSetup() {
           <Button
             variant={tab === 'create' ? 'default' : 'outline'}
             className="flex-1"
-            onClick={() => setTab('create')}
+            onClick={() => { setTab('create'); setError(''); }}
           >
             <Home className="w-4 h-4 mr-2" /> Create
           </Button>
           <Button
             variant={tab === 'join' ? 'default' : 'outline'}
             className="flex-1"
-            onClick={() => setTab('join')}
+            onClick={() => { setTab('join'); setError(''); }}
           >
             <UserPlus className="w-4 h-4 mr-2" /> Join
           </Button>
@@ -64,7 +105,7 @@ export default function HouseholdSetup() {
           <CardHeader className="pb-4">
             <CardTitle className="text-lg">{tab === 'create' ? 'Create Household' : 'Join Household'}</CardTitle>
             <CardDescription>
-              {tab === 'create' ? 'Give your household a name' : 'Enter the invite code'}
+              {tab === 'create' ? 'Give your household a name' : 'Enter an invite code or rejoin a previous household'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -77,13 +118,56 @@ export default function HouseholdSetup() {
                 </Button>
               </form>
             ) : (
-              <form onSubmit={handleJoin} className="space-y-4">
-                <Input placeholder="Invite code" value={code} onChange={e => setCode(e.target.value)} required />
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Joining...' : 'Join Household'}
-                </Button>
-              </form>
+              <div className="space-y-5">
+                <form onSubmit={handleJoin} className="space-y-4">
+                  <Input placeholder="Invite code" value={code} onChange={e => setCode(e.target.value)} />
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  <Button type="submit" className="w-full" disabled={loading || !code.trim()}>
+                    {loading ? 'Joining...' : 'Join Household'}
+                  </Button>
+                </form>
+
+                {pastMemberships.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <History className="w-3.5 h-3.5" />
+                      Previous households
+                    </div>
+                    <div className="space-y-2">
+                      {pastMemberships.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-2 p-2 rounded-lg border border-border/50 bg-muted/30"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{p.household_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Left {formatDistanceToNow(new Date(p.left_at), { addSuffix: true })}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled={rejoiningId === p.household_id}
+                            onClick={() => handleRejoin(p.household_id)}
+                            className="h-8 text-xs"
+                          >
+                            {rejoiningId === p.household_id ? '...' : 'Rejoin'}
+                          </Button>
+                          <button
+                            type="button"
+                            aria-label="Remove from history"
+                            onClick={() => handleRemovePast(p.id)}
+                            className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
