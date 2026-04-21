@@ -168,3 +168,84 @@ export default function HouseholdSetup() {
     </div>
   );
 }
+
+interface PastHouseholdRowProps {
+  past: { id: string; household_id: string; household_name: string; left_at: string };
+  isJoining: boolean;
+  onTap: () => void;
+  onLongPress: () => void;
+}
+
+function PastHouseholdRow({ past, isJoining, onTap, onLongPress }: PastHouseholdRowProps) {
+  const timerRef = useRef<number | null>(null);
+  const triggeredRef = useRef(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const progressTimerRef = useRef<number | null>(null);
+  const HOLD_MS = 600;
+
+  const clearTimers = () => {
+    if (timerRef.current) { window.clearTimeout(timerRef.current); timerRef.current = null; }
+    if (progressTimerRef.current) { window.clearInterval(progressTimerRef.current); progressTimerRef.current = null; }
+    setHoldProgress(0);
+  };
+
+  const startHold = () => {
+    triggeredRef.current = false;
+    const startedAt = Date.now();
+    progressTimerRef.current = window.setInterval(() => {
+      setHoldProgress(Math.min(100, ((Date.now() - startedAt) / HOLD_MS) * 100));
+    }, 16);
+    timerRef.current = window.setTimeout(() => {
+      triggeredRef.current = true;
+      clearTimers();
+      // Haptic feedback when supported
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(30); } catch { /* ignore */ }
+      }
+      onLongPress();
+    }, HOLD_MS);
+  };
+
+  const cancelHold = () => clearTimers();
+
+  const handleClick = () => {
+    if (triggeredRef.current || isJoining) return;
+    onTap();
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={isJoining}
+      onClick={handleClick}
+      onPointerDown={startHold}
+      onPointerUp={cancelHold}
+      onPointerLeave={cancelHold}
+      onPointerCancel={cancelHold}
+      onContextMenu={(e) => e.preventDefault()}
+      className="relative w-full overflow-hidden flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/60 active:bg-muted transition-colors text-left disabled:opacity-60 select-none"
+      style={{ touchAction: 'manipulation', WebkitUserSelect: 'none' }}
+    >
+      {holdProgress > 0 && (
+        <span
+          aria-hidden
+          className="absolute inset-y-0 left-0 bg-destructive/20 transition-[width] duration-75 ease-linear pointer-events-none"
+          style={{ width: `${holdProgress}%` }}
+        />
+      )}
+      <div className="relative flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{past.household_name}</p>
+        <p className="text-xs text-muted-foreground">
+          Left {formatDistanceToNow(new Date(past.left_at), { addSuffix: true })}
+        </p>
+      </div>
+      <div className="relative">
+        {isJoining ? (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        ) : (
+          <UserPlus className="w-4 h-4 text-primary" />
+        )}
+      </div>
+    </button>
+  );
+}
