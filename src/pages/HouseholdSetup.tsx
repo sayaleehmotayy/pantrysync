@@ -68,9 +68,14 @@ export default function HouseholdSetup() {
     setRejoiningId(null);
   };
 
-  const handleRemovePast = async (id: string) => {
+  const handleRemovePast = async (id: string, householdName: string) => {
+    setPastMemberships(prev => prev.filter(p => p.id !== id));
     const { error } = await supabase.from('past_household_memberships').delete().eq('id', id);
-    if (!error) setPastMemberships(prev => prev.filter(p => p.id !== id));
+    if (error) {
+      toast.error('Could not remove from history');
+    } else {
+      toast.success(`Removed "${householdName}" from history`);
+    }
   };
 
   return (
