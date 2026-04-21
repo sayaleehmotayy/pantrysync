@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { Home, UserPlus, LogOut, History, X } from 'lucide-react';
+import { Home, UserPlus, LogOut, History, Loader2 } from 'lucide-react';
 import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
