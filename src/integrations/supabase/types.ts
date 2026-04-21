@@ -447,6 +447,44 @@ export type Database = {
         }
         Relationships: []
       }
+      past_household_memberships: {
+        Row: {
+          household_id: string
+          household_name: string
+          id: string
+          joined_at: string
+          left_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          household_id: string
+          household_name: string
+          id?: string
+          joined_at: string
+          left_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          household_id?: string
+          household_name?: string
+          id?: string
+          joined_at?: string
+          left_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "past_household_memberships_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_history: {
         Row: {
           currency: string
@@ -904,6 +942,10 @@ export type Database = {
         }[]
       }
       realtime_topic_household_id: { Args: { _topic: string }; Returns: string }
+      rejoin_past_household: {
+        Args: { p_household_id: string }
+        Returns: undefined
+      }
       shares_household: {
         Args: { _user_a: string; _user_b: string }
         Returns: boolean
