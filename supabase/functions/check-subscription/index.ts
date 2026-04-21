@@ -107,7 +107,8 @@ async function seedSubscriptionCache(
 ) {
   const productId = getProductId(sub);
   const priceId = getPriceId(sub);
-  const currentPeriodEnd = toIsoDate((sub as any).current_period_end);
+  const item = sub.items?.data?.[0] as any;
+  const currentPeriodEnd = toIsoDate(item?.current_period_end ?? (sub as any).current_period_end);
   const trialEnd = toIsoDate((sub as any).trial_end);
   const cancelAtPeriodEnd = (sub as any).cancel_at_period_end ?? false;
 
