@@ -42,7 +42,12 @@ function getPriceId(subscription: Stripe.Subscription): string | null {
 }
 
 function getSubscriptionEnd(subscription: Stripe.Subscription): string | null {
-  const rawEnd = (subscription as any).current_period_end
+  // Stripe API 2025-08-27.basil moved current_period_end from the subscription
+  // to each subscription item. Read item-level first, then fall back to legacy
+  // top-level fields for older API versions.
+  const item = subscription.items?.data?.[0] as any;
+  const rawEnd = item?.current_period_end
+    ?? (subscription as any).current_period_end
     ?? (subscription as any).trial_end
     ?? (subscription as any).ended_at;
 
