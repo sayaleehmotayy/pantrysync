@@ -308,12 +308,18 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         const finalUnit = item.boughtUnit || item.unit;
         const key = boughtKey(item);
         const existing = bucketsByKey.get(key);
+        // Original quantity from the actual shopping list item (exclude synthetic
+        // "_remaining" tracked entries created during partial buys, otherwise we
+        // double-count and the shopping list won't be properly deducted).
+        const originalListItem = items.find(li => li.id === item.dbId);
+        const originalQty = originalListItem
+          ? Number(originalListItem.quantity)
+          : trackedItems
+              .filter(t => t.dbId === item.dbId && !t.id.includes('_remaining'))
+              .reduce((s, t) => s + t.quantity, 0);
         if (existing) {
           existing.qtyBought += qty;
         } else {
-          const originalQty = trackedItems
-            .filter(t => t.dbId === item.dbId)
-            .reduce((s, t) => s + t.quantity, 0);
           bucketsByKey.set(key, {
             name: item.name,
             unit: finalUnit,
@@ -329,16 +335,10 @@ export default function ShoppingMode({ items, onMarkBought, onExit, currency }: 
         // Track shopping-list consumption per dbId (only when bought in same unit as list)
         if (finalUnit === item.unit) {
           const t = dbIdsTouched.get(item.dbId);
-          const originalQty = trackedItems
-            .filter(tt => tt.dbId === item.dbId)
-            .reduce((s, tt) => s + tt.quantity, 0);
           if (t) t.consumedInOriginalUnit += qty;
           else dbIdsTouched.set(item.dbId, { originalQty, consumedInOriginalUnit: qty });
         } else {
           // bought in different unit — consider list satisfied
-          const originalQty = trackedItems
-            .filter(tt => tt.dbId === item.dbId)
-            .reduce((s, tt) => s + tt.quantity, 0);
           dbIdsTouched.set(item.dbId, { originalQty, consumedInOriginalUnit: originalQty });
         }
       }
