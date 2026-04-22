@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Check, Users, ArrowLeft, Mic, ChefHat, Wallet, Receipt, MessageSquare, RefreshCw, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGooglePlayBilling } from '@/hooks/useGooglePlayBilling';
+import { useMediaPermissions } from '@/hooks/useMediaPermissions';
 import { isNativeAndroid } from '@/lib/platform';
 import { PLAY_PRODUCT_IDS } from '@/config/playBilling';
 
@@ -31,6 +32,7 @@ export default function PlansPage() {
   const [pendingTier, setPendingTier] = useState<string | null>(null);
 
   const billing = useGooglePlayBilling();
+  const { requestCameraAndMic } = useMediaPermissions();
   const onAndroid = isNativeAndroid();
 
   const currentTier = getTierByProductId(subscription.productId);
@@ -61,6 +63,19 @@ export default function PlansPage() {
         toast.success('Purchase successful — unlocking Pro!');
         await checkSubscription();
         setTimeout(() => { void checkSubscription(); }, 2500);
+
+        // Premium unlocks voice & camera-powered features. Prompt for the
+        // OS-level permissions now so first use is friction-free.
+        try {
+          const res = await requestCameraAndMic();
+          if (res.camera === 'granted' || res.microphone === 'granted') {
+            toast.success('Camera & microphone ready for scanning and voice commands.');
+          } else if (res.camera === 'denied' || res.microphone === 'denied') {
+            toast.message('You can enable camera & mic later from your phone Settings.');
+          }
+        } catch (e) {
+          console.warn('[Plans] permission prompt failed', e);
+        }
       } else if (billing.error) {
         toast.error(billing.error);
       }

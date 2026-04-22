@@ -29,6 +29,7 @@ import WelcomePage from "./pages/WelcomePage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useRestorePurchasesOnLaunch } from "./hooks/useRestorePurchasesOnLaunch";
+import { useAndroidBackButton } from "./hooks/useAndroidBackButton";
 import { isRecoveryUrl } from "./lib/authRecovery";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ function AppRoutes() {
   const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
   usePushNotifications();
   useRestorePurchasesOnLaunch();
+  useAndroidBackButton();
 
   // Public auth pages must win before the normal app shell logic.
   // The reset email ultimately lands on /reset-password, and that page itself
