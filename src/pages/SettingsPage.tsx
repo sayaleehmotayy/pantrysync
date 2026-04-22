@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe, Moon, Sun, Monitor, ArrowRightLeft } from 'lucide-react';
+import { Copy, LogOut, Users, Crown, User, Sparkles, Check, Globe, Moon, Sun, Monitor, ArrowRightLeft, ExternalLink, Smartphone } from 'lucide-react';
 import { getTierByProductId, getMemberLimit } from '@/config/subscription';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
+import { isNativeAndroid } from '@/lib/platform';
 
 const CURRENCIES = [
   { code: 'USD', label: 'US Dollar ($)' },
