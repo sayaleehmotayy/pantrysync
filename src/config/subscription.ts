@@ -114,8 +114,22 @@ export const LEGACY_PRODUCT_TO_TIER: Record<string, TierKey> = {
   'prod_UK3l7pPFppJ6G2': 'unlimited',
 };
 
-/** All product IDs (new EUR + legacy USD) mapped to their tier */
-export const PRODUCT_TO_TIER: Record<string, TierKey> = { ...LEGACY_PRODUCT_TO_TIER };
+/** Google Play product IDs (Android billing) mapped to their tier. These match
+ *  the IDs created in Google Play Console (see docs/PLAY_BILLING_SETUP.md). */
+export const PLAY_PRODUCT_TO_TIER: Record<string, TierKey> = {
+  duo_monthly: 'duo',
+  duo_yearly: 'duo',
+  family_monthly: 'family',
+  family_yearly: 'family',
+  unlimited_monthly: 'unlimited',
+  unlimited_yearly: 'unlimited',
+};
+
+/** All product IDs (new EUR Stripe + legacy USD Stripe + Google Play) mapped to their tier */
+export const PRODUCT_TO_TIER: Record<string, TierKey> = {
+  ...LEGACY_PRODUCT_TO_TIER,
+  ...PLAY_PRODUCT_TO_TIER,
+};
 for (const tier of Object.values(TIERS)) {
   PRODUCT_TO_TIER[tier.monthly.productId] = tier.key;
   PRODUCT_TO_TIER[tier.yearly.productId] = tier.key;
