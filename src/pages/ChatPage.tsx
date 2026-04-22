@@ -186,6 +186,36 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(channel); };
   }, [household]);
 
+  // Track which chat messages have already been added to the shopping list
+  useEffect(() => {
+    if (!household) return;
+    const fetchAdds = async () => {
+      const { data } = await supabase
+        .from('chat_message_shopping_adds')
+        .select('chat_message_id, user_id')
+        .eq('household_id', household.id);
+      if (data) {
+        const map: Record<string, { user_id: string }> = {};
+        data.forEach((r: any) => { map[r.chat_message_id] = { user_id: r.user_id }; });
+        setShoppingAdds(map);
+      }
+    };
+    void fetchAdds();
+
+    const channel = supabase
+      .channel(`chat-shopping-adds-${household.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_message_shopping_adds', filter: `household_id=eq.${household.id}` },
+        (payload) => {
+          const r = payload.new as any;
+          setShoppingAdds(prev => ({ ...prev, [r.chat_message_id]: { user_id: r.user_id } }));
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [household]);
+
   // Update own read receipt
   useEffect(() => {
     if (!household || !user || messages.length === 0) return;
