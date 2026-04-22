@@ -124,8 +124,15 @@ export function useSpendingSummary() {
       const toWeekKey = (d: Date) => {
         const weekStart = new Date(d);
         weekStart.setHours(0, 0, 0, 0);
-        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-        return weekStart.toISOString().slice(0, 10);
+        // ISO week: Monday is the start of the week. getDay() => Sun=0..Sat=6.
+        const day = weekStart.getDay();
+        const diffToMonday = (day + 6) % 7; // Mon=0, Tue=1, ..., Sun=6
+        weekStart.setDate(weekStart.getDate() - diffToMonday);
+        // Use local-date components so the key reflects the user's week, not UTC.
+        const y = weekStart.getFullYear();
+        const m = String(weekStart.getMonth() + 1).padStart(2, '0');
+        const dd = String(weekStart.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
       };
       const toMonthKey = (d: Date) =>
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
