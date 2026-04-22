@@ -192,7 +192,37 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    // 1. Check if THIS user has a subscription
+    // 0. Check Google Play–backed entitlements first via subscription_cache.
+    //    These are written by verify-google-purchase. We use the "google_play"
+    //    sentinel in stripe_customer_id to identify Play purchases.
+    const { data: cacheRow } = await supabaseClient
+      .from("subscription_cache")
+      .select("stripe_customer_id, status, product_id, current_period_end, trial_end, cancel_at_period_end")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (cacheRow && cacheRow.stripe_customer_id === "google_play") {
+      const expiry = cacheRow.current_period_end ? new Date(cacheRow.current_period_end as string) : null;
+      const stillActive = (cacheRow.status === "active" || cacheRow.status === "trialing")
+        && (!expiry || expiry.getTime() > Date.now());
+      if (stillActive) {
+        logStep("Google Play subscription active (from cache)", {
+          product_id: cacheRow.product_id,
+          status: cacheRow.status,
+        });
+        return new Response(JSON.stringify({
+          subscribed: true,
+          product_id: cacheRow.product_id,
+          subscription_end: expiry ? expiry.toISOString() : null,
+          trial: cacheRow.status === "trialing",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+    }
+
+    // 1. Check if THIS user has a Stripe subscription (legacy / web)
     const ownSub = await checkStripeSubscription(stripe, user.email);
     if (ownSub) {
       logStep("User has own subscription", {
@@ -236,6 +266,34 @@ serve(async (req) => {
         .neq("user_id", user.id);
 
       if (allMembers && allMembers.length > 0) {
+        // First pass: any household member with an active Google Play sub via cache
+        const memberIds = allMembers.map((m: any) => m.user_id);
+        const { data: cacheRows } = await supabaseClient
+          .from("subscription_cache")
+          .select("user_id, stripe_customer_id, status, product_id, current_period_end")
+          .in("user_id", memberIds);
+
+        const playMember = (cacheRows || []).find((r: any) => {
+          if (r.stripe_customer_id !== "google_play") return false;
+          if (r.status !== "active" && r.status !== "trialing") return false;
+          if (r.current_period_end && new Date(r.current_period_end).getTime() <= Date.now()) return false;
+          return true;
+        });
+        if (playMember) {
+          logStep("Household member has Google Play subscription — granting access", playMember);
+          return new Response(JSON.stringify({
+            subscribed: true,
+            product_id: (playMember as any).product_id,
+            subscription_end: (playMember as any).current_period_end,
+            trial: (playMember as any).status === "trialing",
+            household_pro: true,
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+
+        // Second pass: legacy Stripe lookup per member
         for (const member of allMembers) {
           const { data: memberUser } = await supabaseClient.auth.admin.getUserById(member.user_id);
           const memberEmail = memberUser?.user?.email;
@@ -244,12 +302,11 @@ serve(async (req) => {
             logStep("Checking household member subscription", { memberEmail });
             const memberSub = await checkStripeSubscription(stripe, memberEmail);
             if (memberSub) {
-              logStep("Household member has subscription — granting access", {
+              logStep("Household member has Stripe subscription — granting access", {
                 subscribed: memberSub.subscribed,
                 product_id: memberSub.product_id,
               });
 
-              // Seed cache for the subscribing member too
               if (memberSub._subscription && memberSub._customerId) {
                 seedSubscriptionCache(supabaseClient, member.user_id, memberSub._subscription, memberSub._customerId);
               }

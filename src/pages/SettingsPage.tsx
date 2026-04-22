@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHousehold } from '@/contexts/HouseholdContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, LogOut, Users, Crown, User, Sparkles, CreditCard, Check, Globe, Moon, Sun, Monitor, ArrowRightLeft } from 'lucide-react';
+import { Copy, LogOut, Users, Crown, User, Sparkles, Check, Globe, Moon, Sun, Monitor, ArrowRightLeft, ExternalLink, Smartphone } from 'lucide-react';
 import { getTierByProductId, getMemberLimit } from '@/config/subscription';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
+import { isNativeAndroid } from '@/lib/platform';
 
 const CURRENCIES = [
   { code: 'USD', label: 'US Dollar ($)' },
@@ -44,12 +45,19 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [portalLoading, setPortalLoading] = useState(false);
   const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
   const [shareInviteCode, setShareInviteCode] = useState<string>('');
 
   const currentTier = getTierByProductId(subscription.productId);
   const memberLimit = getMemberLimit(currentTier);
+  const onAndroid = isNativeAndroid();
+
+  // Legacy Stripe subscriber: product_id starts with "prod_" (Stripe IDs).
+  // Google Play product IDs are "duo_monthly", "family_yearly", etc.
+  const isLegacyStripe = useMemo(
+    () => !!subscription.productId && subscription.productId.startsWith('prod_'),
+    [subscription.productId],
+  );
 
   // Load user's preferred currency
   useEffect(() => {
@@ -134,57 +142,12 @@ export default function SettingsPage() {
     toast.success('Invite code copied!');
   };
 
-  const handleManageSubscription = async () => {
-    setPortalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('customer-portal');
-      if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to open subscription portal');
-    } finally {
-      setPortalLoading(false);
-    }
+  const openPlayManagement = () => {
+    const sku = subscription.productId ?? '';
+    const pkg = 'com.pantrysync.app';
+    const url = `https://play.google.com/store/account/subscriptions?sku=${encodeURIComponent(sku)}&package=${pkg}`;
+    window.open(url, '_blank');
   };
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkoutState = params.get('checkout');
-    if (!checkoutState) return;
-
-    const clearCheckoutParam = () => {
-      params.delete('checkout');
-      const search = params.toString();
-      window.history.replaceState({}, '', `${window.location.pathname}${search ? `?${search}` : ''}`);
-    };
-
-    let retryTimer: number | null = null;
-
-    if (checkoutState === 'cancel') {
-      toast.error('Checkout was cancelled');
-      clearCheckoutParam();
-      return;
-    }
-
-    const syncSubscription = async () => {
-      toast.success('Checkout complete — updating your Pro access...');
-      await checkSubscription();
-      retryTimer = window.setTimeout(() => {
-        void checkSubscription();
-      }, 2500);
-      clearCheckoutParam();
-    };
-
-    void syncSubscription();
-
-    return () => {
-      if (retryTimer !== null) {
-        window.clearTimeout(retryTimer);
-      }
-    };
-  }, [checkSubscription]);
 
   const tierLabel = currentTier === 'free' ? 'Free' : currentTier.charAt(0).toUpperCase() + currentTier.slice(1);
 
@@ -289,17 +252,28 @@ export default function SettingsPage() {
 
               {!subscription.householdPro && (
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <Button size="sm" onClick={() => navigate('/plans')}>
-                    <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
-                    Change plan
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
-                    <CreditCard className="w-3.5 h-3.5 mr-1" />
-                    {portalLoading ? 'Loading...' : 'Manage billing'}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={checkSubscription}>
-                    Refresh
-                  </Button>
+                  {isLegacyStripe ? (
+                    <div className="w-full rounded-md border border-border/50 bg-muted/40 p-3 text-xs text-muted-foreground">
+                      You're on a legacy subscription that's still active. Plan changes aren't available in
+                      the app — please reach out to support if you need help with your subscription.
+                    </div>
+                  ) : (
+                    <>
+                      <Button size="sm" onClick={() => navigate('/plans')}>
+                        <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                        Change plan
+                      </Button>
+                      {onAndroid && (
+                        <Button variant="outline" size="sm" onClick={openPlayManagement}>
+                          <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                          Manage on Play Store
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={checkSubscription}>
+                        Refresh
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
 
