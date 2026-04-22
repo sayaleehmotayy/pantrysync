@@ -92,22 +92,33 @@ export function useShoppingList() {
     mutationFn: async (item: { name: string; quantity: number; unit: string; category: string }) => {
       if (!household || !user) throw new Error('No household');
 
-      // Merge into existing pending item with same name + unit
-      const { data: existing } = await supabase
+      // Merge into existing pending item with the same name when units are compatible
+      // (e.g. g + kg, ml + l, or any two of the same unit). Pick the best display unit
+      // for the combined total.
+      const { data: candidates } = await supabase
         .from('shopping_list_items')
         .select('id, quantity, unit')
         .eq('household_id', household.id)
         .eq('status', 'pending')
-        .eq('unit', item.unit)
-        .ilike('name', item.name)
-        .maybeSingle();
+        .ilike('name', item.name);
 
-      if (existing) {
-        const newQty = Number(existing.quantity) + Number(item.quantity);
+      const compatible = (candidates || []).find(c => {
+        if (c.unit === item.unit) return true;
+        return convertUnits(1, item.unit, c.unit) !== null;
+      });
+
+      if (compatible) {
+        // Convert the new quantity into the existing item's unit, sum, then re-pick best display unit
+        const addedInExistingUnit = compatible.unit === item.unit
+          ? Number(item.quantity)
+          : (convertUnits(Number(item.quantity), item.unit, compatible.unit) ?? Number(item.quantity));
+        const totalInExistingUnit = Number(compatible.quantity) + addedInExistingUnit;
+        const display = bestDisplayUnit(totalInExistingUnit, compatible.unit);
+
         const { error } = await supabase
           .from('shopping_list_items')
-          .update({ quantity: newQty })
-          .eq('id', existing.id);
+          .update({ quantity: display.quantity, unit: display.unit })
+          .eq('id', compatible.id);
         if (error) throw error;
         return { merged: true };
       }
