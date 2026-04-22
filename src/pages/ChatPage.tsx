@@ -65,6 +65,7 @@ export default function ChatPage() {
   const [mentionCursorPos, setMentionCursorPos] = useState(0);
   const [readReceipts, setReadReceipts] = useState<ReadReceipt[]>([]);
   const [extraNames, setExtraNames] = useState<Record<string, string>>({});
+  const [shoppingAdds, setShoppingAdds] = useState<Record<string, { user_id: string }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
