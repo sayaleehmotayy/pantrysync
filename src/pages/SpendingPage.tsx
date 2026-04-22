@@ -115,6 +115,53 @@ export default function SpendingPage() {
         </Card>
       )}
 
+      {/* Monthly chart */}
+      {summary?.byMonth && summary.byMonth.length > 0 && (
+        <Card className="border-border/50">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-display flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" /> Monthly Spending
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-2 pb-4">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={summary.byMonth}>
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={v => {
+                    // v is "YYYY-MM"
+                    const [y, m] = String(v).split('-').map(Number);
+                    if (!y || !m) return '';
+                    const d = new Date(y, m - 1, 1);
+                    return format(d, 'MMM');
+                  }}
+                  tick={{ fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
+                <Tooltip
+                  formatter={(value: number) => [formatPrice(value), 'Spent']}
+                  labelFormatter={v => {
+                    const [y, m] = String(v).split('-').map(Number);
+                    if (!y || !m) return String(v);
+                    return format(new Date(y, m - 1, 1), 'MMMM yyyy');
+                  }}
+                  contentStyle={{
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    border: '1px solid hsl(var(--border))',
+                    background: 'hsl(var(--card))',
+                    color: 'hsl(var(--card-foreground))',
+                  }}
+                />
+                <Bar dataKey="total" fill="hsl(var(--info))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
       {/* By store (last 30d) */}
       {summary?.byStore && summary.byStore.length > 0 && (
         <Card className="border-border/50">
