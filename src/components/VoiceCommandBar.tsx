@@ -355,19 +355,33 @@ export default function VoiceCommandBar() {
     }
 
     if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
+      // User tapped to stop — process whatever we have so far.
+      try { recognitionRef.current?.stop(); } catch {}
       return;
     }
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.interimResults = true;
-    recognition.continuous = true;
+    // continuous=true is unreliable on Android Chrome / Capacitor WebView and
+    // often causes the engine to abort silently before any isFinal result is
+    // delivered. Use single-utterance mode instead — much more reliable on mobile.
+    recognition.continuous = false;
     recognition.maxAlternatives = 1;
 
-    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
     let fullTranscript = '';
+    let processed = false;
+
+    const submit = (text: string) => {
+      if (processed) return;
+      processed = true;
+      const cleaned = text.trim();
+      if (cleaned) {
+        void processCommand(cleaned);
+      } else {
+        toast.info("Didn't catch anything — try again");
+      }
+    };
 
     recognition.onresult = (event: any) => {
       const results = Array.from(event.results);
@@ -375,25 +389,19 @@ export default function VoiceCommandBar() {
         .map((r: any) => r[0].transcript)
         .join(' ');
       setTranscript(fullTranscript);
-
-      // Reset silence timer on each result - wait for user to finish speaking
-      if (silenceTimer) clearTimeout(silenceTimer);
-      
-      // Check if the latest result is final
-      const lastResult = event.results[event.results.length - 1];
-      if (lastResult.isFinal) {
-        // Give 2s of silence after final result before processing
-        silenceTimer = setTimeout(() => {
-          recognition.stop();
-          processCommand(fullTranscript);
-          setIsListening(false);
-        }, 2000);
-      }
     };
 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
-      if (event.error !== 'aborted') {
+      // 'aborted' just means the user (or onend) stopped it — not a real error.
+      // 'no-speech' means silence; let onend handle messaging.
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        toast.error('Microphone access denied. Enable it in your browser/app settings.');
+      } else if (event.error === 'audio-capture') {
+        toast.error('No microphone detected.');
+      } else if (event.error === 'network') {
+        toast.error('Network issue with speech recognition. Check your connection.');
+      } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
         toast.error('Could not recognize speech. Please try again.');
       }
       setIsListening(false);
@@ -401,11 +409,20 @@ export default function VoiceCommandBar() {
 
     recognition.onend = () => {
       setIsListening(false);
+      // Always try to submit whatever we captured when recognition ends,
+      // whether by silence detection, manual stop, or browser auto-stop.
+      submit(fullTranscript);
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch (e) {
+      console.error('Failed to start speech recognition:', e);
+      toast.error('Could not start microphone. Please try again.');
+      setIsListening(false);
+    }
   }, [isListening, processCommand]);
 
   return (
