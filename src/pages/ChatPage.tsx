@@ -554,6 +554,11 @@ export default function ChatPage() {
                 name: memberMap.get(r.user_id) || 'Someone',
               }));
             const isParsing = aiParsing === msg.id;
+            const addedBy = shoppingAdds[msg.id];
+            const isAdded = !!addedBy;
+            const adderName = addedBy
+              ? (addedBy.user_id === user?.id ? 'You' : resolveSenderName(addedBy.user_id))
+              : null;
 
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -570,11 +575,13 @@ export default function ChatPage() {
                     </span>
                     <button
                       onClick={() => quickAddFromMessage(msg)}
-                      disabled={!!aiParsing}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition-all duration-200 flex items-center gap-0.5 disabled:opacity-50"
+                      disabled={!!aiParsing || isAdded}
+                      className="text-[10px] text-muted-foreground hover:text-foreground transition-all duration-200 flex items-center gap-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
                     >
                       {isParsing ? (
                         <><Sparkles className="w-3 h-3 animate-spin" /> Adding...</>
+                      ) : isAdded ? (
+                        <><ShoppingCart className="w-3 h-3" /> {adderName} added to shopping list</>
                       ) : (
                         <><ShoppingCart className="w-3 h-3" /> Add to list</>
                       )}
