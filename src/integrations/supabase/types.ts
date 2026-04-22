@@ -52,6 +52,30 @@ export type Database = {
           },
         ]
       }
+      chat_message_shopping_adds: {
+        Row: {
+          chat_message_id: string
+          created_at: string
+          household_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          chat_message_id: string
+          created_at?: string
+          household_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          chat_message_id?: string
+          created_at?: string
+          household_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           content: string
