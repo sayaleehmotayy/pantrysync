@@ -80,66 +80,55 @@ export function usePriceHistory(itemId?: string) {
   return { ...query, addPrice };
 }
 
+export interface SpendEntry {
+  amount: number;
+  store: string;
+  date: string; // ISO string for safe serialization
+}
+
 export function useSpendingSummary() {
   const { household } = useHousehold();
 
   return useQuery({
     queryKey: ['spending_summary', household?.id],
     queryFn: async () => {
-      if (!household) return {
+      const empty = {
         total30d: 0, total7d: 0, totalMonth: 0, totalYear: 0,
-        byStore: [], byWeek: [], byMonth: [],
+        byStore: [] as { name: string; total: number }[],
+        byWeek: [] as { week: string; total: number }[],
+        byMonth: [] as { month: string; total: number }[],
+        entries: [] as SpendEntry[],
       };
+      if (!household) return empty;
 
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const startOfYear = new Date(now.getFullYear(), 0, 1);
-      // Fetch the wider window (year) so we can derive all buckets client-side.
-      const earliest = startOfYear < thirtyDaysAgo ? startOfYear : thirtyDaysAgo;
 
       // Spending = actual purchase events: shopping_trips + completed receipt_scans.
-      // price_history is excluded — it's per-unit price logging, not a purchase total.
+      // Fetch ALL entries for this household so users can browse past years/months.
       const [tripsRes, receiptsRes] = await Promise.all([
         supabase
           .from('shopping_trips')
           .select('id, store_name, total_spent, finished_at')
-          .eq('household_id', household.id)
-          .gte('finished_at', earliest.toISOString()),
+          .eq('household_id', household.id),
         supabase
           .from('receipt_scans')
           .select('id, store_name, total_amount, created_at, status')
           .eq('household_id', household.id)
-          .eq('status', 'completed')
-          .gte('created_at', earliest.toISOString()),
+          .eq('status', 'completed'),
       ]);
 
       if (tripsRes.error) throw tripsRes.error;
       if (receiptsRes.error) throw receiptsRes.error;
 
-      type SpendEntry = { amount: number; store: string; date: Date; weekKey: string; monthKey: string };
       const entries: SpendEntry[] = [];
 
-      const toWeekKey = (d: Date) => {
-        const weekStart = new Date(d);
-        weekStart.setHours(0, 0, 0, 0);
-        // ISO week: Monday is the start of the week. getDay() => Sun=0..Sat=6.
-        const day = weekStart.getDay();
-        const diffToMonday = (day + 6) % 7; // Mon=0, Tue=1, ..., Sun=6
-        weekStart.setDate(weekStart.getDate() - diffToMonday);
-        // Use local-date components so the key reflects the user's week, not UTC.
-        const y = weekStart.getFullYear();
-        const m = String(weekStart.getMonth() + 1).padStart(2, '0');
-        const dd = String(weekStart.getDate()).padStart(2, '0');
-        return `${y}-${m}-${dd}`;
-      };
-      const toMonthKey = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-
       const push = (amt: number, store: string, d: Date) => {
-        if (amt <= 0) return;
-        entries.push({ amount: amt, store, date: d, weekKey: toWeekKey(d), monthKey: toMonthKey(d) });
+        if (amt <= 0 || isNaN(d.getTime())) return;
+        entries.push({ amount: amt, store, date: d.toISOString() });
       };
 
       (tripsRes.data || []).forEach((t: any) =>
@@ -149,8 +138,25 @@ export function useSpendingSummary() {
         push(Number(r.total_amount) || 0, r.store_name || 'Unknown', new Date(r.created_at))
       );
 
+      const toWeekKey = (d: Date) => {
+        const weekStart = new Date(d);
+        weekStart.setHours(0, 0, 0, 0);
+        const day = weekStart.getDay();
+        const diffToMonday = (day + 6) % 7;
+        weekStart.setDate(weekStart.getDate() - diffToMonday);
+        const y = weekStart.getFullYear();
+        const m = String(weekStart.getMonth() + 1).padStart(2, '0');
+        const dd = String(weekStart.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+      };
+      const toMonthKey = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
       const sumIn = (from: Date) =>
-        entries.filter(e => e.date >= from && e.date <= now).reduce((s, e) => s + e.amount, 0);
+        entries.filter(e => {
+          const d = new Date(e.date);
+          return d >= from && d <= now;
+        }).reduce((s, e) => s + e.amount, 0);
 
       const total7d = sumIn(sevenDaysAgo);
       const total30d = sumIn(thirtyDaysAgo);
@@ -158,7 +164,7 @@ export function useSpendingSummary() {
       const totalYear = sumIn(startOfYear);
 
       const storeMap = new Map<string, number>();
-      entries.filter(e => e.date >= thirtyDaysAgo).forEach(e => {
+      entries.filter(e => new Date(e.date) >= thirtyDaysAgo).forEach(e => {
         storeMap.set(e.store, (storeMap.get(e.store) || 0) + e.amount);
       });
       const byStore = Array.from(storeMap.entries())
@@ -166,22 +172,22 @@ export function useSpendingSummary() {
         .sort((a, b) => b.total - a.total);
 
       const weekMap = new Map<string, number>();
-      entries.filter(e => e.date >= thirtyDaysAgo).forEach(e => {
-        weekMap.set(e.weekKey, (weekMap.get(e.weekKey) || 0) + e.amount);
+      entries.filter(e => new Date(e.date) >= thirtyDaysAgo).forEach(e => {
+        weekMap.set(toWeekKey(new Date(e.date)), (weekMap.get(toWeekKey(new Date(e.date))) || 0) + e.amount);
       });
       const byWeek = Array.from(weekMap.entries())
         .map(([week, total]) => ({ week, total }))
         .sort((a, b) => a.week.localeCompare(b.week));
 
       const monthMap = new Map<string, number>();
-      entries.filter(e => e.date >= startOfYear).forEach(e => {
-        monthMap.set(e.monthKey, (monthMap.get(e.monthKey) || 0) + e.amount);
+      entries.filter(e => new Date(e.date) >= startOfYear).forEach(e => {
+        monthMap.set(toMonthKey(new Date(e.date)), (monthMap.get(toMonthKey(new Date(e.date))) || 0) + e.amount);
       });
       const byMonth = Array.from(monthMap.entries())
         .map(([month, total]) => ({ month, total }))
         .sort((a, b) => a.month.localeCompare(b.month));
 
-      return { total30d, total7d, totalMonth, totalYear, byStore, byWeek, byMonth };
+      return { total30d, total7d, totalMonth, totalYear, byStore, byWeek, byMonth, entries };
     },
     enabled: !!household,
   });
