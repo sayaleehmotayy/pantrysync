@@ -45,12 +45,19 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [portalLoading, setPortalLoading] = useState(false);
   const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
   const [shareInviteCode, setShareInviteCode] = useState<string>('');
 
   const currentTier = getTierByProductId(subscription.productId);
   const memberLimit = getMemberLimit(currentTier);
+  const onAndroid = isNativeAndroid();
+
+  // Legacy Stripe subscriber: product_id starts with "prod_" (Stripe IDs).
+  // Google Play product IDs are "duo_monthly", "family_yearly", etc.
+  const isLegacyStripe = useMemo(
+    () => !!subscription.productId && subscription.productId.startsWith('prod_'),
+    [subscription.productId],
+  );
 
   // Load user's preferred currency
   useEffect(() => {
@@ -135,57 +142,12 @@ export default function SettingsPage() {
     toast.success('Invite code copied!');
   };
 
-  const handleManageSubscription = async () => {
-    setPortalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('customer-portal');
-      if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to open subscription portal');
-    } finally {
-      setPortalLoading(false);
-    }
+  const openPlayManagement = () => {
+    const sku = subscription.productId ?? '';
+    const pkg = 'com.pantrysync.app';
+    const url = `https://play.google.com/store/account/subscriptions?sku=${encodeURIComponent(sku)}&package=${pkg}`;
+    window.open(url, '_blank');
   };
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkoutState = params.get('checkout');
-    if (!checkoutState) return;
-
-    const clearCheckoutParam = () => {
-      params.delete('checkout');
-      const search = params.toString();
-      window.history.replaceState({}, '', `${window.location.pathname}${search ? `?${search}` : ''}`);
-    };
-
-    let retryTimer: number | null = null;
-
-    if (checkoutState === 'cancel') {
-      toast.error('Checkout was cancelled');
-      clearCheckoutParam();
-      return;
-    }
-
-    const syncSubscription = async () => {
-      toast.success('Checkout complete — updating your Pro access...');
-      await checkSubscription();
-      retryTimer = window.setTimeout(() => {
-        void checkSubscription();
-      }, 2500);
-      clearCheckoutParam();
-    };
-
-    void syncSubscription();
-
-    return () => {
-      if (retryTimer !== null) {
-        window.clearTimeout(retryTimer);
-      }
-    };
-  }, [checkSubscription]);
 
   const tierLabel = currentTier === 'free' ? 'Free' : currentTier.charAt(0).toUpperCase() + currentTier.slice(1);
 
