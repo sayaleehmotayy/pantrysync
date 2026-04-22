@@ -239,7 +239,38 @@ export default function ChatPage() {
 
   // AI-powered quick add: parses a message and adds extracted items to shopping list
   const quickAddFromMessage = useCallback(async (msg: ChatMessage) => {
-    if (!msg.content.trim()) return;
+    if (!msg.content.trim() || !household || !user) return;
+    if (shoppingAdds[msg.id]) return; // already claimed
+
+    // Claim this message first so two members can't double-add it.
+    // Unique constraint on chat_message_id makes this safe under races.
+    const { error: claimError } = await supabase
+      .from('chat_message_shopping_adds')
+      .insert({
+        chat_message_id: msg.id,
+        household_id: household.id,
+        user_id: user.id,
+      });
+
+    if (claimError) {
+      // Likely already added by someone else — refresh state and bail
+      const { data } = await supabase
+        .from('chat_message_shopping_adds')
+        .select('chat_message_id, user_id')
+        .eq('chat_message_id', msg.id)
+        .maybeSingle();
+      if (data) {
+        setShoppingAdds(prev => ({ ...prev, [msg.id]: { user_id: data.user_id } }));
+        toast.info('Already added to shopping list');
+      } else {
+        toast.error('Failed to add to shopping list');
+      }
+      return;
+    }
+
+    // Optimistic local update (realtime will confirm)
+    setShoppingAdds(prev => ({ ...prev, [msg.id]: { user_id: user.id } }));
+
     setAiParsing(msg.id);
     try {
       const { data, error } = await supabase.functions.invoke('parse-shopping-items', {
@@ -284,7 +315,7 @@ export default function ChatPage() {
     } finally {
       setAiParsing(null);
     }
-  }, [addItem]);
+  }, [addItem, household, user, shoppingAdds]);
 
   const extractMentions = useCallback((content: string): MentionTarget[] => {
     const mentionTargets: MentionTarget[] = [];
