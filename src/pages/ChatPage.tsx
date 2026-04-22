@@ -65,6 +65,7 @@ export default function ChatPage() {
   const [mentionCursorPos, setMentionCursorPos] = useState(0);
   const [readReceipts, setReadReceipts] = useState<ReadReceipt[]>([]);
   const [extraNames, setExtraNames] = useState<Record<string, string>>({});
+  const [shoppingAdds, setShoppingAdds] = useState<Record<string, { user_id: string }>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -185,6 +186,36 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(channel); };
   }, [household]);
 
+  // Track which chat messages have already been added to the shopping list
+  useEffect(() => {
+    if (!household) return;
+    const fetchAdds = async () => {
+      const { data } = await supabase
+        .from('chat_message_shopping_adds')
+        .select('chat_message_id, user_id')
+        .eq('household_id', household.id);
+      if (data) {
+        const map: Record<string, { user_id: string }> = {};
+        data.forEach((r: any) => { map[r.chat_message_id] = { user_id: r.user_id }; });
+        setShoppingAdds(map);
+      }
+    };
+    void fetchAdds();
+
+    const channel = supabase
+      .channel(`chat-shopping-adds-${household.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_message_shopping_adds', filter: `household_id=eq.${household.id}` },
+        (payload) => {
+          const r = payload.new as any;
+          setShoppingAdds(prev => ({ ...prev, [r.chat_message_id]: { user_id: r.user_id } }));
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [household]);
+
   // Update own read receipt
   useEffect(() => {
     if (!household || !user || messages.length === 0) return;
@@ -208,7 +239,38 @@ export default function ChatPage() {
 
   // AI-powered quick add: parses a message and adds extracted items to shopping list
   const quickAddFromMessage = useCallback(async (msg: ChatMessage) => {
-    if (!msg.content.trim()) return;
+    if (!msg.content.trim() || !household || !user) return;
+    if (shoppingAdds[msg.id]) return; // already claimed
+
+    // Claim this message first so two members can't double-add it.
+    // Unique constraint on chat_message_id makes this safe under races.
+    const { error: claimError } = await supabase
+      .from('chat_message_shopping_adds')
+      .insert({
+        chat_message_id: msg.id,
+        household_id: household.id,
+        user_id: user.id,
+      });
+
+    if (claimError) {
+      // Likely already added by someone else — refresh state and bail
+      const { data } = await supabase
+        .from('chat_message_shopping_adds')
+        .select('chat_message_id, user_id')
+        .eq('chat_message_id', msg.id)
+        .maybeSingle();
+      if (data) {
+        setShoppingAdds(prev => ({ ...prev, [msg.id]: { user_id: data.user_id } }));
+        toast.info('Already added to shopping list');
+      } else {
+        toast.error('Failed to add to shopping list');
+      }
+      return;
+    }
+
+    // Optimistic local update (realtime will confirm)
+    setShoppingAdds(prev => ({ ...prev, [msg.id]: { user_id: user.id } }));
+
     setAiParsing(msg.id);
     try {
       const { data, error } = await supabase.functions.invoke('parse-shopping-items', {
@@ -253,7 +315,7 @@ export default function ChatPage() {
     } finally {
       setAiParsing(null);
     }
-  }, [addItem]);
+  }, [addItem, household, user, shoppingAdds]);
 
   const extractMentions = useCallback((content: string): MentionTarget[] => {
     const mentionTargets: MentionTarget[] = [];
@@ -492,6 +554,11 @@ export default function ChatPage() {
                 name: memberMap.get(r.user_id) || 'Someone',
               }));
             const isParsing = aiParsing === msg.id;
+            const addedBy = shoppingAdds[msg.id];
+            const isAdded = !!addedBy;
+            const adderName = addedBy
+              ? (addedBy.user_id === user?.id ? 'You' : resolveSenderName(addedBy.user_id))
+              : null;
 
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -508,11 +575,13 @@ export default function ChatPage() {
                     </span>
                     <button
                       onClick={() => quickAddFromMessage(msg)}
-                      disabled={!!aiParsing}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition-all duration-200 flex items-center gap-0.5 disabled:opacity-50"
+                      disabled={!!aiParsing || isAdded}
+                      className="text-[10px] text-muted-foreground hover:text-foreground transition-all duration-200 flex items-center gap-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
                     >
                       {isParsing ? (
                         <><Sparkles className="w-3 h-3 animate-spin" /> Adding...</>
+                      ) : isAdded ? (
+                        <><ShoppingCart className="w-3 h-3" /> {adderName} added to shopping list</>
                       ) : (
                         <><ShoppingCart className="w-3 h-3" /> Add to list</>
                       )}
