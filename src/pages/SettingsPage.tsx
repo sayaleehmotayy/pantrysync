@@ -252,17 +252,28 @@ export default function SettingsPage() {
 
               {!subscription.householdPro && (
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <Button size="sm" onClick={() => navigate('/plans')}>
-                    <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
-                    Change plan
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
-                    <CreditCard className="w-3.5 h-3.5 mr-1" />
-                    {portalLoading ? 'Loading...' : 'Manage billing'}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={checkSubscription}>
-                    Refresh
-                  </Button>
+                  {isLegacyStripe ? (
+                    <div className="w-full rounded-md border border-border/50 bg-muted/40 p-3 text-xs text-muted-foreground">
+                      You're on a legacy subscription that's still active. Plan changes aren't available in
+                      the app — please reach out to support if you need help with your subscription.
+                    </div>
+                  ) : (
+                    <>
+                      <Button size="sm" onClick={() => navigate('/plans')}>
+                        <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                        Change plan
+                      </Button>
+                      {onAndroid && (
+                        <Button variant="outline" size="sm" onClick={openPlayManagement}>
+                          <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                          Manage on Play Store
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={checkSubscription}>
+                        Refresh
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
 
