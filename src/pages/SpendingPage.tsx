@@ -42,7 +42,7 @@ export default function SpendingPage() {
 
   const weeklyData = summary?.byWeek || [];
 
-  const hasAny = (summary?.byWeek?.length || 0) > 0;
+  const hasAny = (summary?.byWeek?.length || 0) > 0 || (summary?.byMonth?.length || 0) > 0;
 
   return (
     <div className="space-y-4 animate-fade-in">
