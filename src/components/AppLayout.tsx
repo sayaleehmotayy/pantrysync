@@ -6,7 +6,7 @@ import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
   { to: '/pantry', icon: Package, label: 'Pantry' },
-  { to: '/shopping', icon: ShoppingCart, label: 'Shopping List' },
+  { to: '/shopping', icon: ShoppingCart, label: 'Shopping' },
   { to: '/recipes', icon: ChefHat, label: 'Recipes' },
   { to: '/chat', icon: MessageCircle, label: 'Chat' },
 ];
@@ -109,30 +109,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border px-1 pt-1 z-40"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.25rem)' }}
       >
-        <div className="flex justify-around">
+        <div className="grid grid-cols-6">
           {navItems.map(item => {
             const active = location.pathname === item.to;
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center gap-0.5 py-2 px-2 text-[10px] font-medium transition-all duration-200 ${
+                className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 text-[10px] font-medium transition-all duration-200 truncate w-full ${
                   active ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
                 <item.icon className={`w-5 h-5 transition-transform duration-200 ${active ? 'text-primary scale-110' : ''}`} />
-                {item.label}
+                <span className="truncate max-w-full">{item.label}</span>
               </NavLink>
             );
           })}
           <button
             onClick={() => setMoreOpen(true)}
-            className={`flex flex-col items-center gap-0.5 py-2 px-2 text-[10px] font-medium transition-all duration-200 ${
+            className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 text-[10px] font-medium transition-all duration-200 w-full ${
               moreActive ? 'text-primary' : 'text-muted-foreground'
             }`}
           >
             <MoreHorizontal className={`w-5 h-5 transition-transform duration-200 ${moreActive ? 'text-primary scale-110' : ''}`} />
-            More
+            <span className="truncate max-w-full">More</span>
           </button>
         </div>
       </nav>
