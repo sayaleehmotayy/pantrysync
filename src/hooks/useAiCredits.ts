@@ -6,6 +6,8 @@ export interface AiCredits {
   tier: string;
   monthlyAllowance: number;
   creditsRemaining: number;
+  bonusCredits: number;
+  bonusCreditsExpireAt: string | null;
   totalUsedLifetime: number;
   periodEnd: string | null;
   loading: boolean;
@@ -15,6 +17,8 @@ const initial: AiCredits = {
   tier: 'free',
   monthlyAllowance: 0,
   creditsRemaining: 0,
+  bonusCredits: 0,
+  bonusCreditsExpireAt: null,
   totalUsedLifetime: 0,
   periodEnd: null,
   loading: true,
@@ -35,7 +39,7 @@ export function useAiCredits() {
     }
     const { data, error } = await supabase
       .from('ai_credit_ledger')
-      .select('tier, monthly_allowance, credits_remaining, total_used_lifetime, period_end')
+      .select('tier, monthly_allowance, credits_remaining, bonus_credits, bonus_credits_expire_at, total_used_lifetime, period_end')
       .eq('user_id', user.id)
       .maybeSingle();
     if (error) {
@@ -44,7 +48,6 @@ export function useAiCredits() {
       return;
     }
     if (!data) {
-      // No ledger row yet → user hasn't called AI. Show full allowance based on tier.
       const monthly = subscription.subscribed
         ? estimateAllowanceFromProductId(subscription.productId)
         : 0;
@@ -52,6 +55,8 @@ export function useAiCredits() {
         tier: subscription.subscribed ? 'paid' : 'free',
         monthlyAllowance: monthly,
         creditsRemaining: monthly,
+        bonusCredits: 0,
+        bonusCreditsExpireAt: null,
         totalUsedLifetime: 0,
         periodEnd: null,
         loading: false,
@@ -62,6 +67,8 @@ export function useAiCredits() {
       tier: data.tier,
       monthlyAllowance: data.monthly_allowance,
       creditsRemaining: data.credits_remaining,
+      bonusCredits: (data as any).bonus_credits ?? 0,
+      bonusCreditsExpireAt: (data as any).bonus_credits_expire_at ?? null,
       totalUsedLifetime: data.total_used_lifetime,
       periodEnd: data.period_end,
       loading: false,

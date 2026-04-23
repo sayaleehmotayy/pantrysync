@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
 import { isNativeAndroid } from '@/lib/platform';
+import { CreditsCard } from '@/components/CreditsCard';
 
 const CURRENCIES = [
   { code: 'USD', label: 'US Dollar ($)' },
@@ -296,6 +297,8 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <CreditsCard />
 
       <Card className="border-border/50">
         <CardHeader className="pb-3">
