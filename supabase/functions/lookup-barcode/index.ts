@@ -28,9 +28,16 @@ function guessStorage(category: string): string {
   return "pantry";
 }
 
-async function aiLookup(barcode: string): Promise<any | null> {
+async function aiLookup(barcode: string, userId: string): Promise<any | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return null;
+
+  // Charge a credit only when we actually fall back to AI (not for OpenFoodFacts hits).
+  const credit = await chargeCredits(userId, AI_COST.lookupBarcode);
+  if (!credit.ok) {
+    // Surface the credit failure to the caller via a sentinel.
+    return { __credit_error: credit };
+  }
 
   try {
     const prompt = `You are a product database assistant. The user scanned barcode "${barcode}". Using your broad knowledge of consumer products from across the internet, identify what product this barcode most likely belongs to.
@@ -160,7 +167,13 @@ serve(async (req) => {
 
     if (data.status !== 1 || !data.product) {
       // Fallback: ask Lovable AI to identify the product from the barcode using its web knowledge
-      const aiResult = await aiLookup(barcode);
+      const aiResult = await aiLookup(barcode, user.id);
+      if (aiResult && aiResult.__credit_error) {
+        const c = aiResult.__credit_error;
+        return new Response(JSON.stringify(c.body), {
+          status: c.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       if (aiResult) {
         return new Response(JSON.stringify({ found: true, product: aiResult, source: "ai" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
