@@ -54,6 +54,8 @@ export type Database = {
       }
       ai_credit_ledger: {
         Row: {
+          bonus_credits: number
+          bonus_credits_expire_at: string | null
           credits_remaining: number
           monthly_allowance: number
           period_end: string
@@ -64,6 +66,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bonus_credits?: number
+          bonus_credits_expire_at?: string | null
           credits_remaining?: number
           monthly_allowance?: number
           period_end?: string
@@ -74,6 +78,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bonus_credits?: number
+          bonus_credits_expire_at?: string | null
           credits_remaining?: number
           monthly_allowance?: number
           period_end?: string
@@ -161,6 +167,51 @@ export type Database = {
           id?: string
           last_read_at?: string
           last_read_message_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      credit_purchases: {
+        Row: {
+          created_at: string
+          credits_granted: number
+          expires_at: string
+          id: string
+          order_id: string | null
+          platform: string
+          price_currency: string | null
+          price_micros: number | null
+          product_id: string
+          purchase_token: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_granted: number
+          expires_at: string
+          id?: string
+          order_id?: string | null
+          platform?: string
+          price_currency?: string | null
+          price_micros?: number | null
+          product_id: string
+          purchase_token: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_granted?: number
+          expires_at?: string
+          id?: string
+          order_id?: string | null
+          platform?: string
+          price_currency?: string | null
+          price_micros?: number | null
+          product_id?: string
+          purchase_token?: string
+          status?: string
           user_id?: string
         }
         Relationships: []
@@ -985,6 +1036,7 @@ export type Database = {
       consume_ai_credits: {
         Args: { _cost: number; _user_id: string }
         Returns: {
+          bonus_remaining: number
           credits_remaining: number
           monthly_allowance: number
           success: boolean
@@ -996,6 +1048,22 @@ export type Database = {
         Returns: {
           monthly_allowance: number
           tier: string
+        }[]
+      }
+      grant_purchased_credits: {
+        Args: {
+          _credits: number
+          _order_id: string
+          _price_currency: string
+          _price_micros: number
+          _product_id: string
+          _purchase_token: string
+          _user_id: string
+        }
+        Returns: {
+          bonus_credits: number
+          expires_at: string
+          success: boolean
         }[]
       }
       is_household_member: {
