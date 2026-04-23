@@ -58,7 +58,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 p-4 pb-24 md:pb-4 md:p-6 max-w-3xl md:mx-auto w-full">
+      <main
+        className="flex-1 p-4 md:pb-4 md:p-6 max-w-3xl md:mx-auto w-full"
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6rem)',
+        }}
+      >
         {children}
       </main>
 
@@ -99,7 +105,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border px-1 py-1 z-40">
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border px-1 pt-1 z-40"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.25rem)' }}
+      >
         <div className="flex justify-around">
           {navItems.map(item => {
             const active = location.pathname === item.to;
