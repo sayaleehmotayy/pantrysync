@@ -256,6 +256,15 @@ serve(async (req) => {
       );
     }
 
+    // Charge AI credits up-front for ALL photos. Refuses if free tier or
+    // insufficient credits — protects margin since each photo runs vision AI.
+    const credit = await chargeCredits(userId, AI_COST.scanReceiptPerPhoto * images.length);
+    if (!credit.ok) {
+      return new Response(JSON.stringify(credit.body), {
+        status: credit.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     console.log(`[SCAN-RECEIPT] Received ${images.length} photos for household ${household_id}`);
 
     const { data: scan, error: scanError } = await adminClient
