@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +25,13 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
+
+    const credit = await chargeCredits(user.id, AI_COST.pantryAssistant);
+    if (!credit.ok) {
+      return new Response(JSON.stringify(credit.body), {
+        status: credit.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { feature, householdId } = await req.json();
     if (!householdId || typeof householdId !== 'string') throw new Error("Missing householdId");
@@ -109,7 +117,7 @@ Be data-driven and practical.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

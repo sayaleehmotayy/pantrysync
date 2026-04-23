@@ -52,6 +52,39 @@ export type Database = {
           },
         ]
       }
+      ai_credit_ledger: {
+        Row: {
+          credits_remaining: number
+          monthly_allowance: number
+          period_end: string
+          period_start: string
+          tier: string
+          total_used_lifetime: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          credits_remaining?: number
+          monthly_allowance?: number
+          period_end?: string
+          period_start?: string
+          tier?: string
+          total_used_lifetime?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          credits_remaining?: number
+          monthly_allowance?: number
+          period_end?: string
+          period_start?: string
+          tier?: string
+          total_used_lifetime?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chat_message_shopping_adds: {
         Row: {
           chat_message_id: string
@@ -949,6 +982,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_ai_credits: {
+        Args: { _cost: number; _user_id: string }
+        Returns: {
+          credits_remaining: number
+          monthly_allowance: number
+          success: boolean
+          tier: string
+        }[]
+      }
+      get_user_tier_credits: {
+        Args: { _user_id: string }
+        Returns: {
+          monthly_allowance: number
+          tier: string
+        }[]
+      }
       is_household_member: {
         Args: { _household_id: string; _user_id: string }
         Returns: boolean

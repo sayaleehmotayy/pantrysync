@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,13 @@ serve(async (req) => {
     const { images } = await req.json();
     if (!images || !Array.isArray(images) || images.length === 0) {
       throw new Error("At least one product image is required");
+    }
+
+    const credit = await chargeCredits(user.id, AI_COST.scanProduct);
+    if (!credit.ok) {
+      return new Response(JSON.stringify(credit.body), {
+        status: credit.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Build content array with all images

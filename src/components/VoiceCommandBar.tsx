@@ -314,6 +314,8 @@ export default function VoiceCommandBar() {
         },
       });
 
+      const { handleAiCreditError } = await import('@/lib/aiErrors');
+      if (handleAiCreditError(error, data)) return;
       if (error) throw error;
 
       const actions: VoiceAction[] = (data?.actions || []).map((a: VoiceAction) => ({

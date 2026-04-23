@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,7 +28,7 @@ async function processOnePhoto(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-pro",
+      model: "google/gemini-2.5-flash",
       messages: [
         {
           role: "system",
@@ -253,6 +254,15 @@ serve(async (req) => {
         JSON.stringify({ error: "You are not a member of this household" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
       );
+    }
+
+    // Charge AI credits up-front for ALL photos. Refuses if free tier or
+    // insufficient credits — protects margin since each photo runs vision AI.
+    const credit = await chargeCredits(userId, AI_COST.scanReceiptPerPhoto * images.length);
+    if (!credit.ok) {
+      return new Response(JSON.stringify(credit.body), {
+        status: credit.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`[SCAN-RECEIPT] Received ${images.length} photos for household ${household_id}`);

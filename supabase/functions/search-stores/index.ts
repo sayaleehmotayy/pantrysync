@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +23,13 @@ serve(async (req) => {
     if (!query || typeof query !== "string" || query.trim().length === 0) {
       return new Response(JSON.stringify({ results: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const credit = await chargeCredits(user.id, AI_COST.searchStores);
+    if (!credit.ok) {
+      return new Response(JSON.stringify(credit.body), {
+        status: credit.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

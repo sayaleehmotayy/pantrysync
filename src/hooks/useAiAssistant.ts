@@ -36,6 +36,11 @@ export function useAiAssistant() {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: 'Request failed' }));
+        if (resp.status === 402 || err?.code === 'free_tier_blocked' || err?.code === 'out_of_credits') {
+          const { handleAiCreditError } = await import('@/lib/aiErrors');
+          handleAiCreditError({ status: 402 }, err);
+          return;
+        }
         throw new Error(err.error || `Error ${resp.status}`);
       }
 

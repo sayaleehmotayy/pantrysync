@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,6 +37,11 @@ serve(async (req) => {
     const { image_base64 } = await req.json();
     if (!image_base64 || typeof image_base64 !== "string") {
       return json({ error: "image_base64 required" }, 400);
+    }
+
+    const credit = await chargeCredits(user.id, AI_COST.extractCoupon);
+    if (!credit.ok) {
+      return json(credit.body!, credit.status!);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
