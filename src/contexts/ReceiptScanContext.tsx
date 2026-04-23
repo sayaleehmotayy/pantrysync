@@ -73,6 +73,12 @@ export function ReceiptScanProvider({ children }: { children: React.ReactNode })
       const { data, error } = await supabase.functions.invoke('scan-receipt', {
         body: { images: imageBase64s, household_id: household.id },
       });
+      const { handleAiCreditError } = await import('@/lib/aiErrors');
+      if (handleAiCreditError(error, data)) {
+        setScanStatus('idle');
+        setProcessingStartTime(null);
+        return;
+      }
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
