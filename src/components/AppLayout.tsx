@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Package, ShoppingCart, ChefHat, MessageCircle, Settings, Clock, Activity, MoreHorizontal, X, Sparkles, Tag, Receipt, DollarSign, History } from 'lucide-react';
 import pantrySyncLogo from '@/assets/pantry-sync-logo.png';
+import { OnboardingTour } from '@/components/OnboardingTour';
+import { useOnboarding } from '@/hooks/useOnboarding';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Home' },
@@ -27,11 +29,13 @@ const allSidebarItems = [...navItems, ...moreItems];
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { open: onboardingOpen, close: closeOnboarding } = useOnboarding();
 
   const moreActive = moreItems.some(i => i.to === location.pathname);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-background">
+      <OnboardingTour open={onboardingOpen} onClose={closeOnboarding} />
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-56 border-r border-border bg-card p-4 gap-1">
         <div className="flex items-center gap-2 px-3 py-4 mb-4">
