@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Copy, LogOut, Users, Crown, User, Sparkles, Check, Globe, Moon, Sun, Monitor, ArrowRightLeft, ExternalLink, Smartphone } from 'lucide-react';
+import { Copy, LogOut, Users, Crown, User, Sparkles, Check, Globe, Moon, Sun, Monitor, ArrowRightLeft, ExternalLink, Smartphone, HelpCircle } from 'lucide-react';
 import { getTierByProductId, getMemberLimit } from '@/config/subscription';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
 import { isNativeAndroid } from '@/lib/platform';
 import { CreditsCard } from '@/components/CreditsCard';
+import { triggerOnboardingReplay } from '@/hooks/useOnboarding';
 
 const CURRENCIES = [
   { code: 'USD', label: 'US Dollar ($)' },
@@ -345,6 +346,20 @@ export default function SettingsPage() {
               )}
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-display flex items-center gap-2">
+            <HelpCircle className="w-4 h-4 text-primary" /> Help
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" className="w-full justify-start" onClick={triggerOnboardingReplay}>
+            <Sparkles className="w-4 h-4 mr-2" /> How to use the app
+          </Button>
+          <p className="text-xs text-muted-foreground mt-2">Replay the welcome tour for a quick walkthrough of all features.</p>
         </CardContent>
       </Card>
 
