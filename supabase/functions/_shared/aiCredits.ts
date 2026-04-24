@@ -2,27 +2,49 @@
 // Charges credits BEFORE calling the AI gateway. Returns 402 if free tier or
 // out of credits. Free tier always returns 402 (no AI ever).
 //
-// Cost reference (target ≥65% net margin):
-//   1  = ultra-cheap text   (parse-shopping-items, search-stores, lookup-barcode AI fallback)
-//   3  = text reasoning     (smart-chat-reply, voice-command, ai-pantry-assistant)
-//   5  = single image       (extract-coupon, scan-product)
-//  10  = receipt photo      (scan-receipt, charged per photo)
+// PROFIT-SAFE PRICING — every action priced so worst-case AI cost ≤ ~50% of
+// revenue at the minimum top-up price (€0.033/credit). Formula:
+//   credits = ceil(worst_case_cost × safety_multiplier(2) / €0.033)
+// Then floored to the spec band: text 2–3, voice/chat 5–8, scans 10–15.
+//
+// Worst-case cost reference (Lovable AI Gateway max + 30% headroom):
+//   cheap text  ≤ €0.0006   → 2 credits  (≥97% margin)
+//   reasoning   ≤ €0.0030   → 5 credits  (≥98% margin)
+//   image call  ≤ €0.0500   → 12 credits (~75% margin)
+//   receipt+pro ≤ €0.0700   → 15 credits (~74% margin)
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 export const AI_COST = {
-  parseShopping: 1,
-  searchStores: 1,
-  lookupBarcode: 1,
-  smartChatReply: 3,
-  voiceCommand: 3,
-  pantryAssistant: 3,
-  extractCoupon: 10,    // bumped 5→10: image+vision call costs ~€0.037, needs 10 credits to stay profitable
-  scanProduct: 10,      // bumped 5→10: same reason — image+vision call
-  scanReceiptPerPhoto: 10,
+  // Tier 1 — cheap text (Flash-Lite)
+  parseShopping: 2,
+  searchStores: 2,
+  lookupBarcode: 2,
+  // Tier 2 — reasoning (Flash)
+  smartChatReply: 5,
+  voiceCommand: 5,
+  pantryAssistant: 5,
+  // Tier 3 — image vision (Flash + image)
+  extractCoupon: 12,
+  scanProduct: 12,
+  // Tier 4 — Pro + image (most expensive)
+  scanReceiptPerPhoto: 15,
 } as const;
+
+/** Worst-case AI gateway cost per action (EUR). Used by ai_cost_log monitor. */
+export const WORST_CASE_COST: Record<keyof typeof AI_COST, number> = {
+  parseShopping: 0.0006,
+  searchStores: 0.0006,
+  lookupBarcode: 0.0006,
+  smartChatReply: 0.0030,
+  voiceCommand: 0.0030,
+  pantryAssistant: 0.0030,
+  extractCoupon: 0.0500,
+  scanProduct: 0.0500,
+  scanReceiptPerPhoto: 0.0700,
+};
 
 export interface CreditCheckResult {
   ok: boolean;
