@@ -19,8 +19,8 @@ export const AI_COST = {
   smartChatReply: 3,
   voiceCommand: 3,
   pantryAssistant: 3,
-  extractCoupon: 5,
-  scanProduct: 5,
+  extractCoupon: 10,    // bumped 5→10: image+vision call costs ~€0.037, needs 10 credits to stay profitable
+  scanProduct: 10,      // bumped 5→10: same reason — image+vision call
   scanReceiptPerPhoto: 10,
 } as const;
 
