@@ -86,12 +86,12 @@ export function useAiCredits() {
 // when no ledger row exists yet.
 function estimateAllowanceFromProductId(productId: string | null): number {
   if (!productId) return 0;
-  if (productId === 'admin') return 1500;
+  if (productId === 'admin') return 1200;
   const duo = ['prod_UMmLQfrU8s7K5Z','prod_UMmMruDBeQbqq2','prod_UJmkcGNlIWvfoh','prod_UK2GPSlm6dNKbC','duo_monthly','duo_yearly'];
   const family = ['prod_UMmMPePoc6w4tV','prod_UMmMkbQrw4RvWk','prod_UK3jUbJSpStHEx','prod_UK3k0gRfRqH9dl','family_monthly','family_yearly'];
   const unl = ['prod_UMmNSMB08gx044','prod_UMmN3UgAX6Nj4X','prod_UK3k6GQ1X2Phkl','prod_UK3l7pPFppJ6G2','unlimited_monthly','unlimited_yearly'];
-  if (duo.includes(productId)) return 300;
-  if (family.includes(productId)) return 700;
-  if (unl.includes(productId)) return 1500;
+  if (duo.includes(productId)) return 250;
+  if (family.includes(productId)) return 600;
+  if (unl.includes(productId)) return 1200;
   return 0;
 }
