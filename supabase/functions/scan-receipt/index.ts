@@ -15,7 +15,8 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 async function processOnePhoto(
   imageBase64: string,
   existingItems: any[],
-  lovableApiKey: string
+  lovableApiKey: string,
+  userId: string,
 ): Promise<{ items: any[]; coupon_codes: any[]; store_name: string | null; receipt_date: string | null; total_amount: number | null; currency: string }> {
   const existingItemsContext = existingItems.length > 0
     ? `\n\nITEMS ALREADY EXTRACTED FROM PREVIOUS PHOTOS OF THIS RECEIPT (DO NOT include these again, only extract NEW items not in this list):\n${existingItems.map((i: any) => `- ${i.name} (${i.quantity} ${i.unit}, $${i.total_price})`).join('\n')}`
@@ -113,6 +114,14 @@ MULTI-PHOTO DEDUPLICATION:
   }
 
   const aiData = await aiResponse.json();
+  logAiCost({
+    userId,
+    feature: "scan-receipt",
+    creditsCharged: AI_COST.scanReceiptPerPhoto,
+    model: "google/gemini-2.5-flash",
+    usage: aiData.usage,
+    hasImageInput: true,
+  });
   const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
   if (!toolCall) throw new Error("AI did not return structured data");
 
@@ -167,7 +176,7 @@ async function processInBackground(
 
     for (let i = 0; i < images.length; i++) {
       console.log(`[SCAN-RECEIPT] Processing photo ${i + 1}/${images.length} for receipt ${receiptId}`);
-      const result = await processOnePhoto(images[i], allItems, lovableApiKey);
+      const result = await processOnePhoto(images[i], allItems, lovableApiKey, userId);
 
       // Deduplicate items
       const existingNames = new Set(allItems.map(it => it.name.toLowerCase()));
