@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
-import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
+import { chargeCredits, AI_COST, logAiCost } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -121,6 +121,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    logAiCost({ userId: user.id, feature: "extract-coupon", creditsCharged: AI_COST.extractCoupon, model: "google/gemini-2.5-flash", usage: data.usage, hasImageInput: true });
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) return json({ error: "No extraction returned", extracted: {} }, 200);
 

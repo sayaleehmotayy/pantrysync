@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
-import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
+import { chargeCredits, AI_COST, logAiCost } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -107,6 +107,7 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no code blocks, just raw JS
     }
 
     const data = await response.json();
+    logAiCost({ userId: user.id, feature: "scan-product", creditsCharged: AI_COST.scanProduct, model: "google/gemini-2.5-flash", usage: data.usage, hasImageInput: true });
     const rawContent = data.choices?.[0]?.message?.content || "";
 
     // Parse the JSON from the response (handle potential markdown wrapping)
