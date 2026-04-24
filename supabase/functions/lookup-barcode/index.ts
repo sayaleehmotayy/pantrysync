@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
-import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
+import { chargeCredits, AI_COST, logAiCost } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,6 +75,7 @@ If you cannot identify the product with reasonable confidence, return {"found": 
     }
 
     const data = await res.json();
+    logAiCost({ userId, feature: "lookup-barcode", creditsCharged: AI_COST.lookupBarcode, model: "google/gemini-2.5-flash-lite", usage: data.usage });
     const raw = data.choices?.[0]?.message?.content || "";
     const jsonStr = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     const parsed = JSON.parse(jsonStr);

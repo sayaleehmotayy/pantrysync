@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
-import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
+import { chargeCredits, AI_COST, logAiCost } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -176,6 +176,7 @@ Use the provided tool to return structured data.`,
     }
 
     const data = await response.json();
+    logAiCost({ userId: user.id, feature: "smart-chat-reply", creditsCharged: AI_COST.smartChatReply, model: "google/gemini-2.5-flash-lite", usage: data.usage });
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     let result = { intent: "chat", reply: null as string | null, items: [] as any[], suggest_add: [] as any[] };
 

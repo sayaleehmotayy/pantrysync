@@ -1073,6 +1073,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_cost_top_users_30d: {
+        Row: {
+          calls: number | null
+          display_name: string | null
+          product_id: string | null
+          revenue_at_min_topup: number | null
+          total_cost_eur: number | null
+          total_credits: number | null
+          unprofitable: boolean | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      ai_credits_used_per_plan: {
+        Row: {
+          avg_cost_eur: number | null
+          avg_credits_used: number | null
+          plan: string | null
+          subscribers: number | null
+          total_cost_eur: number | null
+        }
+        Relationships: []
+      }
+      ai_revenue_vs_cost_30d: {
+        Row: {
+          ai_cost_eur: number | null
+          calls: number | null
+          credits_used: number | null
+          margin_pct: number | null
+          subscription_revenue_eur: number | null
+          topup_revenue_eur: number | null
+          total_revenue_eur: number | null
+          unprofitable_alert: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       consume_ai_credits: {
@@ -1108,6 +1144,7 @@ export type Database = {
           success: boolean
         }[]
       }
+      is_app_admin: { Args: never; Returns: boolean }
       is_household_member: {
         Args: { _household_id: string; _user_id: string }
         Returns: boolean

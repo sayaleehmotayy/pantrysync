@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
-import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
+import { chargeCredits, AI_COST, logAiCost } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -315,6 +315,7 @@ Extract EVERY item mentioned. Never skip food.`;
     }
 
     const data = await response.json();
+    logAiCost({ userId: user.id, feature: "voice-command", creditsCharged: AI_COST.voiceCommand, model: "google/gemini-2.5-flash-lite", usage: data.usage });
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall?.function?.arguments) {
       return new Response(JSON.stringify({ actions: [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

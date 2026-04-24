@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { chargeCredits, AI_COST } from "../_shared/aiCredits.ts";
+import { chargeCredits, AI_COST, logAiCost, WORST_CASE_COST } from "../_shared/aiCredits.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -141,6 +141,16 @@ Be data-driven and practical.`;
       console.error("AI gateway error:", response.status, t);
       throw new Error("AI gateway error");
     }
+
+    // Streaming response — usage isn't available; log a worst-case estimate so
+    // monitoring still tracks this feature. Adjust if real costs drift.
+    logAiCost({
+      userId: user.id,
+      feature: "ai-pantry-assistant",
+      creditsCharged: AI_COST.pantryAssistant,
+      model: "google/gemini-2.5-flash-lite",
+      costEurOverride: WORST_CASE_COST.pantryAssistant,
+    });
 
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },

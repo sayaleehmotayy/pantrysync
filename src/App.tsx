@@ -23,6 +23,7 @@ import CouponsPage from "./pages/CouponsPage";
 import SpendingPage from "./pages/SpendingPage";
 import ReceiptScannerPage from "./pages/ReceiptScannerPage";
 import ShoppingHistoryPage from "./pages/ShoppingHistoryPage";
+import AdminMarginsPage from "./pages/AdminMarginsPage";
 import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import WelcomePage from "./pages/WelcomePage";
@@ -87,6 +88,7 @@ function AppRoutes() {
         <Route path="/ai" element={<ProGate feature="AI Assistant"><AiPage /></ProGate>} />
         <Route path="/coupons" element={<ProGate feature="Discount Code Scanner"><CouponsPage /></ProGate>} />
         <Route path="/receipts" element={<ProGate feature="Receipt Scanner"><ReceiptScannerPage /></ProGate>} />
+        <Route path="/admin/margins" element={<AdminMarginsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
