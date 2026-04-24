@@ -52,6 +52,36 @@ export type Database = {
           },
         ]
       }
+      ai_cost_log: {
+        Row: {
+          actual_cost_eur: number
+          created_at: string
+          credits_charged: number
+          feature: string
+          id: string
+          model: string | null
+          user_id: string
+        }
+        Insert: {
+          actual_cost_eur: number
+          created_at?: string
+          credits_charged: number
+          feature: string
+          id?: string
+          model?: string | null
+          user_id: string
+        }
+        Update: {
+          actual_cost_eur?: number
+          created_at?: string
+          credits_charged?: number
+          feature?: string
+          id?: string
+          model?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_credit_ledger: {
         Row: {
           bonus_credits: number
@@ -1030,7 +1060,19 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      ai_cost_summary_30d: {
+        Row: {
+          avg_cost_eur: number | null
+          avg_credits: number | null
+          avg_revenue_eur: number | null
+          calls: number | null
+          feature: string | null
+          margin_pct: number | null
+          max_cost_eur: number | null
+          unprofitable_alert: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       consume_ai_credits: {
@@ -1072,6 +1114,16 @@ export type Database = {
       }
       join_household_with_invite: {
         Args: { p_invite_code: string }
+        Returns: undefined
+      }
+      log_ai_cost: {
+        Args: {
+          _cost_eur: number
+          _credits: number
+          _feature: string
+          _model?: string
+          _user_id: string
+        }
         Returns: undefined
       }
       lookup_household_by_invite_code: {
