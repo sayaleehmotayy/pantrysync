@@ -121,3 +121,72 @@ export async function chargeCredits(
     allowance: row.monthly_allowance,
   };
 }
+
+// ============================================================
+// Cost monitoring
+// ============================================================
+
+/** Lovable AI Gateway pricing per 1M tokens (USD). Source: docs.lovable.dev */
+const MODEL_PRICING_USD: Record<string, { in: number; out: number; image?: number }> = {
+  "google/gemini-2.5-flash-lite":   { in: 0.10, out: 0.40 },
+  "google/gemini-2.5-flash":        { in: 0.30, out: 2.50 },
+  "google/gemini-2.5-flash-image":  { in: 0.30, out: 2.50, image: 0.039 },
+  "google/gemini-2.5-pro":          { in: 1.25, out: 10.00 },
+  "google/gemini-3-flash-preview":  { in: 0.30, out: 2.50 },
+  "google/gemini-3.1-pro-preview":  { in: 1.25, out: 10.00 },
+  "openai/gpt-5":      { in: 1.25, out: 10.00 },
+  "openai/gpt-5-mini": { in: 0.25, out: 2.00 },
+  "openai/gpt-5-nano": { in: 0.05, out: 0.40 },
+};
+const USD_TO_EUR = 1 / 1.08;
+
+interface UsageInput {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  // Some image models report a count of generated images
+  images_generated?: number;
+}
+
+/** Compute the EUR cost of a single AI gateway call from its `usage` block. */
+export function computeCallCostEur(model: string, usage: UsageInput | undefined, hasImageInput = false): number {
+  const p = MODEL_PRICING_USD[model] ?? MODEL_PRICING_USD["google/gemini-2.5-flash"]; // safe fallback
+  const inTok = usage?.prompt_tokens ?? 0;
+  const outTok = usage?.completion_tokens ?? 0;
+  let usd = (p.in * inTok / 1e6) + (p.out * outTok / 1e6);
+  if (hasImageInput && p.image) usd += p.image;
+  if (usage?.images_generated && p.image) usd += p.image * usage.images_generated;
+  return usd * USD_TO_EUR;
+}
+
+/**
+ * Fire-and-forget log of one AI call's actual cost. Never throws — failures
+ * are logged but don't block the user's response. Uses service-role to bypass
+ * RLS on the locked-down `ai_cost_log` table.
+ */
+export async function logAiCost(args: {
+  userId: string;
+  feature: string;
+  creditsCharged: number;
+  model: string;
+  usage?: UsageInput;
+  hasImageInput?: boolean;
+  /** Override if you already computed cost (e.g. multi-photo receipt scan). */
+  costEurOverride?: number;
+}): Promise<void> {
+  if (!SUPABASE_SERVICE_ROLE_KEY) return;
+  try {
+    const cost = args.costEurOverride ?? computeCallCostEur(args.model, args.usage, args.hasImageInput);
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { error } = await admin.rpc("log_ai_cost", {
+      _user_id: args.userId,
+      _feature: args.feature,
+      _credits: args.creditsCharged,
+      _cost_eur: Number(cost.toFixed(6)),
+      _model: args.model,
+    });
+    if (error) console.error("[aiCredits] logAiCost error:", error.message);
+  } catch (e) {
+    console.error("[aiCredits] logAiCost exception:", e instanceof Error ? e.message : e);
+  }
+}
